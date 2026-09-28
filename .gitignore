@@ -1,0 +1,12 @@
+**/.gradle/
+**/build/
+**/dist/
+server-app/data/
+*.mv.db
+*.lock.db
+.env
+.env.*
+*.p12
+*.pfx
+*.jks
+copilot-worktrees/

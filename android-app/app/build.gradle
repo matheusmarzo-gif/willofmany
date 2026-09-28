@@ -1,0 +1,42 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.willofmany.app"
+    compileSdk 35
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        applicationId "com.willofmany.app"
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs = ["$buildDir/generated/web-assets"]
+        }
+    }
+}
+
+tasks.register("prepareWebAssets", Sync) {
+    from(projectDir.parentFile.parentFile) {
+        include("index.html")
+        include("will-of-many-ai.js")
+        include("*.png")
+        include("*.json")
+        include("*.svg")
+    }
+    into("$buildDir/generated/web-assets")
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(tasks.named("prepareWebAssets"))
+}
