@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title description">
+  <title id="title">Ranks das peças</title>
+  <desc id="description">Sete G formam F, seis F formam E, cinco E formam D, quatro D formam C, três C formam B e dois B formam A.</desc>
+  <defs>
+    <linearGradient id="paper" x2="0" y2="1">
+      <stop stop-color="#fbf8f1"/>
+      <stop offset="1" stop-color="#eee7dc"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#252824" flood-opacity=".10"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="440" rx="18" fill="url(#paper)"/>
+  <text x="34" y="43" fill="#252824" font-family="Georgia,serif" font-size="30">RANKS DAS PEÇAS</text>
+  <text x="36" y="69" fill="#73736c" font-family="system-ui,sans-serif" font-size="16">Combine peças iguais para subir de rank</text>
+  <path d="M30 82h1140" stroke="#a7482d" stroke-width="2"/>
+  <g filter="url(#shadow)">
+    <rect x="30" y="98" width="360" height="140" rx="12" fill="#fff" stroke="#e5ddd1"/>
+    <rect x="420" y="98" width="360" height="140" rx="12" fill="#fff" stroke="#e5ddd1"/>
+    <rect x="810" y="98" width="360" height="140" rx="12" fill="#fff" stroke="#e5ddd1"/>
+    <rect x="30" y="254" width="360" height="140" rx="12" fill="#fff" stroke="#e5ddd1"/>
+    <rect x="420" y="254" width="360" height="140" rx="12" fill="#fff" stroke="#e5ddd1"/>
+    <rect x="810" y="254" width="360" height="140" rx="12" fill="#fff" stroke="#e5ddd1"/>
+  </g>
+  <g font-family="system-ui,sans-serif" text-anchor="middle">
+    <g transform="translate(30 98)">
+      <text x="48" y="72" fill="#a7482d" font-size="28" font-weight="900">7×</text>
+      <circle cx="126" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="126" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="126" y="75" fill="#a7482d" font-size="29" font-weight="900">G</text>
+      <text x="186" y="74" fill="#8a8277" font-size="29">→</text>
+      <circle cx="248" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="248" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="248" y="75" fill="#a7482d" font-size="29" font-weight="900">F</text>
+      <text x="180" y="122" fill="#73736c" font-size="16" font-weight="700">7 G  →  1 F</text>
+    </g>
+    <g transform="translate(420 98)">
+      <text x="48" y="72" fill="#a7482d" font-size="28" font-weight="900">6×</text>
+      <circle cx="126" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="126" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="126" y="75" fill="#a7482d" font-size="29" font-weight="900">F</text>
+      <text x="186" y="74" fill="#8a8277" font-size="29">→</text>
+      <circle cx="248" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="248" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="248" y="75" fill="#a7482d" font-size="29" font-weight="900">E</text>
+      <text x="180" y="122" fill="#73736c" font-size="16" font-weight="700">6 F  →  1 E</text>
+    </g>
+    <g transform="translate(810 98)">
+      <text x="48" y="72" fill="#a7482d" font-size="28" font-weight="900">5×</text>
+      <circle cx="126" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="126" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="126" y="75" fill="#a7482d" font-size="29" font-weight="900">E</text>
+      <text x="186" y="74" fill="#8a8277" font-size="29">→</text>
+      <circle cx="248" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="248" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="248" y="75" fill="#a7482d" font-size="29" font-weight="900">D</text>
+      <text x="180" y="122" fill="#73736c" font-size="16" font-weight="700">5 E  →  1 D</text>
+    </g>
+    <g transform="translate(30 254)">
+      <text x="48" y="72" fill="#a7482d" font-size="28" font-weight="900">4×</text>
+      <circle cx="126" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="126" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="126" y="75" fill="#a7482d" font-size="29" font-weight="900">D</text>
+      <text x="186" y="74" fill="#8a8277" font-size="29">→</text>
+      <circle cx="248" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="248" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="248" y="75" fill="#a7482d" font-size="29" font-weight="900">C</text>
+      <text x="180" y="122" fill="#73736c" font-size="16" font-weight="700">4 D  →  1 C</text>
+    </g>
+    <g transform="translate(420 254)">
+      <text x="48" y="72" fill="#a7482d" font-size="28" font-weight="900">3×</text>
+      <circle cx="126" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="126" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="126" y="75" fill="#a7482d" font-size="29" font-weight="900">C</text>
+      <text x="186" y="74" fill="#8a8277" font-size="29">→</text>
+      <circle cx="248" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="248" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="248" y="75" fill="#a7482d" font-size="29" font-weight="900">B</text>
+      <text x="180" y="122" fill="#73736c" font-size="16" font-weight="700">3 C  →  1 B</text>
+    </g>
+    <g transform="translate(810 254)">
+      <text x="48" y="72" fill="#a7482d" font-size="28" font-weight="900">2×</text>
+      <circle cx="126" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="126" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="126" y="75" fill="#a7482d" font-size="29" font-weight="900">B</text>
+      <text x="186" y="74" fill="#8a8277" font-size="29">→</text>
+      <circle cx="248" cy="65" r="29" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+      <circle cx="248" cy="65" r="22" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+      <text x="248" y="75" fill="#a7482d" font-size="29" font-weight="900">A</text>
+      <text x="180" y="122" fill="#73736c" font-size="16" font-weight="700">2 B  →  1 A</text>
+    </g>
+  </g>
+  <text x="600" y="425" fill="#a7482d" font-family="system-ui,sans-serif" font-size="15" font-weight="700" text-anchor="middle">A mesma regra vale para peças azuis e laranjas</text>
+</svg>

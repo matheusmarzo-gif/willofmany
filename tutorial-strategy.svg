@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title description">
+  <title id="title">Gire, enfraqueça, conquiste</title>
+  <desc id="description">Girar os discos pode romper cadeias de comando e enfraquecer generais. O objetivo é conquistar o máximo possível de territórios.</desc>
+  <defs>
+    <linearGradient id="paper" x2="0" y2="1">
+      <stop stop-color="#fbf8f1"/>
+      <stop offset="1" stop-color="#eee7dc"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#252824" flood-opacity=".12"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="440" rx="18" fill="url(#paper)"/>
+  <text x="32" y="43" fill="#252824" font-family="Georgia,serif" font-size="30">GIRE. ROMPA. CONQUISTE.</text>
+  <text x="34" y="69" fill="#73736c" font-family="system-ui,sans-serif" font-size="16">A rotação muda quem apoia quem</text>
+  <g filter="url(#shadow)">
+    <rect x="30" y="91" width="558" height="276" rx="14" fill="#fff" stroke="#e5ddd1"/>
+    <rect x="612" y="91" width="558" height="276" rx="14" fill="#fff" stroke="#e5ddd1"/>
+  </g>
+  <text x="309" y="123" fill="#252824" font-family="system-ui,sans-serif" font-size="18" font-weight="900" text-anchor="middle">GIRAR DISCO</text>
+  <g transform="rotate(-13 309 244)">
+    <circle cx="309" cy="244" r="104" fill="#f1eade" stroke="#b8aa97" stroke-width="3"/>
+    <circle cx="309" cy="244" r="85" fill="#f8f4ec" stroke="#c5b7a4" stroke-width="2"/>
+    <circle cx="309" cy="244" r="65" fill="#ece3d7" stroke="#c5b7a4" stroke-width="2"/>
+    <circle cx="309" cy="244" r="44" fill="#f8f4ec" stroke="#c5b7a4" stroke-width="2"/>
+    <circle cx="309" cy="244" r="23" fill="#e2d5c4" stroke="#b8aa97" stroke-width="2"/>
+    <path d="M205 244h208M309 140v208M235 170l148 148M383 170 235 318" fill="none" stroke="#c5b7a4" stroke-width="2" stroke-dasharray="4 7"/>
+    <circle cx="309" cy="244" r="7" fill="#a7482d"/>
+  </g>
+  <path d="M174 183a144 144 0 0 1 270-14" fill="none" stroke="#a7482d" stroke-width="7" stroke-linecap="round"/>
+  <path d="m426 160 21 8-18 14" fill="#a7482d"/>
+  <circle cx="252" cy="244" r="19" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+  <text x="252" y="251" fill="#a7482d" font-family="system-ui,sans-serif" font-size="18" font-weight="900" text-anchor="middle">G</text>
+  <circle cx="364" cy="244" r="19" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+  <text x="364" y="251" fill="#a7482d" font-family="system-ui,sans-serif" font-size="18" font-weight="900" text-anchor="middle">G</text>
+  <path d="M274 244h26m18 0h25" stroke="#a7482d" stroke-width="4" stroke-dasharray="6 6"/>
+  <path d="m310 232 13 12-13 12" fill="none" stroke="#a7482d" stroke-width="4"/>
+  <text x="309" y="342" fill="#73736c" font-family="system-ui,sans-serif" font-size="15" font-weight="800" text-anchor="middle">Quebre cadeias de comando</text>
+  <text x="891" y="123" fill="#252824" font-family="system-ui,sans-serif" font-size="18" font-weight="900" text-anchor="middle">ENFRAQUEÇA OS GENERAIS</text>
+  <g transform="translate(729 145)">
+    <circle cx="162" cy="99" r="98" fill="#f7f3ea" stroke="#cbbba5" stroke-width="3"/>
+    <circle cx="162" cy="99" r="74" fill="#efe7da" stroke="#cbbba5" stroke-width="3"/>
+    <circle cx="162" cy="99" r="50" fill="#e7ddcf" stroke="#cbbba5" stroke-width="3"/>
+    <circle cx="162" cy="99" r="27" fill="#a7482d"/>
+    <circle cx="162" cy="99" r="7" fill="#fffaf4"/>
+    <path d="M162 1v196M64 99h196" stroke="#c7b8a4" stroke-width="2" stroke-dasharray="6 7"/>
+    <circle cx="91" cy="28" r="17" fill="#eaf1fb" stroke="#4774ad" stroke-width="3"/>
+    <text x="91" y="34" fill="#345f96" font-family="system-ui,sans-serif" font-size="16" font-weight="900" text-anchor="middle">G</text>
+    <circle cx="233" cy="170" r="17" fill="#eaf1fb" stroke="#4774ad" stroke-width="3"/>
+    <text x="233" y="176" fill="#345f96" font-family="system-ui,sans-serif" font-size="16" font-weight="900" text-anchor="middle">G</text>
+    <circle cx="162" cy="99" r="17" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+    <text x="162" y="105" fill="#a7482d" font-family="system-ui,sans-serif" font-size="16" font-weight="900" text-anchor="middle">G</text>
+    <path d="M91 170l39-28" stroke="#a7482d" stroke-width="4" stroke-dasharray="5 7"/>
+    <path d="m120 140 12 2-6 11" fill="#a7482d"/>
+  </g>
+  <text x="891" y="342" fill="#73736c" font-family="system-ui,sans-serif" font-size="15" font-weight="800" text-anchor="middle">Sem apoio, a força dos níveis altos cai</text>
+  <rect x="30" y="388" width="1140" height="42" rx="12" fill="#a7482d"/>
+  <g transform="translate(58 396)" fill="none" stroke="#fffaf4" stroke-width="2.2">
+    <path d="M5 2h22a7 7 0 0 1 7 7v22H12a7 7 0 0 1-7-7z"/>
+    <path d="M12 9v22M19 9v22M26 9v22M5 16h29M5 23h29"/>
+  </g>
+  <text x="600" y="416" fill="#fffaf4" font-family="system-ui,sans-serif" font-size="20" font-weight="900" letter-spacing=".05em" text-anchor="middle">CONQUISTE O MÁXIMO DE TERRITÓRIOS</text>
+</svg>

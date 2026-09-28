@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title description">
+  <title id="title">Discos, força e apoio</title>
+  <desc id="description">Multiplicadores de L8 a L1: um, um vírgula oito, três vírgula cinco, cinco, oito, dezesseis, vinte e quatro e quarenta. Até oito soldados L8 apoiam um soldado L7, transferindo metade da força.</desc>
+  <defs>
+    <linearGradient id="paper" x2="0" y2="1">
+      <stop stop-color="#fbf8f1"/>
+      <stop offset="1" stop-color="#eee7dc"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#252824" flood-opacity=".10"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="440" rx="18" fill="url(#paper)"/>
+  <text x="32" y="43" fill="#252824" font-family="Georgia,serif" font-size="30">DISCOS E FORÇA</text>
+  <text x="34" y="69" fill="#73736c" font-family="system-ui,sans-serif" font-size="16">O multiplicador cresce nos discos superiores</text>
+  <g filter="url(#shadow)" font-family="system-ui,sans-serif" text-anchor="middle">
+    <g transform="translate(28 88)"><rect width="137" height="96" rx="10" fill="#fff" stroke="#e5ddd1"/><circle cx="33" cy="43" r="23" fill="#f7f3ea" stroke="#a7482d" stroke-width="3"/><text x="33" y="49" fill="#252824" font-size="13" font-weight="900">L8</text><text x="91" y="43" fill="#252824" font-size="20" font-weight="900">×1</text><text x="91" y="68" fill="#73736c" font-size="15">+0%</text></g>
+    <g transform="translate(172 88)"><rect width="137" height="96" rx="10" fill="#fff" stroke="#e5ddd1"/><circle cx="33" cy="43" r="23" fill="#f7f3ea" stroke="#a7482d" stroke-width="3"/><text x="33" y="49" fill="#252824" font-size="13" font-weight="900">L7</text><text x="91" y="43" fill="#252824" font-size="20" font-weight="900">×1,8</text><text x="91" y="68" fill="#73736c" font-size="15">+80%</text></g>
+    <g transform="translate(316 88)"><rect width="137" height="96" rx="10" fill="#fff" stroke="#e5ddd1"/><circle cx="33" cy="43" r="23" fill="#f7f3ea" stroke="#a7482d" stroke-width="3"/><text x="33" y="49" fill="#252824" font-size="13" font-weight="900">L6</text><text x="91" y="43" fill="#252824" font-size="20" font-weight="900">×3,5</text><text x="91" y="68" fill="#73736c" font-size="15">+250%</text></g>
+    <g transform="translate(460 88)"><rect width="137" height="96" rx="10" fill="#fff" stroke="#e5ddd1"/><circle cx="33" cy="43" r="23" fill="#f7f3ea" stroke="#a7482d" stroke-width="3"/><text x="33" y="49" fill="#252824" font-size="13" font-weight="900">L5</text><text x="91" y="43" fill="#252824" font-size="20" font-weight="900">×5</text><text x="91" y="68" fill="#73736c" font-size="15">+400%</text></g>
+    <g transform="translate(604 88)"><rect width="137" height="96" rx="10" fill="#fff" stroke="#e5ddd1"/><circle cx="33" cy="43" r="23" fill="#f7f3ea" stroke="#a7482d" stroke-width="3"/><text x="33" y="49" fill="#252824" font-size="13" font-weight="900">L4</text><text x="91" y="43" fill="#252824" font-size="20" font-weight="900">×8</text><text x="91" y="68" fill="#73736c" font-size="15">+700%</text></g>
+    <g transform="translate(748 88)"><rect width="137" height="96" rx="10" fill="#fff" stroke="#e5ddd1"/><circle cx="33" cy="43" r="23" fill="#f7f3ea" stroke="#a7482d" stroke-width="3"/><text x="33" y="49" fill="#252824" font-size="13" font-weight="900">L3</text><text x="91" y="43" fill="#252824" font-size="20" font-weight="900">×16</text><text x="91" y="68" fill="#73736c" font-size="15">+1500%</text></g>
+    <g transform="translate(892 88)"><rect width="137" height="96" rx="10" fill="#fff" stroke="#e5ddd1"/><circle cx="33" cy="43" r="23" fill="#f7f3ea" stroke="#a7482d" stroke-width="3"/><text x="33" y="49" fill="#252824" font-size="13" font-weight="900">L2</text><text x="91" y="43" fill="#252824" font-size="20" font-weight="900">×24</text><text x="91" y="68" fill="#73736c" font-size="15">+2300%</text></g>
+    <g transform="translate(1036 88)"><rect width="137" height="96" rx="10" fill="#fff" stroke="#e5ddd1"/><circle cx="33" cy="43" r="23" fill="#f7f3ea" stroke="#a7482d" stroke-width="3"/><text x="33" y="49" fill="#252824" font-size="13" font-weight="900">L1</text><text x="91" y="43" fill="#252824" font-size="20" font-weight="900">×40</text><text x="91" y="68" fill="#73736c" font-size="15">+3900%</text></g>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="28" y="204" width="1145" height="205" rx="14" fill="#fff" stroke="#e5ddd1"/>
+  </g>
+  <text x="52" y="234" fill="#252824" font-family="system-ui,sans-serif" font-size="17" font-weight="900">8 L8 = 1 L7 · APOIO DO L8: 50%</text>
+  <g fill="#f8eee3" stroke="#b45031" stroke-width="2">
+    <circle cx="71" cy="283" r="17"/><circle cx="108" cy="283" r="17"/><circle cx="145" cy="283" r="17"/><circle cx="182" cy="283" r="17"/>
+    <circle cx="219" cy="283" r="17"/><circle cx="256" cy="283" r="17"/><circle cx="293" cy="283" r="17"/><circle cx="330" cy="283" r="17"/>
+  </g>
+  <g fill="#a7482d" font-family="system-ui,sans-serif" font-size="14" font-weight="900" text-anchor="middle">
+    <text x="71" y="288">G</text><text x="108" y="288">G</text><text x="145" y="288">G</text><text x="182" y="288">G</text>
+    <text x="219" y="288">G</text><text x="256" y="288">G</text><text x="293" y="288">G</text><text x="330" y="288">G</text>
+  </g>
+  <text x="201" y="327" fill="#73736c" font-family="system-ui,sans-serif" font-size="14" font-weight="800" text-anchor="middle">8 L8 DE APOIO</text>
+  <path d="M373 282h116m-13-13 13 13-13 13" fill="none" stroke="#a7482d" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+  <text x="430" y="264" fill="#a7482d" font-family="system-ui,sans-serif" font-size="15" font-weight="900" text-anchor="middle">50%</text>
+  <circle cx="535" cy="282" r="26" fill="#f8eee3" stroke="#b45031" stroke-width="3"/>
+  <circle cx="535" cy="282" r="19" fill="none" stroke="#d9b49a" stroke-width="1.5"/>
+  <text x="535" y="291" fill="#a7482d" font-family="system-ui,sans-serif" font-size="24" font-weight="900" text-anchor="middle">G</text>
+  <text x="535" y="327" fill="#252824" font-family="system-ui,sans-serif" font-size="14" font-weight="800" text-anchor="middle">1 SOLDADO L7</text>
+  <path d="M582 248v112" stroke="#e5ddd1" stroke-width="2"/>
+  <text x="610" y="269" fill="#252824" font-family="system-ui,sans-serif" font-size="18" font-weight="800">Metade da força do grupo de baixo</text>
+  <text x="610" y="296" fill="#252824" font-family="system-ui,sans-serif" font-size="18" font-weight="800">é transferida para apoiar o de cima.</text>
+  <text x="610" y="335" fill="#a7482d" font-family="system-ui,sans-serif" font-size="16" font-weight="900">No máximo 8 L8 contribuem para cada L7.</text>
+  <text x="600" y="430" fill="#73736c" font-family="system-ui,sans-serif" font-size="13" text-anchor="middle">Apoio só vem de regiões vizinhas superiores e usa unidades livres.</text>
+</svg>

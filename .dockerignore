@@ -1,0 +1,7 @@
+.git
+**/.gradle
+**/build
+**/dist
+server-app/data
+*.mv.db
+*.lock.db

@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editor de regiões | The Will of Many</title>
+  <style>
+    :root {
+      --paper: #eee9df;
+      --ink: #20211f;
+      --muted: #77766f;
+      --line: rgba(32, 33, 31, .18);
+      --accent: #a7482d;
+      --blue: #2769a8;
+      --panel: rgba(247, 244, 237, .9);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background: linear-gradient(135deg, #f5f1e8, var(--paper) 52%, #e5ded2);
+      font-family: "Trebuchet MS", "Gill Sans", sans-serif;
+    }
+
+    .app {
+      width: min(1380px, 100%);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: clamp(20px, 4vw, 54px);
+    }
+
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(34px, 5vw, 62px);
+      font-weight: 400;
+      line-height: .95;
+      letter-spacing: -.04em;
+    }
+
+    .intro {
+      max-width: 430px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+      gap: clamp(24px, 5vw, 72px);
+      align-items: start;
+    }
+
+    .panel {
+      padding: 20px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .panel + .panel { margin-top: 14px; }
+
+    .panel-title {
+      margin: 0 0 13px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .layer-buttons,
+    .region-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, .22);
+      cursor: pointer;
+      font: 700 11px/1 "Trebuchet MS", "Gill Sans", sans-serif;
+      letter-spacing: .06em;
+      transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+    }
+
+    button:hover,
+    button:focus-visible {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: #fffaf4;
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    button.is-active {
+      border-color: var(--accent);
+      color: #fffaf4;
+      background: var(--accent);
+    }
+
+    button.is-painted {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+
+    .layer-button { min-height: 42px; }
+    .region-button { min-height: 38px; }
+
+    .layer-button.is-active,
+    .region-button.is-active { color: #fffaf4; background: var(--accent); }
+
+    .actions {
+      display: grid;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .selection-tools {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin-top: 14px;
+    }
+
+    .brush-control,
+    .zoom-control {
+      display: grid;
+      gap: 7px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .action-button { min-height: 40px; padding: 8px 12px; }
+    .action-button.secondary { color: var(--muted); }
+
+    .selection-status {
+      min-height: 42px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .canvas-shell {
+      position: relative;
+      width: min(82vw, 760px);
+      max-width: 100%;
+      aspect-ratio: 1;
+      overflow: auto;
+      margin: 0 auto;
+      border: 1px solid rgba(32, 33, 31, .2);
+      background: #d9d2c6;
+      box-shadow: 0 24px 32px rgba(48, 43, 33, .12);
+      touch-action: none;
+    }
+
+    #region-canvas {
+      display: block;
+      flex: none;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+      image-rendering: auto;
+    }
+
+    .canvas-caption {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: .04em;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-top: 15px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .legend span::before {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 5px;
+      border: 1px solid currentColor;
+      content: "";
+      vertical-align: -1px;
+    }
+
+    .legend .selected::before { background: rgba(255, 196, 38, .75); }
+    .legend .assigned::before { background: rgba(39, 105, 168, .55); }
+
+    @media (max-width: 820px) {
+      header { display: block; }
+      .intro { margin-top: 16px; }
+      .workspace { grid-template-columns: 1fr; }
+      .canvas-shell { width: min(92vw, 700px); order: -1; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <p class="eyebrow">The Will of Many</p>
+        <h1>Editor de regiões</h1>
+      </div>
+      <p class="intro">Escolha um disco, selecione os quadradinhos que pertencem a uma região e atribua a seleção ao botão correspondente.</p>
+    </header>
+
+    <div class="workspace">
+      <aside>
+        <section class="panel">
+          <h2 class="panel-title">Escolher disco</h2>
+          <div class="layer-buttons" id="layer-buttons"></div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title" id="region-title">Regiões de L8</h2>
+          <div class="region-buttons" id="region-buttons"></div>
+          <div class="selection-tools" aria-label="Modo de seleção">
+            <button class="action-button" id="brush-mode" type="button">Pincel</button>
+            <button class="action-button is-active" id="rectangle-mode" type="button">Retângulo</button>
+            <button class="action-button" id="wand-mode" type="button">Varinha</button>
+          </div>
+          <label class="brush-control" for="brush-size">Tamanho do pincel: <output id="brush-size-value">1 tile</output>
+            <input id="brush-size" type="range" min="1" max="15" step="2" value="1">
+          </label>
+          <label class="brush-control" for="wand-tolerance">Tolerância da varinha: <output id="wand-tolerance-value">12</output>
+            <input id="wand-tolerance" type="range" min="0" max="100" step="1" value="12">
+          </label>
+          <p class="selection-status" id="selection-status">Nenhum tile selecionado.</p>
+          <div class="actions">
+            <button class="action-button" id="clear-selection" type="button">Limpar seleção</button>
+            <button class="action-button secondary" id="clear-region" type="button">Limpar região ativa</button>
+            <button class="action-button" id="download" type="button">Exportar marcações</button>
+          </div>
+        </section>
+      </aside>
+
+      <section>
+        <div class="canvas-shell">
+          <canvas id="region-canvas" width="908" height="908" aria-label="Imagem com grade de tiles de 4 por 4 pixels"></canvas>
+        </div>
+        <label class="zoom-control" for="zoom-level">Zoom: <output id="zoom-value">100%</output>
+          <input id="zoom-level" type="range" min="50" max="250" step="10" value="100">
+        </label>
+        <div class="canvas-caption">
+          <span id="canvas-caption">L8 · tile 4 x 4 px · grade 227 x 227</span>
+          <span id="painted-count">0 tiles atribuídos</span>
+        </div>
+        <div class="legend" aria-label="Legenda">
+          <span class="selected">Seleção atual</span>
+          <span class="assigned">Tiles já atribuídos</span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script async>
+    const SOURCE_SIZE = 908;
+    const TILE_SIZE = 4;
+    const GRID_SIZE = SOURCE_SIZE / TILE_SIZE;
+    const layerButtons = document.querySelector('#layer-buttons');
+    const regionButtons = document.querySelector('#region-buttons');
+    const regionTitle = document.querySelector('#region-title');
+    const canvas = document.querySelector('#region-canvas');
+    const context = canvas.getContext('2d');
+    const image = new Image();
+    const sourceCanvas = document.createElement('canvas');
+    const sourceContext = sourceCanvas.getContext('2d');
+    const selectionStatus = document.querySelector('#selection-status');
+    const paintedCount = document.querySelector('#painted-count');
+    const canvasCaption = document.querySelector('#canvas-caption');
+    const brushSizeInput = document.querySelector('#brush-size');
+    const brushSizeValue = document.querySelector('#brush-size-value');
+    const wandToleranceInput = document.querySelector('#wand-tolerance');
+    const wandToleranceValue = document.querySelector('#wand-tolerance-value');
+    const zoomInput = document.querySelector('#zoom-level');
+    const zoomValue = document.querySelector('#zoom-value');
+    const assignments = {};
+    const selectedTiles = new Set();
+    let currentLayer = 8;
+    let currentRegion = 1;
+    let dragging = false;
+    let paintMode = true;
+    let selectionTool = 'rectangle';
+    let brushSize = 1;
+    let wandTolerance = 12;
+    let sourcePixels = null;
+    let dragStart = null;
+    let dragEnd = null;
+
+    for (let layer = 1; layer <= 8; layer += 1) {
+      assignments[layer] = {};
+      for (let region = 1; region <= layer; region += 1) assignments[layer][region] = new Set();
+      const button = document.createElement('button');
+      button.className = 'layer-button';
+      button.type = 'button';
+      button.textContent = `L${layer}`;
+      button.addEventListener('click', () => selectLayer(layer));
+      layerButtons.appendChild(button);
+    }
+
+    function tileKey(column, row) { return `${column},${row}`; }
+
+    async function loadRegionData() {
+      // First, try to load from the JSON file (for initial data)
+      try {
+        const response = await fetch('regioes-will-of-many.json');
+        if (response.ok) {
+          const fileData = await response.json();
+          Object.keys(fileData).forEach((layer) => {
+            const layerNum = Number(layer);
+            if (!assignments[layerNum]) return;
+            Object.keys(fileData[layer]).forEach((region) => {
+              const regionNum = Number(region);
+              if (!assignments[layerNum][regionNum]) return;
+              const tiles = fileData[layer][region];
+              if (Array.isArray(tiles)) {
+                tiles.forEach((key) => assignments[layerNum][regionNum].add(key));
+              }
+            });
+          });
+        }
+      } catch (error) {
+        console.warn('Could not load regioes-will-of-many.json:', error);
+      }
+
+      // Then, load any user modifications from localStorage
+      const raw = localStorage.getItem('will-of-many-regions');
+      if (!raw) return;
+      try {
+        const saved = JSON.parse(raw);
+        Object.keys(saved).forEach((layer) => Object.keys(saved[layer] || {}).forEach((region) => {
+          if (!assignments[layer] || !assignments[layer][region]) return;
+          assignments[layer][region] = new Set(saved[layer][region]);
+        }));
+      } catch (error) {
+        localStorage.removeItem('will-of-many-regions');
+      }
+    }
+
+    function saveData() {
+      const serializable = {};
+      Object.keys(assignments).forEach((layer) => {
+        serializable[layer] = {};
+        Object.keys(assignments[layer]).forEach((region) => {
+          serializable[layer][region] = [...assignments[layer][region]];
+        });
+      });
+      localStorage.setItem('will-of-many-regions', JSON.stringify(serializable));
+    }
+
+    function getPointerTile(event) {
+      const bounds = canvas.getBoundingClientRect();
+      const column = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor(((event.clientX - bounds.left) / bounds.width) * GRID_SIZE)));
+      const row = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor(((event.clientY - bounds.top) / bounds.height) * GRID_SIZE)));
+      return { column, row, key: tileKey(column, row) };
+    }
+
+    function toggleTile(key) {
+      if (paintMode) selectedTiles.add(key);
+      else selectedTiles.delete(key);
+      draw();
+      updateStatus();
+    }
+
+    function paintBrush(center) {
+      const radius = Math.floor(brushSize / 2);
+      for (let row = center.row - radius; row <= center.row + radius; row += 1) {
+        for (let column = center.column - radius; column <= center.column + radius; column += 1) {
+          if (row < 0 || row >= GRID_SIZE || column < 0 || column >= GRID_SIZE) continue;
+          const key = tileKey(column, row);
+          if (paintMode) selectedTiles.add(key);
+          else selectedTiles.delete(key);
+        }
+      }
+      draw();
+      updateStatus();
+    }
+
+    function selectMagicArea(start) {
+      if (!sourcePixels) return;
+      const startX = start.column * TILE_SIZE + Math.floor(TILE_SIZE / 2);
+      const startY = start.row * TILE_SIZE + Math.floor(TILE_SIZE / 2);
+      const startIndex = (startY * SOURCE_SIZE + startX) * 4;
+      const target = [sourcePixels[startIndex], sourcePixels[startIndex + 1], sourcePixels[startIndex + 2], sourcePixels[startIndex + 3]];
+      if (target[3] < 10) {
+        selectedTiles.clear();
+        updateStatus('O pixel escolhido é transparente. Clique sobre uma área visível.');
+        return;
+      }
+
+      const threshold = (wandTolerance / 100) * 441;
+      const thresholdSquared = threshold * threshold;
+      const visited = new Uint8Array(SOURCE_SIZE * SOURCE_SIZE);
+      const queue = new Int32Array(SOURCE_SIZE * SOURCE_SIZE);
+      let head = 0;
+      let tail = 0;
+      const startPixel = startY * SOURCE_SIZE + startX;
+      queue[tail++] = startPixel;
+      visited[startPixel] = 1;
+      selectedTiles.clear();
+
+      while (head < tail) {
+        const pixel = queue[head++];
+        const column = pixel % SOURCE_SIZE;
+        const row = Math.floor(pixel / SOURCE_SIZE);
+        const index = pixel * 4;
+        const deltaRed = sourcePixels[index] - target[0];
+        const deltaGreen = sourcePixels[index + 1] - target[1];
+        const deltaBlue = sourcePixels[index + 2] - target[2];
+        const deltaAlpha = sourcePixels[index + 3] - target[3];
+        const distanceSquared = deltaRed * deltaRed + deltaGreen * deltaGreen + deltaBlue * deltaBlue + deltaAlpha * deltaAlpha;
+        if (distanceSquared > thresholdSquared) continue;
+
+        selectedTiles.add(tileKey(Math.floor(column / TILE_SIZE), Math.floor(row / TILE_SIZE)));
+        if (column > 0 && !visited[pixel - 1]) { visited[pixel - 1] = 1; queue[tail++] = pixel - 1; }
+        if (column < SOURCE_SIZE - 1 && !visited[pixel + 1]) { visited[pixel + 1] = 1; queue[tail++] = pixel + 1; }
+        if (row > 0 && !visited[pixel - SOURCE_SIZE]) { visited[pixel - SOURCE_SIZE] = 1; queue[tail++] = pixel - SOURCE_SIZE; }
+        if (row < SOURCE_SIZE - 1 && !visited[pixel + SOURCE_SIZE]) { visited[pixel + SOURCE_SIZE] = 1; queue[tail++] = pixel + SOURCE_SIZE; }
+      }
+      draw();
+      updateStatus();
+    }
+
+    function selectRectangle(start, end) {
+      const minColumn = Math.min(start.column, end.column);
+      const maxColumn = Math.max(start.column, end.column);
+      const minRow = Math.min(start.row, end.row);
+      const maxRow = Math.max(start.row, end.row);
+      selectedTiles.clear();
+      for (let row = minRow; row <= maxRow; row += 1) {
+        for (let column = minColumn; column <= maxColumn; column += 1) {
+          selectedTiles.add(tileKey(column, row));
+        }
+      }
+    }
+
+    function assignSelection(region) {
+      if (!selectedTiles.size) {
+        selectedTiles.clear();
+        assignments[currentLayer][region].forEach((key) => selectedTiles.add(key));
+        currentRegion = region;
+        renderRegionButtons();
+        draw();
+        updateStatus();
+        return;
+      }
+
+      Object.values(assignments[currentLayer]).forEach((tiles) => {
+        selectedTiles.forEach((key) => tiles.delete(key));
+      });
+      selectedTiles.forEach((key) => assignments[currentLayer][region].add(key));
+      selectedTiles.clear();
+      currentRegion = region;
+      saveData();
+      renderRegionButtons();
+      draw();
+      updateStatus();
+    }
+
+    function selectLayer(layer) {
+      currentLayer = layer;
+      currentRegion = 1;
+      selectedTiles.clear();
+      image.src = `l${layer}.png`;
+      document.querySelectorAll('.layer-button').forEach((button) => button.classList.toggle('is-active', button.textContent === `L${layer}`));
+      regionTitle.textContent = `Regiões de L${layer}`;
+      canvasCaption.textContent = `L${layer} · tile 4 x 4 px · grade 227 x 227`;
+      renderRegionButtons();
+      updateStatus();
+    }
+
+    function renderRegionButtons() {
+      regionButtons.replaceChildren();
+      for (let region = 1; region <= currentLayer; region += 1) {
+        const button = document.createElement('button');
+        button.className = 'region-button';
+        button.type = 'button';
+        button.textContent = `L${currentLayer}-${region}`;
+        button.classList.toggle('is-active', currentRegion === region);
+        button.classList.toggle('is-painted', assignments[currentLayer][region].size > 0);
+        button.addEventListener('click', () => assignSelection(region));
+        regionButtons.appendChild(button);
+      }
+    }
+
+    function updateStatus(message = '') {
+      const assigned = Object.values(assignments[currentLayer]).reduce((sum, tiles) => sum + tiles.size, 0);
+      const toolHint = selectionTool === 'wand'
+        ? 'Clique em uma cor para selecionar a área contígua.'
+        : selectionTool === 'brush'
+          ? 'Clique e arraste para pintar tiles.'
+          : 'Clique e arraste para desenhar um retângulo.';
+      selectionStatus.textContent = message || (selectedTiles.size
+        ? `${selectedTiles.size} tiles selecionados. Clique em L${currentLayer}-${currentRegion} para atribuir.`
+        : `Região ativa: L${currentLayer}-${currentRegion}. ${toolHint}`);
+      paintedCount.textContent = `${assigned} tiles atribuídos`;
+    }
+
+    function draw() {
+      context.clearRect(0, 0, SOURCE_SIZE, SOURCE_SIZE);
+      if (image.complete && image.naturalWidth) context.drawImage(image, 0, 0, SOURCE_SIZE, SOURCE_SIZE);
+
+      Object.entries(assignments[currentLayer]).forEach(([region, tiles]) => {
+        const hue = (Number(region) - 1) * (280 / Math.max(1, currentLayer - 1));
+        context.fillStyle = `hsla(${hue}, 78%, 52%, .3)`;
+        tiles.forEach((key) => {
+          const [column, row] = key.split(',').map(Number);
+          context.fillRect(column * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        });
+      });
+
+      context.fillStyle = 'rgba(255, 196, 38, .72)';
+      selectedTiles.forEach((key) => {
+        const [column, row] = key.split(',').map(Number);
+        context.fillRect(column * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+      });
+
+      if (selectionTool === 'rectangle' && dragStart && dragEnd) {
+        const left = Math.min(dragStart.column, dragEnd.column) * TILE_SIZE;
+        const top = Math.min(dragStart.row, dragEnd.row) * TILE_SIZE;
+        const width = (Math.abs(dragEnd.column - dragStart.column) + 1) * TILE_SIZE;
+        const height = (Math.abs(dragEnd.row - dragStart.row) + 1) * TILE_SIZE;
+        context.fillStyle = 'rgba(255, 196, 38, .28)';
+        context.fillRect(left, top, width, height);
+        context.strokeStyle = '#a7482d';
+        context.lineWidth = 2;
+        context.strokeRect(left + 1, top + 1, width - 2, height - 2);
+      }
+
+      context.beginPath();
+      context.strokeStyle = 'rgba(32, 33, 31, .22)';
+      context.lineWidth = 1;
+      for (let position = 0; position <= SOURCE_SIZE; position += TILE_SIZE) {
+        context.moveTo(position + .5, 0);
+        context.lineTo(position + .5, SOURCE_SIZE);
+        context.moveTo(0, position + .5);
+        context.lineTo(SOURCE_SIZE, position + .5);
+      }
+      context.stroke();
+    }
+
+    canvas.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      dragging = true;
+      const tile = getPointerTile(event);
+      canvas.setPointerCapture(event.pointerId);
+      if (selectionTool === 'wand') {
+        dragging = false;
+        selectMagicArea(tile);
+        return;
+      }
+      if (selectionTool === 'rectangle') {
+        dragStart = tile;
+        dragEnd = tile;
+        draw();
+        return;
+      }
+      paintMode = !selectedTiles.has(tile.key);
+      paintBrush(tile);
+    });
+
+    canvas.addEventListener('pointermove', (event) => {
+      if (!dragging) return;
+      if (selectionTool === 'rectangle') {
+        dragEnd = getPointerTile(event);
+        draw();
+        return;
+      }
+      paintBrush(getPointerTile(event));
+    });
+
+    canvas.addEventListener('pointerup', (event) => {
+      if (selectionTool === 'rectangle' && dragStart && dragEnd) {
+        selectRectangle(dragStart, dragEnd);
+        assignSelection(currentRegion);
+        dragStart = null;
+        dragEnd = null;
+      }
+      dragging = false;
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      draw();
+      updateStatus();
+    });
+
+    canvas.addEventListener('pointercancel', () => { dragging = false; });
+    document.querySelector('#brush-mode').addEventListener('click', () => {
+      selectionTool = 'brush';
+      document.querySelector('#brush-mode').classList.add('is-active');
+      document.querySelector('#rectangle-mode').classList.remove('is-active');
+      dragStart = null;
+      dragEnd = null;
+      draw();
+      updateStatus();
+    });
+    document.querySelector('#rectangle-mode').addEventListener('click', () => {
+      selectionTool = 'rectangle';
+      document.querySelector('#rectangle-mode').classList.add('is-active');
+      document.querySelector('#brush-mode').classList.remove('is-active');
+      draw();
+      updateStatus();
+    });
+    document.querySelector('#wand-mode').addEventListener('click', () => {
+      selectionTool = 'wand';
+      document.querySelector('#wand-mode').classList.add('is-active');
+      document.querySelector('#brush-mode').classList.remove('is-active');
+      document.querySelector('#rectangle-mode').classList.remove('is-active');
+      dragStart = null;
+      dragEnd = null;
+      draw();
+      updateStatus();
+    });
+    brushSizeInput.addEventListener('input', () => {
+      brushSize = Number(brushSizeInput.value);
+      brushSizeValue.textContent = `${brushSize} tile${brushSize === 1 ? '' : 's'}`;
+    });
+    wandToleranceInput.addEventListener('input', () => {
+      wandTolerance = Number(wandToleranceInput.value);
+      wandToleranceValue.textContent = wandTolerance;
+    });
+    zoomInput.addEventListener('input', () => {
+      const zoom = Number(zoomInput.value);
+      canvas.style.width = `${zoom}%`;
+      canvas.style.height = `${zoom}%`;
+      zoomValue.textContent = `${zoom}%`;
+    });
+    document.querySelector('#clear-selection').addEventListener('click', () => { selectedTiles.clear(); draw(); updateStatus(); });
+    document.querySelector('#clear-region').addEventListener('click', () => {
+      assignments[currentLayer][currentRegion].clear();
+      selectedTiles.clear();
+      saveData();
+      renderRegionButtons();
+      draw();
+      updateStatus();
+    });
+    document.querySelector('#download').addEventListener('click', () => {
+      const data = JSON.stringify(Object.fromEntries(Object.entries(assignments).map(([layer, regions]) => [layer, Object.fromEntries(Object.entries(regions).map(([region, tiles]) => [region, [...tiles]]))])), null, 2);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+      link.download = 'regioes-will-of-many.json';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
+
+    image.addEventListener('load', () => {
+      sourceCanvas.width = SOURCE_SIZE;
+      sourceCanvas.height = SOURCE_SIZE;
+      sourceContext.clearRect(0, 0, SOURCE_SIZE, SOURCE_SIZE);
+      sourceContext.drawImage(image, 0, 0, SOURCE_SIZE, SOURCE_SIZE);
+      sourcePixels = sourceContext.getImageData(0, 0, SOURCE_SIZE, SOURCE_SIZE).data;
+      draw();
+    });
+    await loadRegionData();
+    selectLayer(8);
+  </script>
+</body>
+</html>
