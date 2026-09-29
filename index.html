@@ -48,6 +48,11 @@
     .online-panel label { color:var(--muted); font-size:11px; }
     .online-panel input { width:100%; min-height:38px; padding:8px; border:1px solid var(--line); background:#fff; font:14px "Trebuchet MS","Gill Sans",sans-serif; }
     .online-profile, .online-status, .online-lobby { margin:0; color:var(--muted); font-size:12px; line-height:1.45; }
+    .online-status { white-space:pre-line; overflow-wrap:anywhere; }
+    .online-diagnostics { color:var(--muted); font-size:11px; }
+    .online-diagnostics summary { min-height:36px; display:flex; align-items:center; cursor:pointer; }
+    .online-diagnostics pre { max-height:180px; overflow:auto; padding:8px; background:rgba(0,0,0,.05); font:11px/1.45 monospace; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
+    .online-diagnostics button { min-height:36px; padding:6px 10px; font-size:11px; }
     .online-match-button { min-height:40px; padding:8px; }
     .final-card { max-height:80vh; }
     .final-summary { max-height:48vh; overflow:auto; color:var(--muted); font-size:12px; line-height:1.55; }
@@ -297,6 +302,11 @@
           <p class="online-profile is-hidden" id="online-profile"></p>
           <p class="online-lobby" id="online-lobby" aria-live="polite"></p>
           <p class="online-status" id="online-status" aria-live="polite"></p>
+          <details class="online-diagnostics is-hidden" id="online-diagnostics">
+            <summary>Mostrar detalhes técnicos do erro</summary>
+            <pre id="online-diagnostics-text"></pre>
+            <button id="online-copy-diagnostics" type="button">Copiar diagnóstico</button>
+          </details>
           <button class="online-match-button is-hidden" id="online-match-button" type="button">Buscar adversário</button>
           <button class="online-match-button is-hidden" id="online-cancel-button" type="button">Cancelar busca</button>
         </div>
@@ -39123,6 +39133,9 @@
     const onlineProfile = document.querySelector('#online-profile');
     const onlineLobby = document.querySelector('#online-lobby');
     const onlineStatus = document.querySelector('#online-status');
+    const onlineDiagnostics = document.querySelector('#online-diagnostics');
+    const onlineDiagnosticsText = document.querySelector('#online-diagnostics-text');
+    const onlineCopyDiagnosticsButton = document.querySelector('#online-copy-diagnostics');
     const onlineMatchButton = document.querySelector('#online-match-button');
     const onlineCancelButton = document.querySelector('#online-cancel-button');
     const finalModal = document.querySelector('#final-modal');
@@ -42305,10 +42318,81 @@
       const headers = new Headers(options.headers || {});
       headers.set('Content-Type', 'application/json');
       if (onlineToken) headers.set('Authorization', `Bearer ${onlineToken}`);
-      const response = await fetch(path, { ...options, headers });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || `Falha do servidor (${response.status}).`);
+      const endpoint = new URL(path, location.href).href;
+      const startedAt = performance.now();
+      let response;
+      try {
+        response = await fetch(path, { ...options, headers });
+      } catch (error) {
+        throw addOnlineErrorDetails(error, {
+          stage: 'Conectando à API do servidor',
+          endpoint,
+          elapsedMs: Math.round(performance.now() - startedAt)
+        });
+      }
+      let result;
+      try {
+        result = await response.json();
+      } catch (error) {
+        const responseError = new Error(
+          `O servidor respondeu com dados que não são JSON (HTTP ${response.status}).`
+        );
+        throw addOnlineErrorDetails(responseError, {
+          stage: 'Interpretando a resposta do servidor',
+          endpoint,
+          status: response.status,
+          contentType: response.headers.get('content-type') || 'não informado',
+          elapsedMs: Math.round(performance.now() - startedAt)
+        });
+      }
+      if (!response.ok) {
+        const error = new Error(result.error || `Falha do servidor (${response.status}).`);
+        throw addOnlineErrorDetails(error, {
+          stage: 'Resposta da API do servidor',
+          endpoint,
+          status: response.status,
+          contentType: response.headers.get('content-type') || 'não informado',
+          elapsedMs: Math.round(performance.now() - startedAt)
+        });
+      }
+      onlineDiagnostics.classList.add('is-hidden');
+      onlineDiagnostics.open = false;
       return result;
+    }
+
+    function addOnlineErrorDetails(error, details) {
+      const diagnosticError = error instanceof Error ? error : new Error(String(error));
+      diagnosticError.onlineDiagnostics = details;
+      return diagnosticError;
+    }
+
+    function showOnlineError(message, error, stage, endpoint = '') {
+      const diagnosticError = error instanceof Error ? error : new Error(String(error));
+      const details = diagnosticError.onlineDiagnostics || {};
+      const lines = [
+        `Etapa: ${details.stage || stage}`,
+        `Página: ${location.origin}${location.pathname}`,
+        `Endpoint: ${details.endpoint || endpoint || 'não informado'}`,
+        `Resultado: ${details.status ? `HTTP ${details.status}` : `${diagnosticError.name}: ${diagnosticError.message}`}`,
+        ...(details.contentType ? [`Tipo de resposta: ${details.contentType}`] : []),
+        `Tempo até a falha: ${typeof details.elapsedMs === 'number' ? `${details.elapsedMs} ms` : 'não disponível'}`,
+        `Internet indicada pelo aparelho: ${navigator.onLine ? 'sim' : 'não'}`,
+        `Contexto HTTPS seguro: ${window.isSecureContext ? 'sim' : 'não'}`,
+        `Horário local: ${new Date().toLocaleString()}`,
+        `Navegador: ${navigator.userAgent}`
+      ];
+      if (location.protocol === 'file:') {
+        lines.push('Dica: esta página está aberta como arquivo local. Para jogar online, abra https://willofmany-game.onrender.com/ no navegador.');
+      } else if (!navigator.onLine) {
+        lines.push('Dica: o aparelho informa que está sem conexão com a internet.');
+      } else if (!window.isSecureContext) {
+        lines.push('Dica: abra o jogo pelo endereço HTTPS publicado; o login Google exige um contexto seguro.');
+      } else if (diagnosticError.name === 'TypeError') {
+        lines.push('Dica: o navegador não recebeu uma resposta HTTP. Confira a rede/VPN, o DNS privado, bloqueadores e tente novamente após o servidor Render iniciar.');
+      }
+      onlineStatus.textContent = `${message}\nToque em "Mostrar detalhes técnicos do erro" e depois em "Copiar diagnóstico" para compartilhar as informações.`;
+      onlineDiagnosticsText.textContent = lines.join('\n');
+      onlineDiagnostics.classList.remove('is-hidden');
     }
 
     function sendOnlineMessage(message) {
@@ -42321,6 +42405,8 @@
     }
 
     async function loadGoogleIdentityButton() {
+      let currentStage = 'Carregando configuração do servidor';
+      let currentEndpoint = new URL('/api/config', location.href).href;
       try {
         const config = await apiRequest('/api/config');
         if (!config.googleClientId) {
@@ -42348,7 +42434,12 @@
                 await refreshOnlineLobby();
                 onlineStatus.textContent = 'Conta conectada. Entre na fila para encontrar uma partida.';
               } catch (error) {
-                onlineStatus.textContent = error.message;
+                showOnlineError(
+                  `Falha no login Google: ${error.message}`,
+                  error,
+                  'Enviando a credencial Google ao servidor',
+                  new URL('/api/auth/google', location.href).href
+                );
               }
             }
           });
@@ -42370,14 +42461,33 @@
             script.async = true;
             script.defer = true;
             script.onload = resolve;
-            script.onerror = reject;
+            script.onerror = () => reject(addOnlineErrorDetails(
+              new Error('O navegador não conseguiu carregar o script do login Google.'),
+              {
+                stage: 'Carregando o login do Google',
+                endpoint: script.src
+              }
+            ));
             document.head.appendChild(script);
           });
         }
+        currentStage = 'Carregando o login do Google';
+        currentEndpoint = 'https://accounts.google.com/gsi/client';
         await googleScriptPromise;
+        if (!window.google?.accounts?.id) {
+          throw addOnlineErrorDetails(
+            new Error('O script carregou, mas o botão de login Google não ficou disponível.'),
+            { stage: currentStage, endpoint: currentEndpoint }
+          );
+        }
         renderButton();
       } catch (error) {
-        onlineStatus.textContent = `Servidor online indisponível: ${error.message}`;
+        showOnlineError(
+          `Servidor online indisponível: ${error.message}`,
+          error,
+          currentStage,
+          currentEndpoint
+        );
       }
     }
 
@@ -42404,7 +42514,12 @@
         onlineProfile.classList.add('is-hidden');
         googleSignIn.classList.remove('is-hidden');
         onlineMatchButton.classList.add('is-hidden');
-        onlineStatus.textContent = error.message;
+        showOnlineError(
+          `Não foi possível restaurar a sessão: ${error.message}`,
+          error,
+          'Restaurando a sessão',
+          new URL('/api/me', location.href).href
+        );
       } finally {
         onlineSessionLoading = false;
       }
@@ -42420,6 +42535,12 @@
           : 'Nenhum jogador aguardando no lobby.';
       } catch (error) {
         onlineLobby.textContent = error.message;
+        showOnlineError(
+          `Não foi possível atualizar o lobby: ${error.message}`,
+          error,
+          'Consultando o lobby',
+          new URL('/api/lobby', location.href).href
+        );
       }
     }
 
@@ -42433,7 +42554,12 @@
         matchmakingPoll = window.setInterval(pollOnlineMatch, 2000);
         await pollOnlineMatch();
       } catch (error) {
-        onlineStatus.textContent = error.message;
+        showOnlineError(
+          `Não foi possível entrar na fila: ${error.message}`,
+          error,
+          'Entrando na fila de partidas',
+          new URL('/api/matchmaking/join', location.href).href
+        );
       }
     }
 
@@ -42456,7 +42582,12 @@
           onlineMatchButton.classList.remove('is-hidden');
         }
       } catch (error) {
-        onlineStatus.textContent = error.message;
+        showOnlineError(
+          `Falha ao consultar a partida: ${error.message}`,
+          error,
+          'Consultando a partida',
+          new URL('/api/matchmaking/status', location.href).href
+        );
         if (matchmakingPoll) window.clearInterval(matchmakingPoll);
         matchmakingPoll = null;
       }
@@ -42472,7 +42603,12 @@
         onlineMatchButton.classList.remove('is-hidden');
         await refreshOnlineLobby();
       } catch (error) {
-        onlineStatus.textContent = error.message;
+        showOnlineError(
+          `Não foi possível cancelar a busca: ${error.message}`,
+          error,
+          'Cancelando a busca',
+          new URL('/api/matchmaking/leave', location.href).href
+        );
       }
     }
 
@@ -42484,9 +42620,23 @@
       humanTeam = onlineTeam;
       aiTeam = null;
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      onlineSocket = new WebSocket(
-        `${protocol}//${location.host}/ws/game?matchId=${encodeURIComponent(onlineMatchId)}&token=${encodeURIComponent(onlineToken)}`
-      );
+      const socketEndpoint = `${protocol}//${location.host}/ws/game`;
+      try {
+        onlineSocket = new WebSocket(
+          `${socketEndpoint}?matchId=${encodeURIComponent(onlineMatchId)}&token=${encodeURIComponent(onlineToken)}`
+        );
+      } catch (error) {
+        showOnlineError(
+          `Não foi possível abrir a conexão da partida: ${error.message}`,
+          addOnlineErrorDetails(error, {
+            stage: 'Abrindo WebSocket da partida',
+            endpoint: socketEndpoint
+          }),
+          'Abrindo WebSocket da partida',
+          socketEndpoint
+        );
+        return;
+      }
       onlineSocket.addEventListener('open', () => {
         updateWarAvailability();
         if (onlineTeam === 'orange') {
@@ -42516,7 +42666,19 @@
         updateTurnState();
       });
       onlineSocket.addEventListener('error', () => {
-        onlineStatus.textContent = 'Falha na conexão online. Verifique a rede e o endereço do servidor.';
+        const error = addOnlineErrorDetails(
+          new Error('O navegador não conseguiu estabelecer o WebSocket da partida.'),
+          {
+            stage: 'Conectando ao WebSocket da partida',
+            endpoint: socketEndpoint
+          }
+        );
+        showOnlineError(
+          'Falha na conexão online. Verifique a rede e o endereço do servidor.',
+          error,
+          'Conectando ao WebSocket da partida',
+          socketEndpoint
+        );
       });
     }
 
@@ -42818,6 +42980,14 @@
 
     onlineMatchButton.addEventListener('click', enterOnlineQueue);
     onlineCancelButton.addEventListener('click', leaveOnlineQueue);
+    onlineCopyDiagnosticsButton.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(onlineDiagnosticsText.textContent);
+        onlineCopyDiagnosticsButton.textContent = 'Diagnóstico copiado';
+      } catch (error) {
+        onlineCopyDiagnosticsButton.textContent = 'Selecione o texto acima e copie';
+      }
+    });
 
     bluetoothHostButton.addEventListener('click', () => {
       if (!selectedStartSpeed) {
