@@ -103,6 +103,7 @@ public class OnlineGameHandler extends TextWebSocketHandler {
                 else relay(match, playerId(session), payload);
             }
             case "game_over" -> handleGameOver(session, match, payload);
+            case "game_surrender" -> handleGameSurrender(session, match);
             default -> reject(session, "Tipo de mensagem online desconhecido.");
         }
     }
@@ -188,6 +189,36 @@ public class OnlineGameHandler extends TextWebSocketHandler {
         matchmaking.complete(match);
     }
 
+    private void handleGameSurrender(WebSocketSession session, OnlineMatch match) throws IOException {
+        if (match.getGameState() == null) {
+            reject(session, "A partida ainda não começou; não é possível abandoná-la.");
+            return;
+        }
+        String surrenderingTeam = match.getTeam(playerId(session));
+        if (surrenderingTeam == null) {
+            reject(session, "Sessão online inválida.");
+            return;
+        }
+        if (!match.tryComplete()) {
+            reject(session, "A partida já foi encerrada.");
+            return;
+        }
+        cancelInactivityTimeout(match);
+
+        String winner = opposite(surrenderingTeam);
+        MatchResultService.Result updated = results.record(match, winner);
+        Map<String, Object> completed = new HashMap<>();
+        completed.put("type", "game_over");
+        completed.put("winner", winner);
+        completed.put("reason", "surrender");
+        completed.put("surrenderingTeam", surrenderingTeam);
+        completed.put("victoryPoints", match.getGameState().path("victoryPoints"));
+        completed.put("orange", updated.orange());
+        completed.put("blue", updated.blue());
+        matchmaking.complete(match);
+        broadcast(match, mapper.valueToTree(completed));
+    }
+
     private void scheduleInactivityTimeout(OnlineMatch match, long activityRevision) {
         ScheduledFuture<?> nextTask = timeoutScheduler.schedule(
             () -> finishForInactivity(match, activityRevision),
@@ -243,7 +274,7 @@ public class OnlineGameHandler extends TextWebSocketHandler {
                 }
             } catch (IOException exception) {
                 logger.warn(
-                    "Could not notify player {} about inactivity result for match {}",
+                    "Could not notify player {} about result for match {}",
                     entry.getKey(),
                     match.getId(),
                     exception

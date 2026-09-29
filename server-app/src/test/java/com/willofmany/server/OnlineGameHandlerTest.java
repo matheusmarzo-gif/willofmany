@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,6 +50,83 @@ class OnlineGameHandlerTest {
         JsonNode ready = establishConnection(state);
 
         assertEquals(true, ready.path("gameStarted").asBoolean());
+    }
+
+    @Test
+    void awardsVictoryToOpponentWhenPlayerAbandonsStartedMatch() throws Exception {
+        JsonNode state = mapper.readTree("""
+            {
+              "currentTeam": "orange",
+              "currentTurn": 1,
+              "regionPiecesByRegion": {},
+              "victoryPoints": {"orange": 0, "blue": 0}
+            }
+            """);
+        match.setGameState(state);
+        WebSocketSession orangeSession = session(1L, "orange");
+        WebSocketSession blueSession = session(2L, "blue");
+        CountDownLatch gameOverSent = new CountDownLatch(2);
+        doAnswer(invocation -> {
+            TextMessage message = invocation.getArgument(0);
+            if (message.getPayload().contains("\"reason\":\"surrender\"")) gameOverSent.countDown();
+            return null;
+        }).when(orangeSession).sendMessage(org.mockito.ArgumentMatchers.any(TextMessage.class));
+        doAnswer(invocation -> {
+            TextMessage message = invocation.getArgument(0);
+            if (message.getPayload().contains("\"reason\":\"surrender\"")) gameOverSent.countDown();
+            return null;
+        }).when(blueSession).sendMessage(org.mockito.ArgumentMatchers.any(TextMessage.class));
+
+        when(matchmaking.requireMatch("timed-match", 1L)).thenReturn(match);
+        when(matchmaking.requireMatch("timed-match", 2L)).thenReturn(match);
+        when(results.record(match, "blue")).thenReturn(new MatchResultService.Result(
+            new MatchResultService.RatingView("Orange", 1184),
+            new MatchResultService.RatingView("Blue", 1216)
+        ));
+        handler.afterConnectionEstablished(orangeSession);
+        handler.afterConnectionEstablished(blueSession);
+        handler.handleTextMessage(orangeSession, new TextMessage("""
+            {"type":"game_surrender"}
+            """));
+
+        assertTrue(gameOverSent.await(3, TimeUnit.SECONDS));
+        ArgumentCaptor<TextMessage> sentMessages = ArgumentCaptor.forClass(TextMessage.class);
+        verify(blueSession, times(3)).sendMessage(sentMessages.capture());
+        JsonNode gameOver = sentMessages.getAllValues().stream()
+            .map(message -> {
+                try {
+                    return mapper.readTree(message.getPayload());
+                } catch (Exception exception) {
+                    throw new IllegalStateException(exception);
+                }
+            })
+            .filter(message -> "surrender".equals(message.path("reason").asText()))
+            .findFirst()
+            .orElseThrow();
+        assertEquals("game_over", gameOver.path("type").asText());
+        assertEquals("orange", gameOver.path("surrenderingTeam").asText());
+        assertEquals("blue", gameOver.path("winner").asText());
+        verify(results).record(match, "blue");
+        verify(matchmaking).complete(match);
+        assertTrue(match.isComplete());
+    }
+
+    @Test
+    void rejectsAbandoningMatchBeforeItStarts() throws Exception {
+        WebSocketSession orangeSession = session(1L, "orange");
+        when(matchmaking.requireMatch("timed-match", 1L)).thenReturn(match);
+
+        handler.handleTextMessage(orangeSession, new TextMessage("""
+            {"type":"game_surrender"}
+            """));
+
+        ArgumentCaptor<TextMessage> sentMessage = ArgumentCaptor.forClass(TextMessage.class);
+        verify(orangeSession).sendMessage(sentMessage.capture());
+        JsonNode error = mapper.readTree(sentMessage.getValue().getPayload());
+        assertEquals("error", error.path("type").asText());
+        assertTrue(error.path("message").asText().contains("ainda não começou"));
+        verify(results, never()).record(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString());
+        verify(matchmaking, never()).complete(match);
     }
 
     @Test

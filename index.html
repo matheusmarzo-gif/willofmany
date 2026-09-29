@@ -367,6 +367,10 @@
           <svg class="turn-button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"></path></svg>
           <span class="turn-button-label">Passar a vez</span>
         </button>
+        <button class="turn-button is-hidden" id="abandon-match-button" type="button" aria-label="Abandonar partida" title="Abandonar partida">
+          <svg class="turn-button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"></path></svg>
+          <span class="turn-button-label">Abandonar partida</span>
+        </button>
         <button class="turn-button" id="statistics-button" type="button" aria-label="Estatísticas" title="Estatísticas">
           <svg class="turn-button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11h4v9M10 20V5h4v15M16 20v-8h4v8M3 20h18"></path></svg>
           <span class="turn-button-label">Estatísticas</span>
@@ -466,6 +470,16 @@
       <h2 id="final-modal-title">Fim de jogo</h2>
       <div id="final-summary"></div>
       <button class="modal-close" id="final-menu-button" type="button">Voltar ao menu</button>
+    </div>
+  </div>
+  <div class="game-modal is-hidden" id="abandon-match-modal" role="dialog" aria-modal="true" aria-labelledby="abandon-match-title">
+    <div class="game-modal-card">
+      <h2 id="abandon-match-title">Abandonar partida?</h2>
+      <p>Ao abandonar, você perderá a partida e seu adversário receberá a vitória. Deseja continuar?</p>
+      <div class="modal-options">
+        <button type="button" data-close-modal="abandon-match-modal">Continuar jogando</button>
+        <button class="war-button" id="confirm-abandon-match-button" type="button">Abandonar</button>
+      </div>
     </div>
   </div>
   <script src="will-of-many-ai.js"></script>
@@ -39141,6 +39155,9 @@
     const finalModal = document.querySelector('#final-modal');
     const finalSummary = document.querySelector('#final-summary');
     const finalMenuButton = document.querySelector('#final-menu-button');
+    const abandonMatchButton = document.querySelector('#abandon-match-button');
+    const abandonMatchModal = document.querySelector('#abandon-match-modal');
+    const confirmAbandonMatchButton = document.querySelector('#confirm-abandon-match-button');
     const stagePanel = document.querySelector('#stage-panel');
     const trashDropZone = document.querySelector('#trash-drop-zone');
     const trashDropRefund = document.querySelector('#trash-drop-refund');
@@ -39252,6 +39269,7 @@
     let onlineMatchId = null;
     let onlineSocket = null;
     let onlineGameStartPending = false;
+    let onlineSurrenderPending = false;
     let matchmakingPoll = null;
     let lobbyPoll = null;
     let googleScriptPromise = null;
@@ -41806,6 +41824,7 @@
       const endReason = reason === 'center' ? 'Vitória por conquista do centro.' :
         reason === 'turn30' ? 'Fim do turno 30.' :
           reason === 'inactivity' ? 'Derrota por ficar mais de 40 segundos sem interagir.' :
+            reason === 'surrender' ? 'Partida encerrada por abandono.' :
             'Resultado pela pontuação de vitória.';
       const metrics = getVictoryMetrics();
       finalSummary.innerHTML = `<h3>Vencedor final: ${winnerLabel}</h3>
@@ -41834,6 +41853,9 @@
           : victoryPoints.orange > victoryPoints.blue ? 'orange' : 'blue';
       isGameOver = true;
       isGameStarted = false;
+      abandonMatchButton.classList.add('is-hidden');
+      onlineSurrenderPending = false;
+      confirmAbandonMatchButton.disabled = false;
       if (notifyOpponent && gameMode === 'bluetooth' && bluetoothConnected) {
         sendBluetoothMessage({
           type: 'game_over',
@@ -41868,6 +41890,7 @@
     function showGameBoard() {
       startScreen.classList.add('is-hidden');
       app.classList.remove('is-hidden');
+      abandonMatchButton.classList.toggle('is-hidden', !isOnlineGame() || !isGameStarted || isGameOver);
       updateWarAvailability();
       updateTurnPointsDisplay();
       focusStrongestRegionForTeam(currentTeam);
@@ -42754,6 +42777,10 @@
 
     function receiveOnlineMessage(message) {
       if (message.type === 'error') {
+        if (onlineSurrenderPending) {
+          onlineSurrenderPending = false;
+          confirmAbandonMatchButton.disabled = false;
+        }
         onlineStatus.textContent = message.message || 'Erro na partida online.';
         return;
       }
@@ -42820,6 +42847,8 @@
         return;
       }
       if (message.type === 'game_over') {
+        onlineSurrenderPending = false;
+        confirmAbandonMatchButton.disabled = false;
         const scores = message.victoryPoints;
         if (scores && typeof scores === 'object') {
           victoryPoints = {
@@ -42829,12 +42858,17 @@
         }
         finishGame(message.winner === 'orange' || message.winner === 'blue' ? message.winner : null,
           message.reason === 'center' ? 'center' :
-            message.reason === 'inactivity' ? 'inactivity' : 'turn30', false);
+            message.reason === 'inactivity' ? 'inactivity' :
+              message.reason === 'surrender' ? 'surrender' : 'turn30', false);
         const resultMessage = message.reason === 'inactivity'
           ? message.inactiveTeam === onlineTeam
             ? 'Você perdeu por ficar mais de 40 segundos sem interagir.'
             : 'Seu adversário perdeu por inatividade.'
-          : 'Partida encerrada.';
+          : message.reason === 'surrender'
+            ? message.surrenderingTeam === onlineTeam
+              ? 'Você abandonou a partida. Derrota registrada.'
+              : 'Seu adversário abandonou a partida. Vitória por abandono.'
+            : 'Partida encerrada.';
         onlineStatus.textContent = `${resultMessage} Elo atualizado: Laranja ${message.orange?.elo ?? '-'} · Azul ${message.blue?.elo ?? '-'}.`;
       }
     }
@@ -43081,6 +43115,23 @@
 
     onlineMatchButton.addEventListener('click', enterOnlineQueue);
     onlineCancelButton.addEventListener('click', leaveOnlineQueue);
+    abandonMatchButton.addEventListener('click', () => {
+      if (!isOnlineGame() || !isGameStarted || isGameOver || onlineSurrenderPending) return;
+      abandonMatchModal.classList.remove('is-hidden');
+      confirmAbandonMatchButton.focus({ preventScroll: true });
+    });
+    confirmAbandonMatchButton.addEventListener('click', () => {
+      if (!isOnlineGame() || !isGameStarted || isGameOver || onlineSurrenderPending) return;
+      confirmAbandonMatchButton.disabled = true;
+      const sent = sendOnlineMessage({ type: 'game_surrender' });
+      if (!sent) {
+        confirmAbandonMatchButton.disabled = false;
+        return;
+      }
+      onlineSurrenderPending = true;
+      onlineStatus.textContent = 'Enviando pedido para abandonar a partida...';
+      closeModal(abandonMatchModal);
+    });
     onlineCopyDiagnosticsButton.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(onlineDiagnosticsText.textContent);
