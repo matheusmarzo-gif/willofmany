@@ -3,6 +3,7 @@ package com.willofmany.server;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Autowired;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
@@ -32,6 +33,7 @@ public class OnlineGameHandler extends TextWebSocketHandler {
     private final Duration inactivityTimeout;
     private final Map<String, ScheduledFuture<?>> inactivityTasks = new ConcurrentHashMap<>();
 
+    @Autowired
     public OnlineGameHandler(
         MatchmakingService matchmaking,
         MatchResultService results,
