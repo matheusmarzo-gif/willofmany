@@ -10,7 +10,20 @@ Durante o build, a tarefa `prepareWebAssets` copia automaticamente o HTML, o mó
 
 Importante: abra a pasta `android-app` como projeto no Android Studio e execute um novo **Build > Clean Project** seguido de **Build > Rebuild Project** antes de instalar novamente o APK. Isso garante que os assets sejam regenerados.
 
-O jogo inicia na tela de menu. Em **Novo jogo**, escolha entre jogar contra a IA, jogar com duas pessoas no mesmo aparelho ou jogar por Bluetooth. O modo Bluetooth funciona no aplicativo Android e usa Bluetooth clássico RFCOMM; a versão aberta diretamente no navegador oferece apenas os modos sem Bluetooth.
+O jogo inicia na tela de menu. Em **Novo jogo**, escolha entre jogar contra a IA, jogar com duas pessoas no mesmo aparelho ou jogar por Bluetooth. O modo Bluetooth funciona no aplicativo Android e usa Bluetooth clássico RFCOMM; a versão aberta diretamente no navegador oferece apenas os modos sem Bluetooth. No aplicativo Android, **Online** abre a versão HTTPS hospedada do jogo dentro do app para comunicar-se com a API e o WebSocket. O login usa o seletor nativo de contas Google do Android (Credential Manager), sem abrir o login Google em uma janela de navegador incorporada. A versão web em um navegador normal continua usando Google Identity Services.
+
+## Configurar o login Google no Android
+
+O login nativo usa o mesmo **OAuth Client ID do tipo Web application** já configurado como `GOOGLE_CLIENT_ID` no servidor. O app solicita ao Android um ID token para esse Client ID, e o servidor valida o token. Não coloque um client secret no app.
+
+1. No Android Studio, abra o terminal na pasta `android-app` e execute `.\gradlew.bat signingReport`.
+2. No Google Cloud Console, abra **APIs e serviços > Credenciais > Criar credenciais > ID do cliente OAuth** e crie também um cliente do tipo **Android**. Use o nome do pacote `com.willofmany.app` e o SHA-1 exibido para a variante que vai instalar.
+   - Para o APK de desenvolvimento gerado localmente, use o SHA-1 da variante `debug` mostrado pelo comando acima.
+   - Para uma versão assinada para distribuição, use o SHA-1 do certificado de assinatura dessa versão. Se publicar pelo Google Play com Play App Signing, use o SHA-1 do certificado de assinatura do app indicado no Play Console.
+3. Mantenha o Client ID do tipo Web no segredo `GOOGLE_CLIENT_ID` do servidor. O ID do cliente Android não substitui esse valor.
+4. Instale o APK e, no jogo, escolha **Online > Entrar com Google**. O Android apresenta sua própria interface de seleção/autorização da conta; o usuário pode ter que escolher uma conta e confirmar para continuar.
+
+Se o acesso pelo navegador funcionar, mas o app não autenticar, confira se o OAuth Client ID Android foi criado com o pacote e SHA-1 exatos da assinatura instalada e se o Client ID Web continua configurado no servidor.
 
 No Android, o jogo abre em tela cheia e com orientação horizontal. No celular, o tabuleiro ocupa a área principal, os detalhes da região e as peças para compra aparecem em faixas sobrepostas, e os controles de rotação, turno, estatísticas e guerra ficam nas laterais.
 

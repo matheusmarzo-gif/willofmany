@@ -43029,7 +43029,9 @@
 
     document.querySelectorAll('#game-mode-options button').forEach((button) => {
       button.addEventListener('click', () => {
-        if (button.dataset.mode === 'online' && window.AndroidBluetooth?.openOnlineGame) {
+        if (button.dataset.mode === 'online' &&
+            location.protocol === 'file:' &&
+            window.AndroidBluetooth?.openOnlineGame) {
           startMessage.textContent = 'Abrindo a versão online segura...';
           window.AndroidBluetooth.openOnlineGame();
           return;
@@ -43272,6 +43274,10 @@
     updateReadout();
     updateSelectedRegionPanel();
     loadRegionMasks();
+    if (new URLSearchParams(location.search).get('mode') === 'online') {
+      document.querySelector('[data-start-action="new"]').click();
+      document.querySelector('#game-mode-options [data-mode="online"]').click();
+    }
   </script>
 </body>
 </html>

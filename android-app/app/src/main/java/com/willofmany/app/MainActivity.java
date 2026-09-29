@@ -11,6 +11,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -20,6 +21,16 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
+import androidx.credentials.Credential;
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CredentialManagerCallback;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.GetCredentialException;
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -39,8 +50,9 @@ import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "WillOfManyBluetooth";
+    private static final String ONLINE_GAME_URL = "https://willofmany-game.onrender.com/?mode=online";
     private static final int REQUEST_ENABLE_BLUETOOTH = 1001;
-    private static final int REQUEST_DISCOVERABLE = 1002;
+    private static final int REQUEST_DISCOVERABLE = 1002 ;
     private static final int REQUEST_BLUETOOTH_PERMISSIONS = 1003;
     private static final int MAX_MESSAGE_LENGTH = 1_000_000;
     private static final UUID GAME_UUID = UUID.fromString("a81656dc-c28f-4c8a-a2b7-2a180a5f47d1");
@@ -48,6 +60,7 @@ public final class MainActivity extends Activity {
     private final Object connectionLock = new Object();
     private final Map<String, JSONObject> discoveredDevices = new LinkedHashMap<>();
     private final ExecutorService bluetoothSendExecutor = Executors.newSingleThreadExecutor();
+    private CredentialManager credentialManager;
     private WebView webView;
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothServerSocket serverSocket;
@@ -82,6 +95,7 @@ public final class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         hideSystemUi();
+        credentialManager = CredentialManager.create(this);
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         webView = new WebView(this);
         WebSettings settings = webView.getSettings();
@@ -94,10 +108,41 @@ public final class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         webView.addJavascriptInterface(new BluetoothBridge(), "AndroidBluetooth");
-        webView.setWebViewClient(new WebViewClient());
+        webView.addJavascriptInterface(new GoogleSignInBridge(), "AndroidGoogleSignIn");
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                if (isBundledGameUrl(url)) {
+                    view.addJavascriptInterface(new BluetoothBridge(), "AndroidBluetooth");
+                } else if (!isHostedGameUrl(url)) {
+                    view.stopLoading();
+                    view.loadUrl("file:///android_asset/index.html");
+                }
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                return !isBundledGameUrl(url) && !isHostedGameUrl(url);
+            }
+        });
         webView.setWebChromeClient(new WebChromeClient());
         setContentView(webView);
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    private boolean isBundledGameUrl(String url) {
+        return url != null && url.startsWith("file:///android_asset/");
+    }
+
+    private boolean isHostedGameUrl(String url) {
+        if (url == null) return false;
+        Uri uri = Uri.parse(url);
+        return "https".equals(uri.getScheme()) &&
+            "willofmany-game.onrender.com".equals(uri.getHost()) &&
+            (uri.getPort() == -1 || uri.getPort() == 443) &&
+            uri.getUserInfo() == null;
     }
 
     @Override
@@ -118,6 +163,15 @@ public final class MainActivity extends Activity {
     }
 
     private final class BluetoothBridge {
+        @JavascriptInterface
+        public void openOnlineGame() {
+            runOnUiThread(() -> {
+                if (webView != null && !destroyed) {
+                    webView.loadUrl(ONLINE_GAME_URL);
+                }
+            });
+        }
+
         @JavascriptInterface
         public void createRoom() {
             runOnUiThread(() -> beginBluetoothAction("create", null));
@@ -150,6 +204,90 @@ public final class MainActivity extends Activity {
                 closeConnection(true);
             });
         }
+    }
+
+    private final class GoogleSignInBridge {
+        @JavascriptInterface
+        public void signInWithGoogle(String serverClientId) {
+            if (serverClientId == null ||
+                serverClientId.length() > 256 ||
+                !serverClientId.endsWith(".apps.googleusercontent.com")) {
+                emitGoogleSignInResult("error", null, "A configuração de login Google do servidor é inválida.");
+                return;
+            }
+            runOnUiThread(() -> requestGoogleCredential(serverClientId));
+        }
+    }
+
+    private void requestGoogleCredential(String serverClientId) {
+        if (destroyed || webView == null || !isHostedGameUrl(webView.getUrl())) return;
+
+        GetSignInWithGoogleOption googleOption =
+            new GetSignInWithGoogleOption.Builder(serverClientId).build();
+        GetCredentialRequest request = new GetCredentialRequest.Builder()
+            .addCredentialOption(googleOption)
+            .build();
+        credentialManager.getCredentialAsync(
+            this,
+            request,
+            null,
+            getMainExecutor(),
+            new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                @Override
+                public void onResult(GetCredentialResponse response) {
+                    Credential credential = response.getCredential();
+                    if (!(credential instanceof CustomCredential) ||
+                        !GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(
+                            ((CustomCredential) credential).getType()
+                        )) {
+                        emitGoogleSignInResult("error", null, "O Android retornou uma credencial Google incompatível.");
+                        return;
+                    }
+                    try {
+                        GoogleIdTokenCredential googleCredential =
+                            GoogleIdTokenCredential.createFrom(credential.getData());
+                        emitGoogleSignInResult("success", googleCredential.getIdToken(), null);
+                    } catch (Exception error) {
+                        Log.e(TAG, "Could not read Google ID token credential", error);
+                        emitGoogleSignInResult("error", null, "Não foi possível ler a credencial Google.");
+                    }
+                }
+
+                @Override
+                public void onError(GetCredentialException error) {
+                    String message = error.getMessage();
+                    boolean cancelled = error.getClass().getSimpleName().toLowerCase()
+                        .contains("cancel");
+                    emitGoogleSignInResult(
+                        cancelled ? "cancelled" : "error",
+                        null,
+                        cancelled ? null : (message == null || message.isBlank()
+                            ? "O Android não conseguiu autenticar a conta Google."
+                            : message)
+                    );
+                }
+            }
+        );
+    }
+
+    private void emitGoogleSignInResult(String type, String idToken, String message) {
+        runOnUiThread(() -> {
+            if (webView == null || destroyed || !isHostedGameUrl(webView.getUrl())) return;
+            JSONObject result = new JSONObject();
+            try {
+                result.put("type", type);
+                if (idToken != null) result.put("idToken", idToken);
+                if (message != null) result.put("message", message);
+            } catch (JSONException error) {
+                Log.e(TAG, "Could not create Google sign-in result", error);
+                return;
+            }
+            webView.evaluateJavascript(
+                "window.onAndroidGoogleSignIn && window.onAndroidGoogleSignIn(" +
+                    JSONObject.quote(result.toString()) + ");",
+                null
+            );
+        });
     }
 
     private void beginBluetoothAction(String action, String address) {
