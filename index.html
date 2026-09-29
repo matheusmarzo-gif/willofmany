@@ -41804,7 +41804,9 @@
       const totalBlue = Object.keys(regionPiecesByRegion).reduce((sum, code) => sum + getTeamSoldierCount(code, 'blue'), 0);
       const winnerLabel = winner === 'orange' ? 'Laranja' : winner === 'blue' ? 'Azul' : 'Empate';
       const endReason = reason === 'center' ? 'Vitória por conquista do centro.' :
-        reason === 'turn30' ? 'Fim do turno 30.' : 'Resultado pela pontuação de vitória.';
+        reason === 'turn30' ? 'Fim do turno 30.' :
+          reason === 'inactivity' ? 'Derrota por ficar mais de 40 segundos sem interagir.' :
+            'Resultado pela pontuação de vitória.';
       const metrics = getVictoryMetrics();
       finalSummary.innerHTML = `<h3>Vencedor final: ${winnerLabel}</h3>
         <p>${endReason}</p>
@@ -42826,8 +42828,14 @@
           };
         }
         finishGame(message.winner === 'orange' || message.winner === 'blue' ? message.winner : null,
-          message.reason === 'center' ? 'center' : 'turn30', false);
-        onlineStatus.textContent = `Partida encerrada. Elo atualizado: Laranja ${message.orange?.elo ?? '-'} · Azul ${message.blue?.elo ?? '-'}.`;
+          message.reason === 'center' ? 'center' :
+            message.reason === 'inactivity' ? 'inactivity' : 'turn30', false);
+        const resultMessage = message.reason === 'inactivity'
+          ? message.inactiveTeam === onlineTeam
+            ? 'Você perdeu por ficar mais de 40 segundos sem interagir.'
+            : 'Seu adversário perdeu por inatividade.'
+          : 'Partida encerrada.';
+        onlineStatus.textContent = `${resultMessage} Elo atualizado: Laranja ${message.orange?.elo ?? '-'} · Azul ${message.blue?.elo ?? '-'}.`;
       }
     }
 

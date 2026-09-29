@@ -14,6 +14,7 @@ public class OnlineMatch {
     private int currentTurn = 1;
     private String currentTeam = "orange";
     private boolean complete;
+    private long activityRevision;
 
     public OnlineMatch(String id, PlayerView orange, PlayerView blue) {
         this.id = id;
@@ -47,12 +48,15 @@ public class OnlineMatch {
         return gameState;
     }
 
-    public synchronized void setGameState(JsonNode state) {
+    public synchronized long setGameState(JsonNode state) {
+        if (complete) return -1;
         gameState = state == null ? null : state.deepCopy();
         if (state != null) {
             currentTeam = state.path("currentTeam").asText(currentTeam);
             currentTurn = state.path("currentTurn").asInt(currentTurn);
+            activityRevision++;
         }
+        return activityRevision;
     }
 
     public synchronized int getCurrentTurn() {
@@ -75,6 +79,12 @@ public class OnlineMatch {
         if (complete) return false;
         complete = true;
         return true;
+    }
+
+    public synchronized String tryForfeitIfInactive(long expectedActivityRevision) {
+        if (complete || activityRevision != expectedActivityRevision || gameState == null) return null;
+        complete = true;
+        return currentTeam;
     }
 
     public Map<Long, WebSocketSession> getSessions() {
