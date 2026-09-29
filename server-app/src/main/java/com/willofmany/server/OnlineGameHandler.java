@@ -32,8 +32,13 @@ public class OnlineGameHandler extends TextWebSocketHandler {
         OnlineMatch match = match(session);
         long playerId = playerId(session);
         match.getSessions().put(playerId, session);
-        send(session, Map.of("type", "match_ready", "team", team(session), "matchId", match.getId()));
         JsonNode currentState = match.getGameState();
+        send(session, Map.of(
+            "type", "match_ready",
+            "team", team(session),
+            "matchId", match.getId(),
+            "gameStarted", currentState != null
+        ));
         if (currentState != null) send(session, Map.of("type", "game_start", "state", currentState));
     }
 

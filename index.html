@@ -39251,6 +39251,7 @@
     let onlineTeam = null;
     let onlineMatchId = null;
     let onlineSocket = null;
+    let onlineGameStartPending = false;
     let matchmakingPoll = null;
     let lobbyPoll = null;
     let googleScriptPromise = null;
@@ -41623,6 +41624,7 @@
       updateTurnState();
       updateWarAvailability();
       if (gameMode === 'ai' && isGameStarted && currentTeam === aiTeam) scheduleAiTurn();
+      startOnlineMatchWhenReady();
     }
 
     async function loadRegionMasks() {
@@ -42685,6 +42687,7 @@
       onlineTeam = status.team;
       onlineMatchId = status.matchId;
       onlineOpponent = status.opponent;
+      onlineGameStartPending = false;
       gameMode = 'online';
       humanTeam = onlineTeam;
       aiTeam = null;
@@ -42708,19 +42711,7 @@
       }
       onlineSocket.addEventListener('open', () => {
         updateWarAvailability();
-        if (onlineTeam === 'orange') {
-          if (isGameStarted && !isGameOver) {
-            sendOnlineMessage({
-              type: 'game_start',
-              state: JSON.parse(localStorage.getItem('will-of-many-save'))
-            });
-          } else {
-            if (!selectedStartSpeed) selectedStartSpeed = '1';
-            beginConfiguredGame();
-          }
-        } else {
-          onlineStatus.textContent = 'Conectado. Aguardando o anfitrião iniciar a partida...';
-        }
+        onlineStatus.textContent = 'Conectado ao servidor da partida.';
       });
       onlineSocket.addEventListener('message', (event) => {
         try {
@@ -42730,6 +42721,7 @@
         }
       });
       onlineSocket.addEventListener('close', () => {
+        onlineGameStartPending = false;
         onlineStatus.textContent = 'Conexão com a partida encerrada.';
         updateWarAvailability();
         updateTurnState();
@@ -42751,12 +42743,37 @@
       });
     }
 
+    function startOnlineMatchWhenReady() {
+      if (!onlineGameStartPending || !allRegionMasks ||
+          !onlineSocket || onlineSocket.readyState !== WebSocket.OPEN) return;
+      onlineGameStartPending = false;
+      if (!selectedStartSpeed) selectedStartSpeed = '1';
+      beginConfiguredGame();
+    }
+
     function receiveOnlineMessage(message) {
       if (message.type === 'error') {
         onlineStatus.textContent = message.message || 'Erro na partida online.';
         return;
       }
-      if (message.type === 'match_ready') return;
+      if (message.type === 'match_ready') {
+        if (message.team !== onlineTeam || message.matchId !== onlineMatchId) {
+          onlineStatus.textContent = 'O servidor retornou uma partida diferente da esperada.';
+          return;
+        }
+        if (onlineTeam === 'orange' && message.gameStarted !== true) {
+          onlineGameStartPending = true;
+          onlineStatus.textContent = 'Partida encontrada. Preparando o tabuleiro...';
+          startOnlineMatchWhenReady();
+        } else if (onlineTeam === 'blue') {
+          onlineStatus.textContent = message.gameStarted === true
+            ? 'Partida em andamento. Sincronizando estado...'
+            : 'Conectado. Aguardando o anfitrião iniciar a partida...';
+        } else {
+          onlineStatus.textContent = 'Partida em andamento. Sincronizando estado...';
+        }
+        return;
+      }
       if (message.type === 'game_action') {
         applyBluetoothAction(message);
         return;
