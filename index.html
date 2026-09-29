@@ -42413,6 +42413,20 @@
           onlineStatus.textContent = 'O servidor precisa ser configurado com GOOGLE_CLIENT_ID.';
           return;
         }
+        googleSignIn.replaceChildren();
+        if (window.AndroidGoogleSignIn?.signInWithGoogle) {
+          const button = document.createElement('button');
+          button.className = 'start-confirm';
+          button.type = 'button';
+          button.textContent = 'Entrar com Google';
+          button.addEventListener('click', () => {
+            button.disabled = true;
+            onlineStatus.textContent = 'Selecione uma conta Google na janela do Android.';
+            window.AndroidGoogleSignIn.signInWithGoogle(config.googleClientId);
+          });
+          googleSignIn.appendChild(button);
+          return;
+        }
         const renderButton = () => {
           if (!window.google?.accounts?.id) return;
           googleSignIn.replaceChildren();
@@ -42487,6 +42501,61 @@
           error,
           currentStage,
           currentEndpoint
+        );
+      }
+    }
+
+    window.onAndroidGoogleSignIn = (resultPayload) => {
+      let result;
+      try {
+        result = typeof resultPayload === 'string' ? JSON.parse(resultPayload) : resultPayload;
+      } catch (error) {
+        showOnlineError(
+          `Resposta do login Android inválida: ${error.message}`,
+          error,
+          'Recebendo a conta Google do Android'
+        );
+        return;
+      }
+      const button = googleSignIn.querySelector('button');
+      if (button) button.disabled = false;
+      if (result?.type === 'cancelled') {
+        onlineStatus.textContent = 'Login cancelado. Toque em Entrar com Google para tentar novamente.';
+        return;
+      }
+      if (result?.type !== 'success' || !result.idToken) {
+        const error = new Error(result?.message || 'O Android não retornou uma credencial Google.');
+        showOnlineError(
+          `Falha no login Google: ${error.message}`,
+          error,
+          'Selecionando uma conta Google no Android'
+        );
+        return;
+      }
+      completeGoogleLogin(result.idToken);
+    };
+
+    async function completeGoogleLogin(idToken) {
+      try {
+        const login = await apiRequest('/api/auth/google', {
+          method: 'POST',
+          body: JSON.stringify({
+            idToken,
+            name: onlineNameInput.value.trim() || null
+          })
+        });
+        onlineToken = login.token;
+        onlinePlayer = login.player;
+        localStorage.setItem('will-of-many-online-token', onlineToken);
+        renderOnlineProfile();
+        await refreshOnlineLobby();
+        onlineStatus.textContent = 'Conta conectada. Entre na fila para encontrar uma partida.';
+      } catch (error) {
+        showOnlineError(
+          `Falha no login Google: ${error.message}`,
+          error,
+          'Validando a credencial Google no servidor',
+          new URL('/api/auth/google', location.href).href
         );
       }
     }
@@ -42960,6 +43029,11 @@
 
     document.querySelectorAll('#game-mode-options button').forEach((button) => {
       button.addEventListener('click', () => {
+        if (button.dataset.mode === 'online' && window.AndroidBluetooth?.openOnlineGame) {
+          startMessage.textContent = 'Abrindo a versão online segura...';
+          window.AndroidBluetooth.openOnlineGame();
+          return;
+        }
         gameMode = button.dataset.mode;
         if (gameMode === 'online') selectedStartSpeed = '1';
         updateStartModeSelection();
