@@ -39444,16 +39444,14 @@
     function focusStrongestRegionForTeam(team) {
       if (!allRegionMasks) return null;
       let strongestCode = null;
-      let strongestSoldiers = 0;
-      Object.keys(allRegionMasks).forEach((layer) => {
-        Object.keys(allRegionMasks[layer] || {}).forEach((region) => {
-          const code = `L${layer}-${region}`;
-          const soldiers = getTeamSoldierCount(code, team);
-          if (soldiers > strongestSoldiers) {
-            strongestSoldiers = soldiers;
-            strongestCode = code;
-          }
-        });
+      let strongestForce = 0;
+      getRegionCalculationOrder().forEach((code) => {
+        if (getRegionDominador(code) !== team) return;
+        const finalForce = Number(regionForceStats[code]?.byTeam?.[team]?.forca_final || 0);
+        if (finalForce > strongestForce) {
+          strongestForce = finalForce;
+          strongestCode = code;
+        }
       });
       if (strongestCode) {
         selectedRegionCode = strongestCode;
@@ -42010,15 +42008,14 @@
       turnRecycledPieces = turnRecycledPieces.filter((piece) => piece.team !== currentTeam);
       turnCreatedPieces = turnCreatedPieces.filter((piece) => piece.team !== currentTeam);
       hasRotatedThisTurn = false;
-      focusStrongestRegionForTeam(currentTeam);
       updateRotationControls();
       pontosDoTurn[currentTeam] = getTurnPointIncome(currentTurn);
       renderPiecePurchaseButtons();
+      recalculateRegionForces();
+      focusStrongestRegionForTeam(currentTeam);
       updateTurnState();
       updateSelectedRegionPanel(selectedRegionCode);
       updateWarAvailability();
-      await showTurnTransition(roundResult);
-      passTurnButton.disabled = !isLocalPlayersTurn();
       saveGame();
       if (gameMode === 'bluetooth') {
         sendBluetoothMessage({
@@ -42032,6 +42029,8 @@
           state: JSON.parse(localStorage.getItem('will-of-many-save'))
         });
       }
+      await showTurnTransition(roundResult);
+      passTurnButton.disabled = !isLocalPlayersTurn();
       if (currentTurn === 30) {
         if (!isOnlineGame() || onlineTeam === 'orange') await startWar(true);
         return;
@@ -42797,6 +42796,7 @@
         recalculateRegionForces();
         refreshRegionVisuals();
         renderPiecePurchaseButtons();
+        focusStrongestRegionForTeam(currentTeam);
         updateRotationControls();
         updateTurnState();
         updateWarAvailability();
