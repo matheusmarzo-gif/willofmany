@@ -128,6 +128,9 @@
     #turn-wheat-icon { width:20px; height:20px; flex:none; }
     .turn-panel p#wheat-feedback { color:#8a3d26; font-size:10px; font-weight:700; line-height:1.3; white-space:normal; }
     .turn-panel button { width:100%; min-height:36px; margin-top:8px; padding:8px; }
+    .campaign-actions { display:flex; gap:8px; }
+    .turn-panel .campaign-actions button { width:auto; flex:1 1 0; }
+    .campaign-actions button { min-width:0; font-size:10px; letter-spacing:.03em; }
     .turn-button-icon { display:none; width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
     .war-button { border-color:var(--accent); color:var(--accent); }
     .war-button:disabled { cursor:wait; opacity:.5; transform:none; }
@@ -159,6 +162,16 @@
     .turn-transition-message { display:grid; gap:10px; min-width:min(78vw,360px); margin:0; padding:clamp(22px,5vw,42px); border:1px solid rgba(255,255,255,.26); background:rgba(31,34,34,.88); box-shadow:0 18px 60px rgba(0,0,0,.32); font-family:Georgia,"Palatino Linotype",serif; text-align:center; }
     .turn-transition-player { color:#f2b270; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:clamp(13px,2.5vw,18px); font-weight:750; letter-spacing:.2em; }
     .turn-transition-message[data-team="blue"] .turn-transition-player { color:#8db9ff; }
+    .campaign-intro { position:fixed; inset:0; z-index:400; display:grid; place-items:center; padding:20px; background:rgba(17,19,20,.82); backdrop-filter:blur(6px); animation:campaign-intro-fade .3s ease both; }
+    .campaign-intro.is-hidden { display:none; }
+    .campaign-intro-dismiss { display:grid; grid-template-columns:88px 1fr; align-items:center; gap:22px; width:min(560px,100%); padding:clamp(22px,5vw,38px); border:1px solid rgba(255,255,255,.26); background:linear-gradient(145deg,#f9f5ec,#e8dfd0); box-shadow:0 24px 90px rgba(0,0,0,.45); text-align:left; white-space:normal; animation:campaign-intro-rise .42s cubic-bezier(.2,.8,.25,1) both; }
+    .campaign-avatar { display:grid; place-items:center; width:88px; height:88px; border:1px solid rgba(167,72,45,.38); border-radius:50%; color:#fff5e9; background:radial-gradient(circle at 36% 28%,#d99361,#783e32 72%); box-shadow:0 8px 22px rgba(80,44,35,.24); }
+    .campaign-avatar svg { width:60px; height:60px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.7; }
+    .campaign-intro-copy { display:grid; gap:9px; }
+    .campaign-agent-name { color:var(--accent); font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+    .campaign-intro-copy strong { font:400 clamp(22px,5vw,31px)/1.1 Georgia,"Times New Roman",serif; }
+    .campaign-intro-copy span:nth-child(3) { color:#55534e; font:14px/1.65 "Trebuchet MS","Gill Sans",sans-serif; }
+    .campaign-intro-hint { padding-top:5px; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
     .turn-transition-turn { color:#fffaf4; font-size:clamp(34px,8vw,66px); font-weight:700; letter-spacing:.06em; line-height:1; text-shadow:0 3px 18px rgba(255,255,255,.18); }
     .turn-transition-round-result { max-width:680px; justify-self:center; color:#fffaf4; font:800 clamp(22px,5vw,38px)/1.15 system-ui,-apple-system,"Segoe UI",sans-serif; text-align:center; text-wrap:balance; }
     .turn-transition-round-result[data-winner="orange"] { color:#ffc184; }
@@ -177,8 +190,11 @@
     @keyframes war-flash { 0%,100% { opacity:1; filter:none; } 50% { opacity:.25; filter:sepia(1) saturate(4); } }
     @keyframes stage-nudge { 0%,100% { translate:0 0; } 25% { translate:-2px 1px; } 50% { translate:2px -1px; } 75% { translate:-1px 0; } }
     @keyframes action-cost-pop { 0% { opacity:0; translate:0 5px; } 12% { opacity:1; translate:0 0; } 78% { opacity:1; } 100% { opacity:0; translate:0 -8px; } }
+    @keyframes campaign-intro-fade { from { opacity:0; } to { opacity:1; } }
+    @keyframes campaign-intro-rise { from { opacity:0; translate:0 18px; scale:.98; } to { opacity:1; translate:0 0; scale:1; } }
     @media (max-width:760px) { body { overflow-x:hidden; } .app { grid-template-columns:1fr; gap:20px; align-content:start; padding:calc(18px + env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left)); } .intro { text-align:center; } h1,.description { margin-left:auto; margin-right:auto; } h1 { font-size:clamp(38px,12vw,56px); } .description { max-width:340px; } .rule { margin-left:auto; margin-right:auto; } .controls { margin:0 auto; width:min(100%,360px); grid-template-columns:repeat(2,minmax(0,1fr)); } .controls .layer-controls:not(.is-mobile-visible) { display:none; } .turn-panel,.region-panel { width:min(100%,360px); margin-left:auto; margin-right:auto; } .stage-wrap { order:-1; width:100%; } .stage-panel { width:min(100%,calc(100vw - 28px)); } .piece { width:30px; height:30px; } .piece-controls { flex-wrap:wrap; margin-top:16px; } .piece-button { min-width:70px; } .debug-tools { flex-wrap:wrap; } .readout { line-height:1.5; } }
     @media (max-width:760px) { .controls { justify-items:center; } .controls .layer-controls.is-mobile-visible { grid-column:1 / -1; justify-self:center; width:min(100%,180px); } }
+    @media (max-width:520px) { .campaign-intro-dismiss { grid-template-columns:1fr; justify-items:center; gap:14px; text-align:center; } .campaign-avatar { width:72px; height:72px; } .campaign-avatar svg { width:50px; height:50px; } }
     @media (orientation:landscape) and (max-height:600px) and (max-width:1000px) {
       html, body { width:100%; height:100%; min-height:0; overflow:hidden; }
       .start-screen { place-items:start center; overflow:auto; padding:8px; }
@@ -235,6 +251,9 @@
       #rotate-picker-button, #pass-turn-button { left:max(5px,env(safe-area-inset-left)); }
       #rotate-picker-button, #pass-turn-button, #statistics-button, #war-button { transform:none; }
       #statistics-button, #war-button { right:max(5px,env(safe-area-inset-right)); }
+      .turn-panel .campaign-actions { position:fixed; z-index:11; bottom:max(46px,calc(env(safe-area-inset-bottom) + 42px)); left:50%; display:flex; width:min(54vw,300px); gap:6px; margin:0; pointer-events:auto; transform:translateX(-50%); }
+      .turn-panel .campaign-actions button { position:static; width:auto; height:34px; min-height:34px; margin:0; padding:5px 8px; border-radius:3px; background:rgba(247,244,237,.96); box-shadow:0 2px 8px rgba(32,33,31,.18); pointer-events:auto; transform:none; }
+      .turn-panel .campaign-actions button:hover, .turn-panel .campaign-actions button:focus-visible { transform:none; }
       #rotate-picker-button { top:max(5px,env(safe-area-inset-top)); }
       #pass-turn-button { top:var(--region-actions-pass-top,calc(50% + 135px)); }
       #statistics-button { top:max(5px,env(safe-area-inset-top)); }
@@ -256,7 +275,7 @@
       .game-modal-card { max-height:96vh; padding:12px; }
       .statistics-table-wrap { max-height:76vh; }
     }
-    @media (prefers-reduced-motion:reduce) { .layer,.pieces,.debug-canvas,button { transition:none; } }
+    @media (prefers-reduced-motion:reduce) { .layer,.pieces,.debug-canvas,button { transition:none; } .campaign-intro,.campaign-intro-dismiss { animation:none; } }
   </style>
 </head>
 <body>
@@ -383,6 +402,10 @@
           <svg class="turn-button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"></path></svg>
           <span class="turn-button-label">Abandonar partida</span>
         </button>
+        <div class="campaign-actions is-hidden" id="campaign-actions">
+          <button id="campaign-menu-button" type="button">Retornar ao menu</button>
+          <button id="campaign-restart-button" type="button">Reiniciar level</button>
+        </div>
         <button class="turn-button" id="statistics-button" type="button" aria-label="Estatísticas" title="Estatísticas">
           <svg class="turn-button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11h4v9M10 20V5h4v15M16 20v-8h4v8M3 20h18"></path></svg>
           <span class="turn-button-label">Estatísticas</span>
@@ -495,6 +518,7 @@
       <h2 id="final-modal-title">Fim de jogo</h2>
       <div id="final-summary"></div>
       <button class="modal-close" id="final-menu-button" type="button">Voltar ao menu</button>
+      <button class="modal-close is-hidden" id="final-restart-campaign-button" type="button">Reiniciar level</button>
     </div>
   </div>
   <div class="game-modal is-hidden" id="abandon-match-modal" role="dialog" aria-modal="true" aria-labelledby="abandon-match-title">
@@ -507,6 +531,19 @@
       </div>
     </div>
   </div>
+  <section class="campaign-intro is-hidden" id="campaign-intro" role="dialog" aria-modal="true" aria-labelledby="campaign-intro-title" aria-hidden="true">
+    <button class="campaign-intro-dismiss" id="campaign-intro-dismiss" type="button">
+      <span class="campaign-avatar" aria-hidden="true">
+        <svg viewBox="0 0 64 64"><path d="M32 34c8 0 14-7 14-16S40 3 32 3 18 9 18 18s6 16 14 16Z"></path><path d="M8 60c1-13 10-21 24-21s23 8 24 21H8Z"></path><path d="M24 17h.1M40 17h.1M27 25c3 2 7 2 10 0"></path></svg>
+      </span>
+      <span class="campaign-intro-copy">
+        <span class="campaign-agent-name">Agente da campanha</span>
+        <strong id="campaign-intro-title">Level 1: conquiste o território inimigo</strong>
+        <span>Seu objetivo é dominar todas as regiões do oponente. Construa unidades e avance até a região mais próxima do inimigo. Para tomá-la, você precisa ter ao menos 2 unidades nessa região e declarar <b>Guerra</b>. Ao vencer o combate e conquistar o território, você vence o level.</span>
+        <span class="campaign-intro-hint">Toque na mensagem para começar</span>
+      </span>
+    </button>
+  </section>
   <script src="will-of-many-ai.js"></script>
   <script type="application/json" id="embedded-region-data">{
   "timestamp": "2026-09-25T19:53:20.123Z",
@@ -39180,9 +39217,15 @@
     const finalModal = document.querySelector('#final-modal');
     const finalSummary = document.querySelector('#final-summary');
     const finalMenuButton = document.querySelector('#final-menu-button');
+    const finalRestartCampaignButton = document.querySelector('#final-restart-campaign-button');
     const abandonMatchButton = document.querySelector('#abandon-match-button');
     const abandonMatchModal = document.querySelector('#abandon-match-modal');
     const confirmAbandonMatchButton = document.querySelector('#confirm-abandon-match-button');
+    const campaignActions = document.querySelector('#campaign-actions');
+    const campaignMenuButton = document.querySelector('#campaign-menu-button');
+    const campaignRestartButton = document.querySelector('#campaign-restart-button');
+    const campaignIntro = document.querySelector('#campaign-intro');
+    const campaignIntroDismiss = document.querySelector('#campaign-intro-dismiss');
     const stagePanel = document.querySelector('#stage-panel');
     const trashDropZone = document.querySelector('#trash-drop-zone');
     const trashDropRefund = document.querySelector('#trash-drop-refund');
@@ -39290,6 +39333,9 @@
     let campaignCollectedBags = [];
     let campaignObjectiveRegions = [];
     let campaignResetPending = false;
+    let campaignIntroPending = false;
+    let gameSessionVersion = 0;
+    let gameLaunchRequestVersion = 0;
     const boardLayerElements = new Map();
     const probeBoxSize = 30;
     let debugZoom = 1;
@@ -39352,6 +39398,7 @@
     }
 
     function resetGameState() {
+      gameSessionVersion += 1;
       Object.keys(regionPiecesByRegion).forEach((key) => delete regionPiecesByRegion[key]);
       Object.keys(regionStats).forEach((key) => delete regionStats[key]);
       Object.keys(regionForceStats).forEach((key) => delete regionForceStats[key]);
@@ -39374,6 +39421,7 @@
       isGameOver = false;
       isGameStarted = true;
       isAiTurnRunning = false;
+      isWarRunning = false;
       turnMoveHistory = [];
       turnRecycledPieces = [];
       turnCreatedPieces = [];
@@ -39384,6 +39432,9 @@
       campaignCollectedBags = [];
       campaignObjectiveRegions = [];
       campaignResetPending = false;
+      campaignIntroPending = false;
+      campaignIntro.classList.add('is-hidden');
+      campaignIntro.setAttribute('aria-hidden', 'true');
       trashDropZone.classList.add('is-hidden');
       trashDropZone.classList.remove('is-visible', 'is-target');
     }
@@ -40189,6 +40240,7 @@
       if (isWarRunning || !allRegionMasks ||
           (!isCampaignGame() && !isAutomatic && !allowUnscheduled &&
             ![6, 13, 18, 25].includes(currentTurn))) return;
+      const sessionVersion = gameSessionVersion;
       isWarRunning = true;
       if (gameMode === 'bluetooth' && bluetoothRole === 'host' && bluetoothConnected) {
         sendBluetoothMessage({ type: 'war_start' });
@@ -40243,6 +40295,7 @@
         const enemyForce = block.enemyRegions.reduce((sum, code) => sum + getRegionFinalForceValue(code), 0);
         renderWarForces(block.attacker, alliedForce, enemyForce);
         await waitForWarAnimation(3000);
+        if (sessionVersion !== gameSessionVersion) return;
 
         const winner = alliedForce > enemyForce
           ? block.attacker
@@ -40251,6 +40304,7 @@
             : null;
         renderWarWinner(winner);
         await waitForWarAnimation(2200);
+        if (sessionVersion !== gameSessionVersion) return;
 
         if (winner) {
           pieces.classList.remove('war-flash');
@@ -40267,6 +40321,7 @@
           updateSelectedRegionPanel(selectedRegionCode);
           readout.textContent = `${block.regionCode}: regiões derrotadas trocaram de equipe.`;
           await waitForWarAnimation(1000);
+          if (sessionVersion !== gameSessionVersion) return;
         }
       }
 
@@ -42243,7 +42298,10 @@
       const tileRows = Number(data.coordinateSystem?.tileRows) || 226;
       const tileSize = Number(data.coordinateSystem?.tileSize) || 4;
       const tileOffset = Number(data.coordinateSystem?.tileCenterOffset) || tileSize / 2;
-      const scale = Math.min(908 / (right - left), 908 / (bottom - top));
+      const displayScale = Number.isFinite(Number(data.displayScale))
+        ? Math.min(2, Math.max(1, Number(data.displayScale)))
+        : 1;
+      const scale = Math.min(908 / (right - left), 908 / (bottom - top)) * displayScale;
       const offsetX = (908 - (right - left) * scale) / 2 - left * scale;
       const offsetY = (908 - (bottom - top) * scale) / 2 - top * scale;
       const matrices = {};
@@ -43124,6 +43182,7 @@
       isGameOver = true;
       isGameStarted = false;
       abandonMatchButton.classList.add('is-hidden');
+      finalRestartCampaignButton.classList.toggle('is-hidden', !isCampaignGame());
       onlineSurrenderPending = false;
       confirmAbandonMatchButton.disabled = false;
       if (notifyOpponent && gameMode === 'bluetooth' && bluetoothConnected) {
@@ -43166,15 +43225,78 @@
       return true;
     }
 
-    async function failCampaignLevel() {
+    async function failCampaignLevel(message = 'Você perdeu: era necessário concluir o level em seu único turno. O level será reiniciado.') {
       if (!isCampaignGame() || campaignResetPending || isGameOver) return;
       campaignResetPending = true;
+      const sessionVersion = gameSessionVersion;
       isAiTurnRunning = false;
-      readout.textContent = `Level fracassado. ${activeCampaignLevel.name} será reiniciado...`;
+      isGameOver = true;
+      isGameStarted = false;
+      localStorage.removeItem('will-of-many-save');
+      passTurnButton.disabled = true;
+      readout.textContent = `${message} ${activeCampaignLevel.name} será reiniciado...`;
       await waitForWarAnimation(1800);
-      if (!isGameOver && isCampaignGame()) {
+      if (sessionVersion === gameSessionVersion && isCampaignGame()) {
         campaignResetPending = false;
         await beginConfiguredGame();
+      }
+    }
+
+    function showCampaignIntro() {
+      if (!campaignIntroPending) return;
+      campaignIntroPending = false;
+      campaignIntro.classList.remove('is-hidden');
+      campaignIntro.setAttribute('aria-hidden', 'false');
+      campaignIntroDismiss.focus({ preventScroll: true });
+    }
+
+    function dismissCampaignIntro() {
+      campaignIntro.classList.add('is-hidden');
+      campaignIntro.setAttribute('aria-hidden', 'true');
+      campaignIntroDismiss.blur();
+    }
+
+    function returnCampaignToMenu() {
+      if (!isCampaignGame()) return;
+      gameSessionVersion += 1;
+      gameLaunchRequestVersion += 1;
+      isGameStarted = false;
+      isGameOver = true;
+      isAiTurnRunning = false;
+      isWarRunning = false;
+      campaignResetPending = false;
+      campaignIntroPending = false;
+      localStorage.removeItem('will-of-many-save');
+      dismissCampaignIntro();
+      campaignActions.classList.add('is-hidden');
+      finalModal.classList.add('is-hidden');
+      turnTransition.classList.remove('is-visible');
+      turnTransition.setAttribute('aria-hidden', 'true');
+      app.classList.add('is-hidden');
+      newGameOptions.classList.add('is-hidden');
+      startMenu.classList.remove('is-hidden');
+      startScreen.classList.remove('is-hidden');
+      startMessage.textContent = '';
+    }
+
+    async function restartCampaignLevel() {
+      if (!isCampaignGame()) return;
+      gameSessionVersion += 1;
+      gameLaunchRequestVersion += 1;
+      isGameStarted = false;
+      isGameOver = true;
+      isAiTurnRunning = false;
+      isWarRunning = false;
+      campaignResetPending = false;
+      dismissCampaignIntro();
+      finalModal.classList.add('is-hidden');
+      campaignRestartButton.disabled = true;
+      finalRestartCampaignButton.disabled = true;
+      try {
+        await beginConfiguredGame();
+      } finally {
+        campaignRestartButton.disabled = false;
+        finalRestartCampaignButton.disabled = false;
       }
     }
 
@@ -43183,11 +43305,14 @@
       app.classList.remove('is-hidden');
       renderBoardLayers();
       abandonMatchButton.classList.toggle('is-hidden', !isOnlineGame() || !isGameStarted || isGameOver);
+      campaignActions.classList.toggle('is-hidden', !isCampaignGame() || !isGameStarted);
+      finalRestartCampaignButton.classList.add('is-hidden');
       updateWarAvailability();
       updateTurnPointsDisplay();
       focusStrongestRegionForTeam(currentTeam);
       updateSelectedRegionPanel(selectedRegionCode);
       updateTurnState();
+      showCampaignIntro();
       if ((gameMode === 'ai' || isCampaignGame()) && currentTeam === aiTeam) scheduleAiTurn();
     }
 
@@ -43232,16 +43357,20 @@
     async function scheduleAiTurn() {
       if ((gameMode !== 'ai' && !isCampaignGame()) || !isGameStarted ||
           isGameOver || currentTeam !== aiTeam || isAiTurnRunning) return;
+      const sessionVersion = gameSessionVersion;
+      const isCurrentGame = () => sessionVersion === gameSessionVersion && isGameStarted && !isGameOver;
       isAiTurnRunning = true;
       passTurnButton.disabled = true;
       turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA pensando`;
       await waitForWarAnimation(650);
+      if (!isCurrentGame()) return;
       focusStrongestRegionForTeam(aiTeam);
       await waitForWarAnimation(700);
+      if (!isCurrentGame()) return;
 
       let actionCount = 0;
       let pendingAiFollowUp = null;
-      while (actionCount < 32 && pontosDoTurn[aiTeam] > 0 && !isGameOver) {
+      while (actionCount < 32 && pontosDoTurn[aiTeam] > 0 && isCurrentGame()) {
         const pointsBefore = pontosDoTurn[aiTeam];
         const snapshot = getGameSnapshot();
         snapshot.pendingAiFollowUp = pendingAiFollowUp;
@@ -43253,6 +43382,7 @@
         focusActionRegion(action.source, action.target);
         turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA: ${action.type}`;
         await waitForWarAnimation(500);
+        if (!isCurrentGame()) return;
         if (action.type === 'buy' && action.source) {
           pendingAiFollowUp = action.followUp || null;
           selectedRegionCode = action.source;
@@ -43276,10 +43406,11 @@
         }
         actionCount += 1;
         await waitForWarAnimation(850);
+        if (!isCurrentGame()) return;
         if (pontosDoTurn[aiTeam] >= pointsBefore && !recycleSucceeded) break;
       }
 
-      if (!isGameOver && !hasRotatedThisTurn) {
+      if (isCurrentGame() && !hasRotatedThisTurn) {
         let rotationButton = null;
         const suggested = window.WillOfManyAI?.chooseAction(getGameSnapshot());
         if (suggested?.type === 'rotate') {
@@ -43300,32 +43431,42 @@
         if (rotationButton) {
           focusActionRegion(selectedRegionCode);
           await waitForWarAnimation(500);
+          if (!isCurrentGame()) return;
           const rotationBefore = rotationAnimationVersion;
           turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA girando disco`;
           rotationButton.click();
           await waitForWarAnimation(3200);
+          if (!isCurrentGame()) return;
           if (rotationAnimationVersion === rotationBefore) {
             const retryButton = [...document.querySelectorAll('.layer-button')]
               .find((button) => !button.disabled && Number(button.dataset.layer) >= 2);
             if (retryButton) {
               retryButton.click();
               await waitForWarAnimation(3200);
+              if (!isCurrentGame()) return;
             }
           }
         }
       }
+      if (!isCurrentGame()) return;
       isAiTurnRunning = false;
-      if (!isGameOver) await passTurnToNextPlayer();
+      await passTurnToNextPlayer();
     }
 
     async function passTurnToNextPlayer() {
       if (isWarRunning || isGameOver || isAiTurnRunning || !isLocalPlayersTurn()) return;
       passTurnButton.disabled = true;
+      if (isCampaignGame() && currentTeam === humanTeam) {
+        await failCampaignLevel('Você perdeu: tinha apenas 1 turno para concluir este level.');
+        return;
+      }
       const roundResult = scoreCurrentRound();
       if (finishIfCenterConquered()) return;
       if (isCampaignGame() && currentTeam === aiTeam &&
           currentTurn >= Number(activeCampaignLevel.turnLimit || 1) * 2) {
-        if (!finishCampaignIfObjectiveMet()) await failCampaignLevel();
+        if (!finishCampaignIfObjectiveMet()) {
+          await failCampaignLevel('Você perdeu: tinha apenas 1 turno para concluir este level.');
+        }
         return;
       }
       currentTeam = currentTeam === 'orange' ? 'blue' : 'orange';
@@ -43680,6 +43821,7 @@
     }
 
     function isLocalPlayersTurn() {
+      if (isCampaignGame()) return isGameStarted && !campaignResetPending;
       if (isOnlineGame()) {
         return !!onlineSocket && onlineSocket.readyState === WebSocket.OPEN &&
           currentTeam === onlineTeam;
@@ -44501,6 +44643,15 @@
 
     onlineMatchButton.addEventListener('click', enterOnlineQueue);
     onlineCancelButton.addEventListener('click', leaveOnlineQueue);
+    campaignMenuButton.addEventListener('click', returnCampaignToMenu);
+    campaignRestartButton.addEventListener('click', restartCampaignLevel);
+    finalRestartCampaignButton.addEventListener('click', restartCampaignLevel);
+    campaignIntroDismiss.addEventListener('click', dismissCampaignIntro);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !campaignIntro.classList.contains('is-hidden')) {
+        dismissCampaignIntro();
+      }
+    });
     abandonMatchButton.addEventListener('click', () => {
       if (!isOnlineGame() || !isGameStarted || isGameOver || onlineSurrenderPending) return;
       abandonMatchModal.classList.remove('is-hidden');
@@ -44557,6 +44708,7 @@
     });
 
     async function beginConfiguredGame() {
+      const launchVersion = ++gameLaunchRequestVersion;
       if (gameMode === 'campaign') {
         try {
           await loadBoardFile('tabuleiro-01.json');
@@ -44565,6 +44717,7 @@
           return;
         }
       }
+      if (launchVersion !== gameLaunchRequestVersion) return;
       if ((gameMode === 'ai' && !selectedStartColor) ||
           (gameMode === 'campaign' && !campaignBoardConfig) ||
           (!selectedStartSpeed && !isOnlineGame()) || !allRegionMasks) {
@@ -44583,6 +44736,7 @@
       placeBoardInitialPieces();
       if (isCampaignGame()) {
         campaignObjectiveRegions = [...(activeCampaignLevel.objectiveRegions || [])];
+        campaignIntroPending = true;
         if (!campaignObjectiveRegions.length) {
           startMessage.textContent = 'O level da campanha não define regiões iniciais azuis para conquistar.';
           isGameStarted = false;
@@ -44755,6 +44909,11 @@
       startMessage.textContent = '';
     });
     finalMenuButton.addEventListener('click', () => {
+      gameSessionVersion += 1;
+      isGameStarted = false;
+      isGameOver = true;
+      isAiTurnRunning = false;
+      isWarRunning = false;
       if (window.AndroidBluetooth && bluetoothConnected) {
         window.AndroidBluetooth.disconnect();
       }
