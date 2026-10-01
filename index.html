@@ -152,7 +152,7 @@
     .statistics-table th:first-child, .statistics-table td:first-child { text-align:left; }
     .statistics-table tbody tr:nth-child(even) { background:rgba(32,33,31,.035); }
     .game-modal-card h2 { margin:0 0 14px; font-size:18px; }
-    .war-status { position:absolute; top:50%; left:50%; z-index:35; width:min(88%,340px); padding:16px; border:1px solid var(--accent); background:rgba(255,250,244,.94); box-shadow:0 12px 30px rgba(32,33,31,.2); text-align:center; transform:translate(-50%,-50%); }
+    .war-status { position:absolute; top:43%; left:50%; z-index:35; width:min(88%,340px); padding:16px; border:1px solid var(--accent); background:rgba(255,250,244,.94); box-shadow:0 12px 30px rgba(32,33,31,.2); text-align:center; transform:translate(-50%,-50%); }
     .war-status.is-hidden { display:none; }
     .war-status h2 { margin:0 0 8px; font-size:17px; }
     .war-status p { margin:4px 0; color:var(--muted); font-size:12px; line-height:1.4; }
@@ -175,6 +175,7 @@
     .campaign-guide-shade { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
     .campaign-guide-spotlights { position:absolute; inset:0; pointer-events:none; }
     .campaign-guide-spotlight { position:fixed; border:2px solid #f3c66b; border-radius:8px; box-shadow:0 0 0 2px rgba(26,25,22,.4),0 0 22px 5px rgba(255,218,127,.78); pointer-events:none; }
+    .campaign-guide-region-outline { fill:none; stroke:#ffe08a; stroke-width:4px; vector-effect:non-scaling-stroke; filter:drop-shadow(0 0 5px rgba(255,218,127,.95)); pointer-events:none; }
     #turn-points.is-guide-pinned { position:fixed; z-index:481; top:max(8px,env(safe-area-inset-top)); left:50%; width:min(360px,calc(100vw - 28px)); margin:0; padding:8px 12px; border:1px solid rgba(167,72,45,.5); background:rgba(255,250,244,.97); box-shadow:0 4px 18px rgba(0,0,0,.3); text-align:center; transform:translateX(-50%); }
     .campaign-guide-card { position:fixed; left:50%; bottom:max(14px,env(safe-area-inset-bottom)); display:grid; grid-template-columns:48px 1fr; align-items:center; gap:12px; width:min(520px,calc(100vw - 28px)); max-height:min(34vh,240px); overflow:auto; padding:16px 18px; border:1px solid rgba(255,255,255,.32); background:linear-gradient(145deg,#f9f5ec,#e8dfd0); box-shadow:0 18px 55px rgba(0,0,0,.48); color:var(--ink); text-align:left; transform:translateX(-50%); pointer-events:auto; }
     .campaign-guide-card[data-position="top"] { top:max(14px,env(safe-area-inset-top)); bottom:auto; }
@@ -41838,48 +41839,148 @@
       if (pieceCount <= 0 || !slots.length) return slots;
       const center = getRegionPieceCenter(regionCode);
       if (pieceCount === 1 && center) return [center];
-      if ((pieceCount !== 2 && pieceCount !== 3) || slots.length < pieceCount || !center) {
+      if ((pieceCount !== 2 && pieceCount !== 3) || !center) {
         return slots;
       }
 
-      let bestArrangement = slots.slice(0, pieceCount);
-      let bestScore = -Infinity;
-      const evaluate = (arrangement) => {
-        const average = arrangement.reduce((sum, point) => ({
-          x: sum.x + point.x / arrangement.length,
-          y: sum.y + point.y / arrangement.length
-        }), { x: 0, y: 0 });
-        const distances = [];
-        for (let first = 0; first < arrangement.length; first += 1) {
-          for (let second = first + 1; second < arrangement.length; second += 1) {
-            distances.push(Math.hypot(
-              arrangement[first].x - arrangement[second].x,
-              arrangement[first].y - arrangement[second].y
-            ));
+      const layerNumber = getRegionLayer(regionCode);
+      const angle = ((rotations[layerNumber - 1] || 0) * Math.PI) / 180;
+      const sin = Math.sin(angle);
+      const cos = Math.cos(angle);
+      const match = String(regionCode).match(/^L\d+-(\d+)$/);
+      const tiles = match ? allRegionMasks?.[layerNumber]?.[match[1]] : null;
+      if (Array.isArray(tiles) && tiles.length) {
+        const points = tiles.map((key) => {
+          const [column, row] = key.split(',').map(Number);
+          const rawX = column * 4 + 2;
+          const rawY = row * 4 + 2;
+          const dx = rawX - 454;
+          const dy = rawY - 454;
+          return {
+            rawX,
+            rawY,
+            x: 454 + dx * cos - dy * sin,
+            y: 454 + dx * sin + dy * cos
+          };
+        });
+        const regionSet = new Set(points.map((point) =>
+          `${Math.round(point.x)},${Math.round(point.y)}`
+        ));
+        const panelWidth = stagePanel.getBoundingClientRect().width || 780;
+        const radius = Math.max(2, Math.min(3, Math.ceil((30 / panelWidth * 908 / 4 / 2))));
+        const rows = new Map();
+        points.forEach((point) => {
+          for (let y = Math.floor(point.y / 4) - radius; y <= Math.floor(point.y / 4) + radius; y += 1) {
+            for (let x = Math.floor(point.x / 4) - radius; x <= Math.floor(point.x / 4) + radius; x += 1) {
+              if (!regionSet.has(`${Math.round(x * 4 + 2)},${Math.round(y * 4 + 2)}`)) {
+                return;
+              }
+            }
           }
-        }
-        const centerOffset = Math.hypot(average.x - center.x, average.y - center.y);
-        const minimumSpacing = Math.min(...distances);
-        const averageSpacing = distances.reduce((total, distance) => total + distance, 0) / distances.length;
-        const score = minimumSpacing + averageSpacing * 0.15 - centerOffset * 1.5;
-        if (score > bestScore) {
+          const rowKey = Math.floor(point.y / 4);
+          if (!rows.has(rowKey)) rows.set(rowKey, []);
+          rows.get(rowKey).push(point);
+        });
+
+        const baseGap = (30 / panelWidth) * 100 * 1.2;
+        let bestRow = null;
+        let bestRowScore = Infinity;
+        rows.forEach((row) => {
+          if (row.length < pieceCount) return;
+          row.sort((first, second) => first.x - second.x);
+          const minX = row[0].x / 908 * 100;
+          const maxX = row[row.length - 1].x / 908 * 100;
+          const availableGap = (maxX - minX) / (pieceCount - 1);
+          const gap = Math.min(baseGap, availableGap * 0.8);
+          const occupiedWidth = gap * (pieceCount - 1);
+          const startX = Math.max(minX, Math.min(center.x - occupiedWidth / 2, maxX - occupiedWidth));
+          const targetXs = Array.from({ length: pieceCount }, (_, index) => startX + gap * index);
+          const selected = [];
+          targetXs.forEach((targetX) => {
+            const previous = selected[selected.length - 1];
+            const candidate = row.reduce((closest, point) => {
+              const pointX = point.x / 908 * 100;
+              if (previous && pointX <= previous.x / 908 * 100 + gap * 0.45) return closest;
+              if (!closest || Math.abs(pointX - targetX) < Math.abs(closest.x / 908 * 100 - targetX)) {
+                return point;
+              }
+              return closest;
+            }, null);
+            if (candidate) selected.push(candidate);
+          });
+          if (selected.length !== pieceCount) return;
+          const averageX = selected.reduce((total, point) => total + point.x / 908 * 100, 0) / pieceCount;
+          const averageY = selected.reduce((total, point) => total + point.y / 908 * 100, 0) / pieceCount;
+          const rowScore = ((averageY - center.y) ** 2) * 3 + ((averageX - center.x) ** 2) * 2
+            + ((baseGap - gap) ** 2);
+          if (rowScore < bestRowScore) {
+            bestRowScore = rowScore;
+            bestRow = selected.map((point) => ({
+              x: point.rawX / 908 * 100,
+              y: point.rawY / 908 * 100
+            }));
+          }
+        });
+        if (bestRow) return bestRow;
+      }
+      if (slots.length < pieceCount) return slots;
+
+      const positionedSlots = slots.map((slot) => {
+        const dx = (slot.x / 100) * 908 - 454;
+        const dy = (slot.y / 100) * 908 - 454;
+        return {
+          slot,
+          x: (454 + dx * cos - dy * sin) / 908 * 100,
+          y: (454 + dx * sin + dy * cos) / 908 * 100
+        };
+      });
+      const horizontalSpan = Math.max(...positionedSlots.map((point) => point.x))
+        - Math.min(...positionedSlots.map((point) => point.x));
+      const panelWidth = stagePanel.getBoundingClientRect().width || 780;
+      const desiredGap = Math.min(
+        (30 / panelWidth) * 100 * 1.2,
+        horizontalSpan / (pieceCount - 1) * 0.8
+      );
+      const minimumGap = desiredGap * 0.45;
+      let bestArrangement = positionedSlots.slice(0, pieceCount);
+      let bestScore = Infinity;
+      const evaluate = (arrangement) => {
+        const horizontalOrder = [...arrangement].sort((first, second) => first.x - second.x);
+        const average = horizontalOrder.reduce((sum, point) => ({
+          x: sum.x + point.x / horizontalOrder.length,
+          y: sum.y + point.y / horizontalOrder.length
+        }), { x: 0, y: 0 });
+        const gaps = horizontalOrder.slice(1).map((point, index) => point.x - horizontalOrder[index].x);
+        const verticalDeviation = horizontalOrder.reduce(
+          (total, point) => total + ((point.y - center.y) ** 2),
+          0
+        ) / horizontalOrder.length;
+        const centerDeviation = ((average.x - center.x) ** 2) + ((average.y - center.y) ** 2);
+        const spacingDeviation = gaps.reduce((total, gap) => total + ((gap - desiredGap) ** 2), 0);
+        const overlapPenalty = gaps.reduce(
+          (total, gap) => total + (Math.max(0, minimumGap - gap) ** 2) * 4,
+          0
+        );
+        const score = verticalDeviation * 3 + centerDeviation * 2
+          + spacingDeviation * 2 + overlapPenalty;
+        if (score < bestScore) {
           bestScore = score;
-          bestArrangement = arrangement;
+          bestArrangement = horizontalOrder;
         }
       };
 
-      for (let first = 0; first < slots.length; first += 1) {
-        for (let second = first + 1; second < slots.length; second += 1) {
+      for (let first = 0; first < positionedSlots.length; first += 1) {
+        for (let second = first + 1; second < positionedSlots.length; second += 1) {
           if (pieceCount === 2) {
-            evaluate([slots[first], slots[second]]);
+            evaluate([positionedSlots[first], positionedSlots[second]]);
             continue;
           }
-          for (let third = second + 1; third < slots.length; third += 1) {
-            evaluate([slots[first], slots[second], slots[third]]);
+          for (let third = second + 1; third < positionedSlots.length; third += 1) {
+            evaluate([positionedSlots[first], positionedSlots[second], positionedSlots[third]]);
           }
         }
       }
-      return bestArrangement;
+      return bestArrangement.map((point) => point.slot);
     }
 
     function getRegionPieceCenter(regionCode) {
@@ -43485,6 +43586,12 @@
       ) || null;
     }
 
+    function getCampaignBagIcon(regionCode) {
+      return [...document.querySelectorAll('g[data-region][aria-label]')].find((element) =>
+        element.dataset.region === regionCode && element.getAttribute('aria-label').startsWith('Saco com')
+      ) || null;
+    }
+
     function getCampaignGuideTargetElements(step) {
       const approachRegion = getCampaignApproachRegion();
       const piecesInRegion = (regionCode) => [...pieces.querySelectorAll('.piece')]
@@ -43500,7 +43607,7 @@
         case 'move':
           return [...piecesInRegion('L8-5'), getCampaignRegionShape('L8-4')].filter(Boolean);
         case 'bag-tip':
-          return [turnPoints, getCampaignRegionShape('L8-3')].filter(Boolean);
+          return [turnPoints, getCampaignBagIcon('L8-3')].filter(Boolean);
         case 'army-tip':
           return [getCampaignRegionShape(approachRegion)].filter(Boolean);
         case 'war':
@@ -43524,9 +43631,10 @@
             rect.right > 0 && rect.left < window.innerWidth;
         });
       campaignGuideSpotlights.replaceChildren();
-      const width = window.innerWidth;
-      const height = window.innerHeight;
+      const width = campaignGuideShade.clientWidth;
+      const height = campaignGuideShade.clientHeight;
       campaignGuideShade.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      campaignGuideShade.querySelector('.campaign-guide-region-outline')?.remove();
       const holes = targets.map((target) => {
         const rect = target.getBoundingClientRect();
         const padding = target === turnPoints || target.id === 'war-button' ? 8 : 6;
@@ -43547,6 +43655,18 @@
         'd',
         [`M0 0H${width}V${height}H0Z`, ...holes].join('')
       );
+      if (campaignGuideStep === 'bag-tip') {
+        const regionShape = getCampaignRegionShape('L8-3');
+        const matrix = regionShape?.getScreenCTM();
+        const pathData = regionShape?.getAttribute('d');
+        if (matrix && pathData) {
+          const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          outline.classList.add('campaign-guide-region-outline');
+          outline.setAttribute('d', pathData);
+          outline.setAttribute('transform', `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})`);
+          campaignGuideShade.appendChild(outline);
+        }
+      }
       const targetRects = targets.map((target) => target.getBoundingClientRect());
       const topCardBottom = campaignGuideCard.getBoundingClientRect().height + 28;
       const bottomCardTop = height - topCardBottom;
@@ -43614,7 +43734,7 @@
       const primaryTarget = step === 'purchase'
         ? document.querySelector('#piece-controls .piece-button[data-stage="g"]')
         : step === 'coins' ? turnPoints
-          : step === 'bag-tip' ? getCampaignRegionShape('L8-3')
+          : step === 'bag-tip' ? getCampaignBagIcon('L8-3')
           : step === 'war' ? document.querySelector('#war-button')
             : getCampaignGuideTargetElements(step)[0];
       const guideTargets = getCampaignGuideTargetElements(step).filter((target) =>
@@ -43649,6 +43769,7 @@
       campaignGuideSpotlights.replaceChildren();
       campaignGuideContinue.blur();
       campaignGuideShadePath.setAttribute('d', '');
+      campaignGuideShade.querySelector('.campaign-guide-region-outline')?.remove();
     }
 
     function continueCampaignGuide() {
@@ -45112,6 +45233,12 @@
         window.requestAnimationFrame(updateCampaignGuideSpotlights);
       }
     }, true);
+    stage.addEventListener('transitionend', (event) => {
+      if (event.target === stage && event.propertyName === 'transform' &&
+          !campaignGuide.classList.contains('is-hidden')) {
+        updateCampaignGuideSpotlights();
+      }
+    });
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !campaignIntro.classList.contains('is-hidden')) {
         dismissCampaignIntro();
