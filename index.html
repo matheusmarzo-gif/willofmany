@@ -329,6 +329,7 @@
       </div>
       <div class="tutorial-slide" data-tutorial-slide="1" hidden>
         <img class="tutorial-art" src="tutorial-discs.svg" alt="O tabuleiro tem oito discos: L8 com oito regiões, L7 com sete, e assim por diante até L1 no centro. Para promover, são necessários oito soldados em L8 para um em L7, sete em L7 para um em L6, e assim sucessivamente até dois em L2 para um em L1.">
+        <p>Rebaixar envia uma peça para uma região vizinha inferior livre ou sua, respeitando o limite de peças. Você recebe metade do valor da peça na origem menos o custo dela no destino, sem restituição negativa, e deve manter ao menos uma peça na origem.</p>
       </div>
       <div class="tutorial-slide" data-tutorial-slide="2" hidden>
         <img class="tutorial-art" src="tutorial-layers.svg" alt="Bônus de força dos discos: L8 zero por cento, L7 oitenta por cento, L6 duzentos e cinquenta por cento, L5 quatrocentos por cento, L4 setecentos por cento, L3 mil e quinhentos por cento, L2 dois mil e trezentos por cento e L1 três mil e novecentos por cento. Até oito soldados L8 transferem metade da força para apoiar cada soldado L7.">
@@ -416,6 +417,9 @@
         <div class="region-move is-hidden" id="region-promotion-controls">
           <button type="button" id="open-promotion-button">Promover unidades</button>
         </div>
+        <div class="region-move is-hidden" id="region-relegation-controls">
+          <button type="button" id="open-relegation-button">Rebaixar peça</button>
+        </div>
       </aside>
       <button class="trash-drop-zone is-hidden" id="trash-drop-zone" type="button" aria-label="Lixeira: arraste uma peça para receber metade do seu valor em pontos">
         <svg class="trash-drop-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h22M12 8V5h8v3M8 8l1.5 19h13L24 8M13 12v10M19 12v10"></path></svg>
@@ -455,6 +459,15 @@
       <div class="modal-options" id="promotion-target-options"></div>
       <div class="modal-options is-hidden" id="promotion-amount-options"></div>
       <button class="modal-close" type="button" data-close-modal="promotion-modal">Cancelar</button>
+    </div>
+  </div>
+  <div class="game-modal is-hidden" id="relegation-modal" role="dialog" aria-modal="true" aria-labelledby="relegation-modal-title">
+    <div class="game-modal-card">
+      <h2 id="relegation-modal-title">Rebaixar peça</h2>
+      <p id="relegation-modal-instructions">Escolha uma peça para enviar a uma região vizinha inferior livre ou dominada por você. É necessário manter outra peça na origem.</p>
+      <div class="modal-options" id="relegation-stage-options"></div>
+      <div class="modal-options is-hidden" id="relegation-target-options"></div>
+      <button class="modal-close" type="button" data-close-modal="relegation-modal">Cancelar</button>
     </div>
   </div>
   <div class="game-modal is-hidden" id="statistics-modal" role="dialog" aria-modal="true" aria-labelledby="statistics-modal-title">
@@ -39190,8 +39203,10 @@
     const regionNeighbors = document.querySelector('#region-neighbors');
     const regionMoveControls = document.querySelector('#region-move-controls');
     const regionPromotionControls = document.querySelector('#region-promotion-controls');
+    const regionRelegationControls = document.querySelector('#region-relegation-controls');
     const openMoveButton = document.querySelector('#open-move-button');
     const openPromotionButton = document.querySelector('#open-promotion-button');
+    const openRelegationButton = document.querySelector('#open-relegation-button');
     const passTurnButton = document.querySelector('#pass-turn-button');
     const rotatePickerButton = document.querySelector('#rotate-picker-button');
     const rotationPickerClose = document.querySelector('#rotation-picker-close');
@@ -39203,6 +39218,10 @@
     const promotionModal = document.querySelector('#promotion-modal');
     const promotionTargetOptions = document.querySelector('#promotion-target-options');
     const promotionAmountOptions = document.querySelector('#promotion-amount-options');
+    const relegationModal = document.querySelector('#relegation-modal');
+    const relegationModalInstructions = document.querySelector('#relegation-modal-instructions');
+    const relegationStageOptions = document.querySelector('#relegation-stage-options');
+    const relegationTargetOptions = document.querySelector('#relegation-target-options');
     const statisticsButton = document.querySelector('#statistics-button');
     const statisticsModal = document.querySelector('#statistics-modal');
     const statisticsTableContainer = document.querySelector('#statistics-table-container');
@@ -39555,7 +39574,7 @@
       const teamLabel = currentTeam === 'orange' ? 'laranja' : 'azul';
       turnNumber.textContent = `Turn ${currentTurn}`;
       turnPlayer.textContent = `Vez: ${teamLabel}`;
-      turnPoints.textContent = `Pontos: ${pontosDoTurn[currentTeam]}`;
+      turnPoints.textContent = `Pontos: ${Number(pontosDoTurn[currentTeam]).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
     }
 
     function renderPiecePurchaseButtons() {
@@ -39593,6 +39612,12 @@
         promotionCost += promotionCostBySourceLayer[sourceLayer] || 0;
       }
       return soldierWeights[stage] * (promotionCost + 1);
+    }
+
+    function getRelegationRefund(sourceCode, targetCode, stage) {
+      const sourceValue = getRecruitmentCost(sourceCode, stage);
+      const targetCost = getRecruitmentCost(targetCode, stage);
+      return Math.max(0, sourceValue / 2 - targetCost);
     }
 
     function getRecycleRefund(regionCode, stage) {
@@ -40126,10 +40151,16 @@
         .map((target) => ({ code: target.code, type: 'promotion' }));
     }
 
-    function getDragTargets(sourceCode, team, amount) {
+    function getDragRelegationTargets(sourceCode, team, stage) {
+      return getRelegationTargetsForPiece(sourceCode, team, stage)
+        .map((target) => ({ code: target.code, type: 'relegation' }));
+    }
+
+    function getDragTargets(sourceCode, team, amount, stage) {
       return [
         ...getDragMoveTargets(sourceCode, team, amount),
-        ...getDragPromotionTargets(sourceCode, team, amount)
+        ...getDragPromotionTargets(sourceCode, team, amount),
+        ...getDragRelegationTargets(sourceCode, team, stage)
       ];
     }
 
@@ -40207,7 +40238,9 @@
       const completed = target
         ? target.type === 'move'
           ? (selectedRegionCode = sourceCode, performMove(target.direction, amount), true)
-          : (performPromotion(target.code, amount), true)
+          : target.type === 'promotion'
+            ? (performPromotion(target.code, amount), true)
+            : (performRelegation(target.code, pieceStage), true)
         : false;
       if (!completed) {
         readout.textContent = 'Arraste cancelado: solte a peça sobre uma região válida.';
@@ -40230,7 +40263,7 @@
         readout.textContent = 'Para descartar uma peça, a região precisa ter pelo menos 2 peças.';
         return false;
       }
-      const targets = getDragTargets(sourceCode, currentTeam, amount);
+      const targets = getDragTargets(sourceCode, currentTeam, amount, pieceStage);
       if (!amount || !Object.prototype.hasOwnProperty.call(soldierWeights, pieceStage)) return false;
       const dragPiece = document.createElement('img');
       dragPiece.className = 'drag-piece';
@@ -40631,9 +40664,46 @@
       return targets.sort((left, right) => left.code.localeCompare(right.code));
     }
 
+    function getRelegationTargetsForPiece(regionCode, team, stage) {
+      if (!regionCode || !team || !Object.prototype.hasOwnProperty.call(soldierWeights, stage) ||
+          !isRegionAvailableForTeam(regionCode, team) || getTeamPieceCount(regionCode, team) < 2 ||
+          Number(regionPiecesByRegion[regionCode]?.[team]?.[stage] || 0) < 1) return [];
+      const sourceLayer = getRegionLayer(regionCode);
+      if (sourceLayer >= 8) return [];
+
+      return (getRegionNeighborSummary(regionCode).inferior || [])
+        .filter((targetCode) => getRegionLayer(targetCode) === sourceLayer + 1)
+        .filter((targetCode) => isRegionAvailableForTeam(targetCode, team))
+        .filter((targetCode) => {
+          ensureRegionPieces(targetCode);
+          const targetCounts = regionPiecesByRegion[targetCode][team];
+          if (getFinalPieceCountForTeam(targetCounts) >= getRegionPieceLimit(targetCode)) return false;
+          const projectedCounts = { ...targetCounts, [stage]: Number(targetCounts[stage] || 0) + 1 };
+          return getFinalPieceCountForTeam(projectedCounts) <= getRegionPieceLimit(targetCode);
+        })
+        .map((code) => ({
+          code,
+          refund: getRelegationRefund(regionCode, code, stage)
+        }))
+        .sort((left, right) => left.code.localeCompare(right.code));
+    }
+
+    function getRelegationOptionsForRegion(regionCode, team) {
+      if (!regionCode || getTeamPieceCount(regionCode, team) < 2) return [];
+      return Object.keys(soldierWeights)
+        .filter((stage) => Number(regionPiecesByRegion[regionCode]?.[team]?.[stage] || 0) > 0)
+        .map((stage) => ({
+          stage,
+          targets: getRelegationTargetsForPiece(regionCode, team, stage)
+        }))
+        .filter((option) => option.targets.length > 0);
+    }
+
     function refreshPromotionControls(regionCode = selectedRegionCode) {
       const promotionTargets = regionCode ? getPromotionTargetsForRegion(regionCode, currentTeam) : [];
       regionPromotionControls.classList.toggle('is-hidden', !promotionTargets.length);
+      const relegationOptions = regionCode ? getRelegationOptionsForRegion(regionCode, currentTeam) : [];
+      regionRelegationControls.classList.toggle('is-hidden', !relegationOptions.length);
     }
 
     function closeModal(modal) {
@@ -40716,6 +40786,45 @@
         });
       if (!promotionAmountOptions.children.length) {
         promotionAmountOptions.innerHTML = '<p>Pontos insuficientes para promover.</p>';
+      }
+    }
+
+    function openRelegationModal() {
+      const options = getRelegationOptionsForRegion(selectedRegionCode, currentTeam);
+      relegationStageOptions.innerHTML = '';
+      relegationTargetOptions.innerHTML = '';
+      relegationTargetOptions.classList.add('is-hidden');
+      relegationStageOptions.classList.remove('is-hidden');
+      relegationModalInstructions.textContent =
+        'Escolha uma peça para enviar a uma região vizinha inferior livre ou dominada por você. É necessário manter outra peça na origem.';
+      options.forEach(({ stage }) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.innerHTML = `<img src="${currentTeam === 'orange' ? 'peca_laranja' : 'peca_azul'}_${stage}.png" alt=""> ${stage.toUpperCase()} · ${regionPiecesByRegion[selectedRegionCode][currentTeam][stage]}`;
+        button.addEventListener('click', () => renderRelegationTargets(stage));
+        relegationStageOptions.appendChild(button);
+      });
+      relegationModal.classList.remove('is-hidden');
+    }
+
+    function renderRelegationTargets(stage) {
+      const targets = getRelegationTargetsForPiece(selectedRegionCode, currentTeam, stage);
+      relegationStageOptions.classList.add('is-hidden');
+      relegationTargetOptions.classList.remove('is-hidden');
+      relegationTargetOptions.innerHTML = '';
+      relegationModalInstructions.textContent = `Escolha a região inferior para a peça ${stage.toUpperCase()}. Restituição: metade do valor na origem menos o custo da peça no destino (mínimo 0).`;
+      targets.forEach((target) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = `${target.code} · +${target.refund.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
+        button.addEventListener('click', () => {
+          closeModal(relegationModal);
+          performRelegation(target.code, stage);
+        });
+        relegationTargetOptions.appendChild(button);
+      });
+      if (!targets.length) {
+        relegationTargetOptions.innerHTML = '<p>Nenhuma região inferior disponível para essa peça.</p>';
       }
     }
 
@@ -40818,6 +40927,7 @@
             buy: { frequency: 520, endFrequency: 740, duration: 0.16, wave: 'triangle' },
             move: { frequency: 360, endFrequency: 270, duration: 0.13, wave: 'sine' },
             promote: { frequency: 480, endFrequency: 820, duration: 0.22, wave: 'sine' },
+            relegate: { frequency: 520, endFrequency: 340, duration: 0.2, wave: 'sine' },
             recycle: { frequency: 620, endFrequency: 440, duration: 0.18, wave: 'triangle' }
           }[actionType];
           if (!sound) return;
@@ -41040,7 +41150,7 @@
 
     function syncDebugInteractionState() {
       const debugActive = isDebugModeActive();
-      [passTurnButton, openMoveButton, openPromotionButton, ...pieceControls.querySelectorAll('button')].forEach((button) => {
+      [passTurnButton, openMoveButton, openPromotionButton, openRelegationButton, ...pieceControls.querySelectorAll('button')].forEach((button) => {
         if (button) button.disabled = debugActive;
       });
       updateRotationControls();
@@ -42118,6 +42228,53 @@
       finishIfCenterConquered();
     }
 
+    function performRelegation(targetCode, stage) {
+      if (!isApplyingBluetoothAction && !isLocalPlayersTurn()) return;
+      const sourceCode = selectedRegionCode;
+      if (!sourceCode || !targetCode ||
+          !Object.prototype.hasOwnProperty.call(soldierWeights, stage)) return;
+      if (!isRegionAvailableForTeam(sourceCode, currentTeam) ||
+          getTeamPieceCount(sourceCode, currentTeam) < 2 ||
+          Number(regionPiecesByRegion[sourceCode]?.[currentTeam]?.[stage] || 0) < 1) {
+        readout.textContent = `${sourceCode}: é necessário possuir a peça e manter pelo menos outra na região de origem.`;
+        return;
+      }
+      const targetInfo = getRelegationTargetsForPiece(sourceCode, currentTeam, stage)
+        .find((target) => target.code === targetCode);
+      if (!targetInfo) {
+        readout.textContent = `${targetCode}: região inferior indisponível, dominada pelo oponente ou sem espaço.`;
+        return;
+      }
+
+      ensureRegionPieces(targetCode);
+      const targetCountsBefore = { ...regionPiecesByRegion[targetCode][currentTeam] };
+      regionPiecesByRegion[sourceCode][currentTeam][stage] -= 1;
+      regionPiecesByRegion[targetCode][currentTeam][stage] =
+        Number(regionPiecesByRegion[targetCode][currentTeam][stage] || 0) + 1;
+      mergeRegionTeam(sourceCode, currentTeam);
+      mergeRegionTeam(targetCode, currentTeam, targetCountsBefore);
+      const refund = getRelegationRefund(sourceCode, targetCode, stage);
+      pontosDoTurn[currentTeam] += refund;
+      recalculatePieceCounts();
+      recalculateRegionForces();
+      refreshRegionVisuals();
+      updateSelectedRegionPanel(sourceCode);
+      updateReadout();
+      updateTurnState();
+      showActionFeedback(targetCode, refund, 'relegate', '+');
+      readout.textContent = refund > 0
+        ? `${sourceCode} → ${targetCode}: peça ${stage.toUpperCase()} rebaixada. +${refund.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} pontos.`
+        : `${sourceCode} → ${targetCode}: peça ${stage.toUpperCase()} rebaixada. Sem restituição.`;
+      publishBluetoothAction({
+        type: 'relegate',
+        team: currentTeam,
+        source: sourceCode,
+        target: targetCode,
+        stage
+      });
+      finishIfCenterConquered();
+    }
+
     function performMove(direction, amount) {
       if (!isApplyingBluetoothAction && !isLocalPlayersTurn()) return;
       if (!selectedRegionCode) return;
@@ -42182,6 +42339,7 @@
 
     openMoveButton.addEventListener('click', openMoveModal);
     openPromotionButton.addEventListener('click', openPromotionModal);
+    openRelegationButton.addEventListener('click', openRelegationModal);
     moveDirectionOptions.querySelectorAll('[data-direction]').forEach((button) => {
       button.addEventListener('click', () => renderMoveAmountOptions(button.dataset.direction));
     });
@@ -42915,6 +43073,9 @@
         } else if (action.type === 'promote' && source && action.target && Number.isInteger(action.amount)) {
           selectedRegionCode = source;
           performPromotion(action.target, action.amount);
+        } else if (action.type === 'relegate' && source && action.target && action.stage) {
+          selectedRegionCode = source;
+          performRelegation(action.target, action.stage);
         } else if (action.type === 'recycle' && source && action.stage) {
           selectedRegionCode = source;
         } else if (action.type === 'rotate' && Number.isInteger(action.layer)) {
@@ -42957,6 +43118,7 @@
         buy: `comprou uma peça ${String(action.stage || '').toUpperCase()} em ${source}`,
         move: `moveu ${action.amount} unidade(s): ${source} → ${action.target}`,
         promote: `promoveu ${action.amount} unidade(s): ${source} → ${action.target}`,
+        relegate: `rebaixou uma peça ${String(action.stage || '').toUpperCase()}: ${source} → ${action.target}`,
         recycle: `reciclou uma peça ${String(action.stage || '').toUpperCase()} em ${source}`,
         rotate: `girou o disco L${action.layer} para a ${action.direction === 'left' ? 'esquerda' : 'direita'}`
       }[action.type] || 'realizou uma ação';

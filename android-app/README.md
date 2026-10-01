@@ -32,7 +32,7 @@ No Android, o jogo abre em tela cheia e com orientação horizontal. No celular,
 1. Instale e abra o app nos dois aparelhos Android e mantenha o Bluetooth ligado.
 2. No aparelho anfitrião, escolha **Novo jogo > Bluetooth**, selecione a velocidade e toque em **Criar sala Bluetooth**. Conceda as permissões solicitadas e aceite deixar o aparelho visível.
 3. No outro aparelho, escolha **Novo jogo > Bluetooth > Buscar partidas**, selecione o anfitrião encontrado e aceite o pareamento/conexão do Android, se solicitado.
-4. O anfitrião joga como Laranja e começa; o convidado joga como Azul. A visão acompanha a região de cada ação, e compra, movimento, promoção e rotação são enviados imediatamente para que o outro aparelho os acompanhe. O estado do turno também é sincronizado ao passar a vez.
+4. O anfitrião joga como Laranja e começa; o convidado joga como Azul. A visão acompanha a região de cada ação, e compra, movimento, promoção, rebaixamento e rotação são enviados imediatamente para que o outro aparelho os acompanhe. O estado do turno também é sincronizado ao passar a vez.
 
 O Android pede permissões de dispositivos próximos (e localização em versões Android 11 ou anteriores, necessária para descoberta Bluetooth). A permissão de visibilidade do anfitrião é temporária; se a busca não encontrar o aparelho, toque novamente em **Buscar partidas** enquanto a sala ainda estiver visível.
 
