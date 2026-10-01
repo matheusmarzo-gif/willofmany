@@ -41900,7 +41900,7 @@
             const previous = selected[selected.length - 1];
             const candidate = row.reduce((closest, point) => {
               const pointX = point.x / 908 * 100;
-              if (previous && pointX <= previous.x / 908 * 100 + gap * 0.45) return closest;
+              if (previous && pointX <= previous.x / 908 * 100 + gap * 0.75) return closest;
               if (!closest || Math.abs(pointX - targetX) < Math.abs(closest.x / 908 * 100 - targetX)) {
                 return point;
               }
