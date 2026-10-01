@@ -85,6 +85,13 @@
     .layer { position:absolute; inset:0; z-index:1; width:100%; height:100%; overflow:visible; pointer-events:none; transform:rotate(0deg); transform-origin:center; transition:transform .32s cubic-bezier(.22,.8,.25,1); user-select:none; }
     .layer.heavy-rotation { transition-duration:3s; transition-timing-function:cubic-bezier(.7,0,.9,.45); }
     .pieces { position:absolute; inset:0; z-index:20; pointer-events:none; transform:rotate(0deg); transform-origin:center; transition:transform .32s cubic-bezier(.22,.8,.25,1); }
+    .board-focus-overlay { position:absolute; inset:0; z-index:25; width:100%; height:100%; overflow:visible; pointer-events:none; }
+    .board-focus-dim { fill:#111315; fill-opacity:.76; fill-rule:evenodd; }
+    .board-focus-outline { fill:none; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; animation:region-outline-pulse 1s ease-in-out infinite alternate; }
+    .board-focus-outline.is-war-outer { stroke:#ffd447; stroke-width:10px; filter:drop-shadow(0 0 5px rgba(255,196,44,.95)); }
+    .board-focus-outline.is-war-inner { stroke:#fff3a6; stroke-width:4px; }
+    .board-focus-outline.is-selected-outer { stroke:#ef4dca; stroke-width:5px; filter:drop-shadow(0 0 5px rgba(239,77,202,.95)); }
+    .board-focus-outline.is-selected-inner { stroke:#fff; stroke-width:2px; }
     .drag-overlay { position:absolute; inset:0; z-index:15; width:100%; height:100%; pointer-events:none; }
     .stage.is-dragging .drag-overlay { backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); }
     .trash-drop-zone { position:fixed; z-index:80; display:grid; justify-items:center; align-content:center; width:72px; min-height:80px; padding:7px 5px; border:1px solid rgba(103,45,34,.28); border-radius:12px; background:rgba(255,250,244,.96); box-shadow:0 5px 18px rgba(32,33,31,.24); color:#7c3425; pointer-events:none; transform:translateY(-50%) scale(.88); opacity:0; transition:opacity .16s ease,transform .16s ease,background .16s ease; }
@@ -211,6 +218,7 @@
     .debug-canvas { position:absolute; inset:0; z-index:25; width:100%; height:100%; pointer-events:none; opacity:1; background:rgba(255,255,255,.02); transform:rotate(0deg); transform-origin:center; transition:transform .32s cubic-bezier(.22,.8,.25,1); }
     .debug-canvas.is-hidden { display:none; }
     @keyframes piece-in { from { opacity:0; } to { opacity:1; } }
+    @keyframes region-outline-pulse { from { opacity:.48; } to { opacity:1; } }
     @keyframes war-flash { 0%,100% { opacity:1; filter:none; } 50% { opacity:.25; filter:sepia(1) saturate(4); } }
     @keyframes stage-nudge { 0%,100% { translate:0 0; } 25% { translate:-2px 1px; } 50% { translate:2px -1px; } 75% { translate:-1px 0; } }
     @keyframes action-cost-pop { 0% { opacity:0; translate:0 5px; } 12% { opacity:1; translate:0 0; } 78% { opacity:1; } 100% { opacity:0; translate:0 -8px; } }
@@ -301,7 +309,7 @@
       .statistics-table-wrap { max-height:76vh; }
     }
     @media (max-width:520px) { .campaign-guide-card { grid-template-columns:38px 1fr; gap:9px; padding:12px; } .campaign-guide-card button { grid-template-columns:38px 1fr; gap:9px; } .campaign-guide-avatar { width:38px; height:38px; font-size:17px; } }
-    @media (prefers-reduced-motion:reduce) { .layer,.pieces,.debug-canvas,button { transition:none; } .campaign-intro,.campaign-intro-dismiss,.campaign-defeat,.campaign-defeat-card { animation:none; } }
+    @media (prefers-reduced-motion:reduce) { .layer,.pieces,.debug-canvas,button { transition:none; } .campaign-intro,.campaign-intro-dismiss,.campaign-defeat,.campaign-defeat-card,.board-focus-outline { animation:none; } }
   </style>
 </head>
 <body>
@@ -447,6 +455,16 @@
         <button class="stage-panel-close" id="stage-panel-close" type="button" aria-label="Voltar para a visão global">×</button>
         <div class="stage" id="stage">
           <div class="pieces" id="pieces" aria-live="polite"></div>
+          <svg class="board-focus-overlay" id="board-focus-overlay" viewBox="0 0 908 908" aria-hidden="true">
+            <defs>
+              <mask id="board-focus-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="908" height="908">
+                <rect width="908" height="908" fill="#fff"></rect>
+                <g id="board-focus-mask-holes" fill="#000" fill-rule="evenodd"></g>
+              </mask>
+            </defs>
+            <rect class="board-focus-dim" id="board-focus-dim" width="908" height="908" mask="url(#board-focus-mask)"></rect>
+            <g id="board-focus-outlines"></g>
+          </svg>
         </div>
       </div>
       <div class="war-status is-hidden" id="war-status" aria-live="polite"></div>
@@ -39288,6 +39306,10 @@
     const campaignGuideMessage = document.querySelector('#campaign-guide-message');
     const campaignGuideHint = document.querySelector('#campaign-guide-hint');
     const stagePanel = document.querySelector('#stage-panel');
+    const boardFocusOverlay = document.querySelector('#board-focus-overlay');
+    const boardFocusMaskHoles = document.querySelector('#board-focus-mask-holes');
+    const boardFocusDim = document.querySelector('#board-focus-dim');
+    const boardFocusOutlines = document.querySelector('#board-focus-outlines');
     const trashDropZone = document.querySelector('#trash-drop-zone');
     const trashDropRefund = document.querySelector('#trash-drop-refund');
     const stagePanelClose = document.querySelector('#stage-panel-close');
@@ -39410,6 +39432,7 @@
     const redRegionOrder = [8, 8, 1, 2, 3, 4, 5, 6];
     let currentDebugLayer = 8; // Which layer's regions to show in debug canvas
     let selectedRegionCode = null;
+    let warSpotlightRegionCodes = [];
     let focusedRegionCode = null;
     let stageZoom = 1;
     let stageZoomOffset = { x: 0, y: 0 };
@@ -39479,6 +39502,7 @@
       lastRotatedBy = null;
       rotationLockTurn = null;
       selectedRegionCode = null;
+      warSpotlightRegionCodes = [];
       focusedRegionCode = null;
       stageZoom = 1;
       stageZoomOffset = { x: 0, y: 0 };
@@ -40335,6 +40359,8 @@
       if (isOnlineGame() && onlineTeam === 'orange') sendOnlineMessage({ type: 'war_start' });
       warButton.disabled = true;
       resetCombatRegions();
+      warSpotlightRegionCodes = [];
+      updateBoardFocusOverlay();
       resetStageZoom();
       const blocks = [];
 
@@ -40361,6 +40387,8 @@
       });
 
       if (!blocks.length) {
+        warSpotlightRegionCodes = [];
+        updateBoardFocusOverlay();
         readout.textContent = 'Guerra: nenhum bloco de confronto encontrado.';
         isWarRunning = false;
         updateWarAvailability();
@@ -40377,7 +40405,9 @@
 
       blocks.reverse();
       for (const block of blocks) {
+        warSpotlightRegionCodes = [...new Set([...block.alliedRegions, ...block.enemyRegions])];
         focusRegion(block.regionCode);
+        updateBoardFocusOverlay();
         const alliedForce = block.alliedRegions.reduce((sum, code) => sum + getRegionFinalForceValue(code), 0);
         const enemyForce = block.enemyRegions.reduce((sum, code) => sum + getRegionFinalForceValue(code), 0);
         renderWarForces(block.attacker, alliedForce, enemyForce);
@@ -40413,6 +40443,8 @@
       }
 
       warStatus.classList.add('is-hidden');
+      warSpotlightRegionCodes = [];
+      updateBoardFocusOverlay();
       resetStageZoom();
       isWarRunning = false;
       updateWarAvailability();
@@ -42984,6 +43016,66 @@
       layerElement.appendChild(icon);
     }
 
+    function getRegionFocusPathData(geometry) {
+      if (geometry.shape === 'quadrilateral') return getQuadrilateralRegionPath(geometry);
+      const path = getCircularRegionPath(geometry);
+      if (path) return path;
+      const { centerX, centerY, outerRadius } = geometry;
+      return [
+        `M ${centerX + outerRadius} ${centerY}`,
+        `A ${outerRadius} ${outerRadius} 0 1 0 ${centerX - outerRadius} ${centerY}`,
+        `A ${outerRadius} ${outerRadius} 0 1 0 ${centerX + outerRadius} ${centerY}`,
+        'Z'
+      ].join(' ');
+    }
+
+    function updateBoardFocusOverlay() {
+      if (!boardFocusOverlay) return;
+      const svgNamespace = 'http://www.w3.org/2000/svg';
+      const warRegions = [...new Set(warSpotlightRegionCodes)]
+        .filter((code) => Object.prototype.hasOwnProperty.call(regionGeometryByCode, code));
+      const selectedRegion = !warRegions.length && selectedRegionCode &&
+        Object.prototype.hasOwnProperty.call(regionGeometryByCode, selectedRegionCode)
+        ? selectedRegionCode
+        : null;
+      const focusRegions = [...new Set([...warRegions, ...(selectedRegion ? [selectedRegion] : [])])];
+      boardFocusMaskHoles.replaceChildren();
+      boardFocusOutlines.replaceChildren();
+      boardFocusDim.style.display = warRegions.length ? '' : 'none';
+
+      warRegions.forEach((regionCode) => {
+        const geometry = regionGeometryByCode[regionCode];
+        const path = document.createElementNS(svgNamespace, 'path');
+        path.setAttribute('d', getRegionFocusPathData(geometry));
+        path.setAttribute('transform', `rotate(${rotations[geometry.layer - 1] || 0} 454 454)`);
+        boardFocusMaskHoles.appendChild(path);
+      });
+
+      focusRegions.forEach((regionCode) => {
+        const geometry = regionGeometryByCode[regionCode];
+        const isWarRegion = warRegions.includes(regionCode);
+        const pathData = getRegionFocusPathData(geometry);
+        const transform = `rotate(${rotations[geometry.layer - 1] || 0} 454 454)`;
+        const outerOutline = document.createElementNS(svgNamespace, 'path');
+        outerOutline.setAttribute('d', pathData);
+        outerOutline.setAttribute('transform', transform);
+        outerOutline.setAttribute(
+          'class',
+          `board-focus-outline ${isWarRegion ? 'is-war-outer' : 'is-selected-outer'}`
+        );
+        boardFocusOutlines.appendChild(outerOutline);
+
+        const innerOutline = document.createElementNS(svgNamespace, 'path');
+        innerOutline.setAttribute('d', pathData);
+        innerOutline.setAttribute('transform', transform);
+        innerOutline.setAttribute(
+          'class',
+          `board-focus-outline ${isWarRegion ? 'is-war-inner' : 'is-selected-inner'}`
+        );
+        boardFocusOutlines.appendChild(innerOutline);
+      });
+    }
+
     function renderBoardLayers() {
       const svgNamespace = 'http://www.w3.org/2000/svg';
       const farmTiers = [250, 1000, 4000, 16000, 50000];
@@ -43078,6 +43170,7 @@
           appendCampaignBagIcon(layerElement, code, geometry, svgNamespace, iconScale);
         });
       });
+      updateBoardFocusOverlay();
     }
 
     function normalizeImportedRegionProbeBoxes(data) {
@@ -44310,7 +44403,7 @@
     });
     debugExportButton.addEventListener('click', exportGameDebugLog);
     stage.addEventListener('pointerdown', (event) => {
-      if (isDebugModeActive()) {
+      if (isDebugModeActive() || isWarRunning) {
         event.stopPropagation();
         return;
       }
@@ -44318,12 +44411,14 @@
       const regionCode = resolveRegionFromPointer(event.clientX, event.clientY);
       if (!regionCode) {
         selectedRegionCode = null;
+        updateBoardFocusOverlay();
         updateSelectedRegionPanel();
         updateMobileRotationControls();
         return;
       }
       if (beginPieceDrag(event, regionCode)) return;
       selectedRegionCode = regionCode;
+      updateBoardFocusOverlay();
       updateSelectedRegionPanel(selectedRegionCode);
       updateMobileRotationControls();
       focusRegion(regionCode);
@@ -45306,6 +45401,13 @@
           await loadBoardFile('tabuleiro-01.json');
         } catch (error) {
           startMessage.textContent = `Não foi possível carregar o level da campanha: ${error.message}`;
+          return;
+        }
+      } else {
+        try {
+          await loadBoardFile('regioes-will-of-many-circular.json');
+        } catch (error) {
+          startMessage.textContent = `Não foi possível carregar o tabuleiro principal: ${error.message}`;
           return;
         }
       }
