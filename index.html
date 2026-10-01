@@ -170,6 +170,21 @@
     .campaign-defeat-mark { display:grid; place-items:center; width:58px; height:58px; border:1px solid #c77962; border-radius:50%; color:#e49a81; font:400 38px/1 Georgia,"Times New Roman",serif; }
     .campaign-defeat-card strong { color:#f0a188; font:400 clamp(26px,7vw,38px)/1.1 Georgia,"Times New Roman",serif; }
     .campaign-defeat-card span:last-child { color:rgba(255,255,255,.76); font-size:14px; line-height:1.55; }
+    .campaign-guide { position:fixed; inset:0; z-index:480; pointer-events:none; }
+    .campaign-guide.is-hidden { display:none; }
+    .campaign-guide-shade { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+    .campaign-guide-spotlights { position:absolute; inset:0; pointer-events:none; }
+    .campaign-guide-spotlight { position:fixed; border:2px solid #f3c66b; border-radius:8px; box-shadow:0 0 0 2px rgba(26,25,22,.4),0 0 22px 5px rgba(255,218,127,.78); pointer-events:none; }
+    #turn-points.is-guide-pinned { position:fixed; z-index:481; top:max(8px,env(safe-area-inset-top)); left:50%; width:min(360px,calc(100vw - 28px)); margin:0; padding:8px 12px; border:1px solid rgba(167,72,45,.5); background:rgba(255,250,244,.97); box-shadow:0 4px 18px rgba(0,0,0,.3); text-align:center; transform:translateX(-50%); }
+    .campaign-guide-card { position:fixed; left:50%; bottom:max(14px,env(safe-area-inset-bottom)); display:grid; grid-template-columns:48px 1fr; align-items:center; gap:12px; width:min(520px,calc(100vw - 28px)); max-height:min(34vh,240px); overflow:auto; padding:16px 18px; border:1px solid rgba(255,255,255,.32); background:linear-gradient(145deg,#f9f5ec,#e8dfd0); box-shadow:0 18px 55px rgba(0,0,0,.48); color:var(--ink); text-align:left; transform:translateX(-50%); pointer-events:auto; }
+    .campaign-guide-card[data-position="top"] { top:max(14px,env(safe-area-inset-top)); bottom:auto; }
+    .campaign-guide-card button { display:grid; grid-template-columns:48px 1fr; align-items:center; gap:12px; width:100%; min-height:48px; padding:0; border:0; background:transparent; text-align:left; letter-spacing:normal; }
+    .campaign-guide-avatar { display:grid; place-items:center; width:48px; height:48px; border:1px solid rgba(167,72,45,.38); border-radius:50%; color:#fff5e9; background:radial-gradient(circle at 36% 28%,#d99361,#783e32 72%); font:700 20px Georgia,"Times New Roman",serif; }
+    .campaign-guide-copy { display:grid; gap:5px; }
+    .campaign-guide-name { color:var(--accent); font-size:9px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
+    .campaign-guide-copy strong { font:400 clamp(17px,4vw,21px)/1.1 Georgia,"Times New Roman",serif; }
+    .campaign-guide-copy span:last-child { color:#55534e; font:12px/1.45 "Trebuchet MS","Gill Sans",sans-serif; }
+    .campaign-guide-hint { grid-column:2; padding-top:2px; color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
     .campaign-intro { position:fixed; inset:0; z-index:400; display:grid; place-items:center; padding:20px; background:rgba(17,19,20,.82); backdrop-filter:blur(6px); animation:campaign-intro-fade .3s ease both; }
     .campaign-intro.is-hidden { display:none; }
     .campaign-intro-dismiss { display:grid; grid-template-columns:88px 1fr; align-items:center; gap:22px; width:min(560px,100%); padding:clamp(22px,5vw,38px); border:1px solid rgba(255,255,255,.26); background:linear-gradient(145deg,#f9f5ec,#e8dfd0); box-shadow:0 24px 90px rgba(0,0,0,.45); text-align:left; white-space:normal; animation:campaign-intro-rise .42s cubic-bezier(.2,.8,.25,1) both; }
@@ -284,6 +299,7 @@
       .game-modal-card { max-height:96vh; padding:12px; }
       .statistics-table-wrap { max-height:76vh; }
     }
+    @media (max-width:520px) { .campaign-guide-card { grid-template-columns:38px 1fr; gap:9px; padding:12px; } .campaign-guide-card button { grid-template-columns:38px 1fr; gap:9px; } .campaign-guide-avatar { width:38px; height:38px; font-size:17px; } }
     @media (prefers-reduced-motion:reduce) { .layer,.pieces,.debug-canvas,button { transition:none; } .campaign-intro,.campaign-intro-dismiss,.campaign-defeat,.campaign-defeat-card { animation:none; } }
   </style>
 </head>
@@ -559,6 +575,23 @@
       <strong id="campaign-defeat-title">Você foi derrotado</strong>
       <span id="campaign-defeat-message">O level será reiniciado.</span>
     </div>
+  </section>
+  <section class="campaign-guide is-hidden" id="campaign-guide" role="dialog" aria-modal="true" aria-labelledby="campaign-guide-title" aria-describedby="campaign-guide-message" aria-hidden="true">
+    <svg class="campaign-guide-shade" id="campaign-guide-shade" aria-hidden="true" preserveAspectRatio="none">
+      <path id="campaign-guide-shade-path" fill="#0c0d0e" fill-opacity=".82" fill-rule="evenodd"></path>
+    </svg>
+    <div class="campaign-guide-spotlights" id="campaign-guide-spotlights" aria-hidden="true"></div>
+    <article class="campaign-guide-card" id="campaign-guide-card">
+      <button id="campaign-guide-continue" type="button" aria-label="Continuar com as instruções do agente">
+        <span class="campaign-guide-avatar" aria-hidden="true">A</span>
+        <span class="campaign-guide-copy">
+          <span class="campaign-guide-name">Agente da campanha</span>
+          <strong id="campaign-guide-title"></strong>
+          <span id="campaign-guide-message"></span>
+        </span>
+      </button>
+      <span class="campaign-guide-hint" id="campaign-guide-hint">Toque na mensagem para continuar</span>
+    </article>
   </section>
   <script src="will-of-many-ai.js"></script>
   <script type="application/json" id="embedded-region-data">{
@@ -39244,6 +39277,15 @@
     const campaignIntroDismiss = document.querySelector('#campaign-intro-dismiss');
     const campaignDefeat = document.querySelector('#campaign-defeat');
     const campaignDefeatMessage = document.querySelector('#campaign-defeat-message');
+    const campaignGuide = document.querySelector('#campaign-guide');
+    const campaignGuideShade = document.querySelector('#campaign-guide-shade');
+    const campaignGuideShadePath = document.querySelector('#campaign-guide-shade-path');
+    const campaignGuideSpotlights = document.querySelector('#campaign-guide-spotlights');
+    const campaignGuideCard = document.querySelector('#campaign-guide-card');
+    const campaignGuideContinue = document.querySelector('#campaign-guide-continue');
+    const campaignGuideTitle = document.querySelector('#campaign-guide-title');
+    const campaignGuideMessage = document.querySelector('#campaign-guide-message');
+    const campaignGuideHint = document.querySelector('#campaign-guide-hint');
     const stagePanel = document.querySelector('#stage-panel');
     const trashDropZone = document.querySelector('#trash-drop-zone');
     const trashDropRefund = document.querySelector('#trash-drop-refund');
@@ -39349,6 +39391,11 @@
     let campaignBoardConfig = null;
     let activeCampaignLevel = null;
     let campaignCollectedBags = [];
+    let campaignGuideStep = 'complete';
+    let campaignGuideDismissible = false;
+    let actionFeedbackQueue = [];
+    let activeActionFeedback = null;
+    let actionFeedbackTimer = 0;
     let campaignObjectiveRegions = [];
     let campaignResetPending = false;
     let campaignIntroPending = false;
@@ -39448,11 +39495,22 @@
       wheatBalances = { orange: 0, blue: 0 };
       lastWheatTurnReport = null;
       campaignCollectedBags = [];
+      campaignGuideStep = 'complete';
+      campaignGuideDismissible = false;
+      actionFeedbackQueue = [];
+      if (actionFeedbackTimer) window.clearTimeout(actionFeedbackTimer);
+      activeActionFeedback?.tag?.remove();
+      activeActionFeedback = null;
+      actionFeedbackTimer = 0;
       campaignObjectiveRegions = [];
       campaignResetPending = false;
       campaignIntroPending = false;
       campaignIntro.classList.add('is-hidden');
       campaignIntro.setAttribute('aria-hidden', 'true');
+      campaignGuide.classList.add('is-hidden');
+      campaignGuide.setAttribute('aria-hidden', 'true');
+      campaignGuideSpotlights.replaceChildren();
+      turnPoints.classList.remove('is-guide-pinned');
       campaignDefeat.classList.add('is-hidden');
       campaignDefeat.setAttribute('aria-hidden', 'true');
       trashDropZone.classList.add('is-hidden');
@@ -39465,6 +39523,7 @@
         gameMode, humanTeam, aiTeam, gameSpeed, currentTeam, currentTurn,
         campaignLevelId: activeCampaignLevel?.id || null,
         campaignCollectedBags: [...campaignCollectedBags],
+        campaignGuideStep,
         hasRotatedThisTurn, lastRotatedLayer, lastRotatedBy, rotationLockTurn,
         rotations: [...rotations], pontosDoTurn: { ...pontosDoTurn },
         turnMoveHistory: JSON.parse(JSON.stringify(turnMoveHistory)),
@@ -39491,6 +39550,13 @@
         campaignCollectedBags = Array.isArray(save.campaignCollectedBags)
           ? save.campaignCollectedBags.filter((code) => typeof code === 'string')
           : [];
+        campaignGuideStep = [
+          'intro', 'coins', 'purchase', 'move', 'await-move', 'bag-tip',
+          'await-bag', 'army-tip', 'await-army', 'war', 'complete'
+        ].includes(save.campaignGuideStep)
+          ? save.campaignGuideStep
+          : 'complete';
+        campaignIntroPending = gameMode === 'campaign' && campaignGuideStep === 'intro';
         campaignObjectiveRegions = gameMode === 'campaign'
           ? (activeCampaignLevel?.objectiveRegions || [])
           : [];
@@ -41494,8 +41560,30 @@
       tag.setAttribute('aria-hidden', 'true');
       tag.style.left = `${point.x}%`;
       tag.style.top = `${point.y}%`;
-      stage.appendChild(tag);
-      window.setTimeout(() => tag.remove(), 1800);
+      if (actionFeedbackQueue.length + Number(!!activeActionFeedback) >= 3) {
+        if (activeActionFeedback) {
+          window.clearTimeout(actionFeedbackTimer);
+          activeActionFeedback.tag.remove();
+          activeActionFeedback = null;
+          actionFeedbackTimer = 0;
+        } else {
+          actionFeedbackQueue.shift();
+        }
+      }
+      actionFeedbackQueue.push({ tag });
+      showNextActionFeedback();
+    }
+
+    function showNextActionFeedback() {
+      if (activeActionFeedback || !actionFeedbackQueue.length) return;
+      activeActionFeedback = actionFeedbackQueue.shift();
+      stage.appendChild(activeActionFeedback.tag);
+      actionFeedbackTimer = window.setTimeout(() => {
+        activeActionFeedback?.tag.remove();
+        activeActionFeedback = null;
+        actionFeedbackTimer = 0;
+        showNextActionFeedback();
+      }, 1800);
     }
 
     function updateActiveRegions() {
@@ -41691,7 +41779,11 @@
       );
       const activeKeys = new Set();
       Object.entries(regionPiecesByRegion).forEach(([regionCode, piecesByTeam]) => {
-        const slots = getRegionSlots(regionCode) || [];
+        const availableSlots = getRegionSlots(regionCode) || [];
+        const totalPieces = Object.values(piecesByTeam)
+          .flatMap((stages) => Object.values(stages))
+          .reduce((total, quantity) => total + Number(quantity || 0), 0);
+        const slots = getBalancedRegionSlots(regionCode, availableSlots, totalPieces);
         const layerNumber = getRegionLayer(regionCode);
         const rotation = ((rotations[layerNumber - 1] || 0) * Math.PI) / 180;
         const sin = Math.sin(rotation);
@@ -41740,6 +41832,69 @@
       existingPieces.forEach((piece, key) => {
         if (!activeKeys.has(key)) piece.remove();
       });
+    }
+
+    function getBalancedRegionSlots(regionCode, slots, pieceCount) {
+      if (pieceCount <= 0 || !slots.length) return slots;
+      const center = getRegionPieceCenter(regionCode);
+      if (pieceCount === 1 && center) return [center];
+      if ((pieceCount !== 2 && pieceCount !== 3) || slots.length < pieceCount || !center) {
+        return slots;
+      }
+
+      let bestArrangement = slots.slice(0, pieceCount);
+      let bestScore = -Infinity;
+      const evaluate = (arrangement) => {
+        const average = arrangement.reduce((sum, point) => ({
+          x: sum.x + point.x / arrangement.length,
+          y: sum.y + point.y / arrangement.length
+        }), { x: 0, y: 0 });
+        const distances = [];
+        for (let first = 0; first < arrangement.length; first += 1) {
+          for (let second = first + 1; second < arrangement.length; second += 1) {
+            distances.push(Math.hypot(
+              arrangement[first].x - arrangement[second].x,
+              arrangement[first].y - arrangement[second].y
+            ));
+          }
+        }
+        const centerOffset = Math.hypot(average.x - center.x, average.y - center.y);
+        const minimumSpacing = Math.min(...distances);
+        const averageSpacing = distances.reduce((total, distance) => total + distance, 0) / distances.length;
+        const score = minimumSpacing + averageSpacing * 0.15 - centerOffset * 1.5;
+        if (score > bestScore) {
+          bestScore = score;
+          bestArrangement = arrangement;
+        }
+      };
+
+      for (let first = 0; first < slots.length; first += 1) {
+        for (let second = first + 1; second < slots.length; second += 1) {
+          if (pieceCount === 2) {
+            evaluate([slots[first], slots[second]]);
+            continue;
+          }
+          for (let third = second + 1; third < slots.length; third += 1) {
+            evaluate([slots[first], slots[second], slots[third]]);
+          }
+        }
+      }
+      return bestArrangement;
+    }
+
+    function getRegionPieceCenter(regionCode) {
+      const geometry = regionGeometryByCode[regionCode];
+      if (geometry?.shape !== 'quadrilateral' ||
+          !Number.isFinite(geometry.centerX) || !Number.isFinite(geometry.centerY)) {
+        return getRegionFocusPoint(regionCode);
+      }
+      const angle = ((rotations[getRegionLayer(regionCode) - 1] || 0) * Math.PI) / 180;
+      const dx = geometry.centerX - 454;
+      const dy = geometry.centerY - 454;
+      return {
+        x: (454 + dx * Math.cos(angle) - dy * Math.sin(angle)) / 908 * 100,
+        y: (454 + dx * Math.sin(angle) + dy * Math.cos(angle)) / 908 * 100
+      };
     }
 
     function rotationEasing(progress) {
@@ -41880,6 +42035,12 @@
         stage
       });
       finishIfCenterConquered();
+      if (isCampaignGame() && campaignGuideStep === 'purchase' &&
+          team === 'orange' && regionReference === 'L8-5' && stage === 'g') {
+        showCampaignGuide('move');
+      } else {
+        maybeShowCampaignWarGuide();
+      }
     }
 
     function getRegionFocusPoint(regionCode) {
@@ -43267,17 +43428,262 @@
     }
 
     function showCampaignIntro() {
-      if (!campaignIntroPending) return;
-      campaignIntroPending = false;
-      campaignIntro.classList.remove('is-hidden');
-      campaignIntro.setAttribute('aria-hidden', 'false');
-      campaignIntroDismiss.focus({ preventScroll: true });
+      if (campaignIntroPending) {
+        campaignIntroPending = false;
+        campaignIntro.classList.remove('is-hidden');
+        campaignIntro.setAttribute('aria-hidden', 'false');
+        campaignIntroDismiss.focus({ preventScroll: true });
+        return;
+      }
+      if (isCampaignGame() && [
+        'coins', 'purchase', 'move', 'bag-tip', 'army-tip', 'war'
+      ].includes(campaignGuideStep)) {
+        showCampaignGuide(campaignGuideStep);
+      }
     }
 
     function dismissCampaignIntro() {
+      const shouldContinueGuide = !campaignIntro.classList.contains('is-hidden') &&
+        isCampaignGame() && isGameStarted && campaignGuideStep === 'intro';
       campaignIntro.classList.add('is-hidden');
       campaignIntro.setAttribute('aria-hidden', 'true');
       campaignIntroDismiss.blur();
+      if (shouldContinueGuide) {
+        showCampaignGuide('coins');
+      }
+    }
+
+    function getCampaignApproachRegion() {
+      const startingRegions = Object.entries(regionGeometryByCode)
+        .filter(([, geometry]) => geometry.initialPieces.some((piece) => piece.team === 'orange'))
+        .map(([code]) => code);
+      for (const start of startingRegions) {
+        for (const target of campaignObjectiveRegions) {
+          const queue = [[start]];
+          const visited = new Set([start]);
+          while (queue.length) {
+            const path = queue.shift();
+            const current = path[path.length - 1];
+            if (current === target) return path.length > 1 ? path[path.length - 2] : null;
+            const neighbors = [...(regionNeighborCache[current]?.sameRank || [])].sort();
+            neighbors.forEach((neighbor) => {
+              if (visited.has(neighbor)) return;
+              visited.add(neighbor);
+              queue.push([...path, neighbor]);
+            });
+          }
+        }
+      }
+      return null;
+    }
+
+    function getCampaignRegionShape(regionCode) {
+      if (!regionCode) return null;
+      return [...document.querySelectorAll('[data-region]')].find((element) =>
+        element.dataset.region === regionCode && !element.dataset.team &&
+        ['path', 'circle'].includes(element.tagName.toLowerCase())
+      ) || null;
+    }
+
+    function getCampaignGuideTargetElements(step) {
+      const approachRegion = getCampaignApproachRegion();
+      const piecesInRegion = (regionCode) => [...pieces.querySelectorAll('.piece')]
+        .filter((piece) => piece.dataset.region === regionCode && piece.dataset.team === 'orange');
+      switch (step) {
+        case 'coins':
+          return [turnPoints];
+        case 'purchase':
+          return [
+            document.querySelector('#piece-controls .piece-button[data-stage="g"]'),
+            getCampaignRegionShape('L8-5')
+          ];
+        case 'move':
+          return [...piecesInRegion('L8-5'), getCampaignRegionShape('L8-4')].filter(Boolean);
+        case 'bag-tip':
+          return [turnPoints, getCampaignRegionShape('L8-3')].filter(Boolean);
+        case 'army-tip':
+          return [getCampaignRegionShape(approachRegion)].filter(Boolean);
+        case 'war':
+          return [
+            document.querySelector('#war-button'),
+            getCampaignRegionShape(approachRegion),
+            ...campaignObjectiveRegions.map(getCampaignRegionShape)
+          ].filter(Boolean);
+        default:
+          return [];
+      }
+    }
+
+    function updateCampaignGuideSpotlights() {
+      if (campaignGuide.classList.contains('is-hidden')) return;
+      const targets = getCampaignGuideTargetElements(campaignGuideStep)
+        .filter((target) => {
+          if (!target || !target.getClientRects().length) return false;
+          const rect = target.getBoundingClientRect();
+          return rect.bottom > 0 && rect.top < window.innerHeight &&
+            rect.right > 0 && rect.left < window.innerWidth;
+        });
+      campaignGuideSpotlights.replaceChildren();
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      campaignGuideShade.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      const holes = targets.map((target) => {
+        const rect = target.getBoundingClientRect();
+        const padding = target === turnPoints || target.id === 'war-button' ? 8 : 6;
+        const left = Math.max(0, rect.left - padding);
+        const top = Math.max(0, rect.top - padding);
+        const right = Math.min(width, rect.right + padding);
+        const bottom = Math.min(height, rect.bottom + padding);
+        const outline = document.createElement('span');
+        outline.className = 'campaign-guide-spotlight';
+        outline.style.left = `${left}px`;
+        outline.style.top = `${top}px`;
+        outline.style.width = `${Math.max(1, right - left)}px`;
+        outline.style.height = `${Math.max(1, bottom - top)}px`;
+        campaignGuideSpotlights.appendChild(outline);
+        return `M${left} ${top}H${right}V${bottom}H${left}Z`;
+      });
+      campaignGuideShadePath.setAttribute(
+        'd',
+        [`M0 0H${width}V${height}H0Z`, ...holes].join('')
+      );
+      const targetRects = targets.map((target) => target.getBoundingClientRect());
+      const topCardBottom = campaignGuideCard.getBoundingClientRect().height + 28;
+      const bottomCardTop = height - topCardBottom;
+      const overlap = (top, bottom) => targetRects.reduce((total, rect) =>
+        total + Math.max(0, Math.min(rect.bottom, bottom) - Math.max(rect.top, top)), 0);
+      campaignGuideCard.dataset.position = overlap(12, topCardBottom) <= overlap(bottomCardTop, height - 12)
+        ? 'top'
+        : 'bottom';
+    }
+
+    function showCampaignGuide(step) {
+      if (!isCampaignGame() || !isGameStarted || isGameOver) return;
+      const approachRegion = getCampaignApproachRegion();
+      const guideContent = {
+        coins: {
+          title: 'Suas moedas neste turno',
+          message: `Você tem ${Number(pontosDoTurn.orange).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} moedas disponíveis para comprar unidades ou movê-las. As moedas não acumulam de um turno para o outro.`,
+          dismissible: true,
+          focus: null
+        },
+        purchase: {
+          title: 'Compre sua primeira unidade',
+          message: 'Você controla L8-5. Toque no ícone da peça G para comprar uma unidade; ela custa 1 moeda.',
+          dismissible: false,
+          focus: 'L8-5'
+        },
+        move: {
+          title: 'Avance pelo tabuleiro',
+          message: 'Toque nesta mensagem para voltar ao jogo. Depois, arraste a peça G de L8-5 para a região vizinha L8-4.',
+          dismissible: true,
+          focus: 'L8-5'
+        },
+        'bag-tip': {
+          title: 'Encontre mais moedas',
+          message: 'Suas moedas estão acabando. Compre uma unidade G em L8-4 (1 moeda) e avance com uma das duas até L8-3 para pegar o saco com 3 moedas.',
+          dismissible: true,
+          focus: 'L8-3'
+        },
+        'army-tip': {
+          title: 'Prepare o avanço final',
+          message: `Parabéns! Você encontrou as moedas. Faltam apenas duas regiões: reúna o máximo possível de soldados em ${approachRegion || 'L8-2'}, ao lado do inimigo.`,
+          dismissible: true,
+          focus: approachRegion
+        },
+        war: {
+          title: 'Declare Guerra',
+          message: `Você tem pelo menos dois soldados em ${approachRegion || 'L8-2'}. Toque em Guerra para atacar os territórios inimigos vizinhos; vença com mais força para conquistá-los.`,
+          dismissible: false,
+          focus: null
+        }
+      }[step];
+      if (!guideContent) return;
+      campaignGuideStep = step;
+      campaignGuideDismissible = guideContent.dismissible;
+      turnPoints.classList.toggle('is-guide-pinned', step === 'bag-tip');
+      campaignGuideTitle.textContent = guideContent.title;
+      campaignGuideMessage.textContent = guideContent.message;
+      campaignGuideContinue.disabled = !guideContent.dismissible;
+      campaignGuideHint.textContent = guideContent.dismissible
+        ? 'Toque na mensagem para continuar'
+        : step === 'purchase' ? 'Compre a unidade destacada para continuar' : 'Toque no botão Guerra destacado';
+      campaignGuide.classList.remove('is-hidden');
+      campaignGuide.setAttribute('aria-hidden', 'false');
+      if (guideContent.focus) focusRegion(guideContent.focus);
+      const primaryTarget = step === 'purchase'
+        ? document.querySelector('#piece-controls .piece-button[data-stage="g"]')
+        : step === 'coins' ? turnPoints
+          : step === 'bag-tip' ? getCampaignRegionShape('L8-3')
+          : step === 'war' ? document.querySelector('#war-button')
+            : getCampaignGuideTargetElements(step)[0];
+      const guideTargets = getCampaignGuideTargetElements(step).filter((target) =>
+        target && target.getClientRects().length);
+      if (guideTargets.length) {
+        const rects = guideTargets.map((target) => target.getBoundingClientRect());
+        const bounds = {
+          top: Math.min(...rects.map((rect) => rect.top)),
+          bottom: Math.max(...rects.map((rect) => rect.bottom))
+        };
+        const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        if (bounds.bottom - bounds.top < window.innerHeight - 170) {
+          const center = (bounds.top + bounds.bottom) / 2;
+          window.scrollTo(0, Math.max(0, Math.min(maxScroll,
+            window.scrollY + center - window.innerHeight / 2)));
+        } else if (primaryTarget) {
+          primaryTarget.scrollIntoView({ block: 'center', inline: 'nearest' });
+        }
+      }
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        updateCampaignGuideSpotlights();
+        const focusTarget = guideContent.dismissible ? campaignGuideContinue : primaryTarget;
+        focusTarget?.focus?.({ preventScroll: true });
+      }));
+      if (isGameStarted && !isGameOver) saveGame();
+    }
+
+    function hideCampaignGuide() {
+      campaignGuide.classList.add('is-hidden');
+      campaignGuide.setAttribute('aria-hidden', 'true');
+      turnPoints.classList.remove('is-guide-pinned');
+      campaignGuideSpotlights.replaceChildren();
+      campaignGuideContinue.blur();
+      campaignGuideShadePath.setAttribute('d', '');
+    }
+
+    function continueCampaignGuide() {
+      if (!campaignGuideDismissible || campaignGuide.classList.contains('is-hidden')) return;
+      if (campaignGuideStep === 'coins') {
+        showCampaignGuide('purchase');
+        return;
+      }
+      const nextStep = {
+        move: 'await-move',
+        'bag-tip': 'await-bag',
+        'army-tip': 'await-army'
+      }[campaignGuideStep] || 'complete';
+      hideCampaignGuide();
+      campaignGuideStep = nextStep;
+      saveGame();
+      if (nextStep === 'await-army') maybeShowCampaignWarGuide();
+    }
+
+    function isCampaignGuideActionAllowed(target, eventType) {
+      if (campaignGuideDismissible) return campaignGuideContinue.contains(target);
+      if (campaignGuideStep === 'purchase') {
+        const purchaseButton = document.querySelector('#piece-controls .piece-button[data-stage="g"]');
+        return !!purchaseButton && purchaseButton.contains(target);
+      }
+      return campaignGuideStep === 'war' && warButton.contains(target) &&
+        (eventType === 'pointerdown' || eventType === 'click');
+    }
+
+    function maybeShowCampaignWarGuide() {
+      if (!isCampaignGame() || campaignGuideStep !== 'await-army') return;
+      const approachRegion = getCampaignApproachRegion();
+      if (!approachRegion || getRegionDominador(approachRegion) !== 'orange' ||
+          getTeamSoldierCount(approachRegion, 'orange') < 2) return;
+      showCampaignGuide('war');
     }
 
     function returnCampaignToMenu() {
@@ -43292,6 +43698,8 @@
       campaignIntroPending = false;
       localStorage.removeItem('will-of-many-save');
       dismissCampaignIntro();
+      hideCampaignGuide();
+      campaignGuideStep = 'complete';
       campaignDefeat.classList.add('is-hidden');
       campaignDefeat.setAttribute('aria-hidden', 'true');
       campaignActions.classList.add('is-hidden');
@@ -43540,6 +43948,11 @@
 
     passTurnButton.addEventListener('click', passTurnToNextPlayer);
     warButton.addEventListener('click', () => {
+      if (isCampaignGame() && campaignGuideStep === 'war') {
+        hideCampaignGuide();
+        campaignGuideStep = 'complete';
+        saveGame();
+      }
       if (gameMode === 'bluetooth' && bluetoothRole === 'guest') {
         sendBluetoothMessage({ type: 'war_request' });
         startMessage.textContent = 'Solicitação de guerra enviada ao anfitrião.';
@@ -43653,6 +44066,9 @@
       showActionFeedback(regionCode, coins, 'bag', '+');
       readout.textContent = `${team === 'orange' ? 'Laranja' : 'Azul'} encontrou um saco com ${coins} moedas em ${regionCode}.`;
       updateTurnState();
+      if (team === 'orange' && campaignGuideStep === 'await-bag' && regionCode === 'L8-3') {
+        showCampaignGuide('army-tip');
+      }
       return coins;
     }
 
@@ -43730,6 +44146,12 @@
         amount
       });
       finishIfCenterConquered();
+      if (isCampaignGame() && currentTeam === 'orange' &&
+          campaignGuideStep === 'await-move' && sourceCode === 'L8-5' && neighbor === 'L8-4') {
+        showCampaignGuide('bag-tip');
+      } else {
+        maybeShowCampaignWarGuide();
+      }
     }
 
     openMoveButton.addEventListener('click', openMoveModal);
@@ -44675,6 +45097,21 @@
     campaignRestartButton.addEventListener('click', restartCampaignLevel);
     finalRestartCampaignButton.addEventListener('click', restartCampaignLevel);
     campaignIntroDismiss.addEventListener('click', dismissCampaignIntro);
+    campaignGuideContinue.addEventListener('click', continueCampaignGuide);
+    ['pointerdown', 'click'].forEach((eventType) => {
+      document.addEventListener(eventType, (event) => {
+        if (!isCampaignGame() || campaignGuide.classList.contains('is-hidden') ||
+            isCampaignGuideActionAllowed(event.target, eventType)) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }, true);
+    });
+    window.addEventListener('resize', updateCampaignGuideSpotlights);
+    window.addEventListener('scroll', () => {
+      if (!campaignGuide.classList.contains('is-hidden')) {
+        window.requestAnimationFrame(updateCampaignGuideSpotlights);
+      }
+    }, true);
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !campaignIntro.classList.contains('is-hidden')) {
         dismissCampaignIntro();
@@ -44765,6 +45202,7 @@
       if (isCampaignGame()) {
         campaignObjectiveRegions = [...(activeCampaignLevel.objectiveRegions || [])];
         campaignIntroPending = true;
+        campaignGuideStep = 'intro';
         if (!campaignObjectiveRegions.length) {
           startMessage.textContent = 'O level da campanha não define regiões iniciais azuis para conquistar.';
           isGameStarted = false;
