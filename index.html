@@ -274,6 +274,7 @@
         <p>Modo de jogo</p>
         <div class="choice-row" id="game-mode-options">
           <button type="button" data-mode="ai">Contra IA</button>
+          <button type="button" data-mode="campaign">Campanha</button>
           <button type="button" data-mode="local">Dois jogadores</button>
           <button type="button" data-mode="bluetooth">Bluetooth</button>
           <button type="button" data-mode="online">Online</button>
@@ -288,7 +289,7 @@
           <button type="button" data-color="blue">Azul</button>
           </div>
         </div>
-        <p id="speed-choice-label">Velocidade de pontos</p>
+        <p id="speed-choice-label">Velocidade de moedas</p>
         <div class="choice-row" id="speed-options">
           <button type="button" data-speed="1">1x</button>
           <button type="button" data-speed="2">2x</button>
@@ -366,7 +367,8 @@
       <section class="turn-panel" aria-live="polite">
         <p id="turn-number">Turn 1</p>
         <p id="turn-player">Vez: laranja</p>
-        <p id="turn-points">Pontos: 8</p>
+        <p id="turn-points">Moedas: 8</p>
+        <p id="campaign-objective" class="is-hidden"></p>
         <p id="turn-wheat"><svg id="turn-wheat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V4m0 5C8 9 6 7 6 4c4 0 6 2 6 5Zm0 5c4 0 6-2 6-5-4 0-6 2-6 5Zm0-4C8 12 6 10 6 7c4 0 6 2 6 5Zm0 7c4 0 6-2 6-5-4 0-6 2-6 5Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></svg><span id="turn-wheat-value">Trigo: 0</span></p>
         <p id="wheat-feedback" class="is-hidden" aria-live="polite"></p>
         <button class="turn-button rotation-picker-trigger" id="rotate-picker-button" type="button" aria-label="Girar disco" title="Girar disco">
@@ -431,7 +433,7 @@
           <button type="button" id="open-relegation-button">Rebaixar peça</button>
         </div>
       </aside>
-      <button class="trash-drop-zone is-hidden" id="trash-drop-zone" type="button" aria-label="Lixeira: arraste uma peça para receber metade do seu valor em pontos">
+      <button class="trash-drop-zone is-hidden" id="trash-drop-zone" type="button" aria-label="Lixeira: arraste uma peça para receber metade do seu valor em moedas">
         <svg class="trash-drop-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h22M12 8V5h8v3M8 8l1.5 19h13L24 8M13 12v10M19 12v10"></path></svg>
         <span class="trash-drop-label">Lixeira</span>
         <span class="trash-drop-refund" id="trash-drop-refund"></span>
@@ -39206,6 +39208,7 @@
     const regionFinalForce = document.querySelector('#region-final-force');
     const regionFreeUnits = document.querySelector('#region-free-units');
     const turnPoints = document.querySelector('#turn-points');
+    const campaignObjective = document.querySelector('#campaign-objective');
     const turnWheatValue = document.querySelector('#turn-wheat-value');
     const wheatFeedback = document.querySelector('#wheat-feedback');
     const turnNumber = document.querySelector('#turn-number');
@@ -39280,6 +39283,13 @@
     let regionNeighborCache = {};
     const regionProbeBoxes = {};
     let regionGeometryByCode = {};
+    let quadrilateralBoard = null;
+    let currentBoardData = null;
+    let campaignBoardConfig = null;
+    let activeCampaignLevel = null;
+    let campaignCollectedBags = [];
+    let campaignObjectiveRegions = [];
+    let campaignResetPending = false;
     const boardLayerElements = new Map();
     const probeBoxSize = 30;
     let debugZoom = 1;
@@ -39371,6 +39381,9 @@
       lastRoundResult = null;
       wheatBalances = { orange: 0, blue: 0 };
       lastWheatTurnReport = null;
+      campaignCollectedBags = [];
+      campaignObjectiveRegions = [];
+      campaignResetPending = false;
       trashDropZone.classList.add('is-hidden');
       trashDropZone.classList.remove('is-visible', 'is-target');
     }
@@ -39379,6 +39392,8 @@
       if (!isGameStarted || isGameOver || !allRegionMasks) return;
       const save = {
         gameMode, humanTeam, aiTeam, gameSpeed, currentTeam, currentTurn,
+        campaignLevelId: activeCampaignLevel?.id || null,
+        campaignCollectedBags: [...campaignCollectedBags],
         hasRotatedThisTurn, lastRotatedLayer, lastRotatedBy, rotationLockTurn,
         rotations: [...rotations], pontosDoTurn: { ...pontosDoTurn },
         turnMoveHistory: JSON.parse(JSON.stringify(turnMoveHistory)),
@@ -39397,9 +39412,17 @@
       try {
         const save = JSON.parse(localStorage.getItem('will-of-many-save') || 'null');
         if (!save || !save.regionPiecesByRegion) return false;
-        gameMode = ['ai', 'local', 'bluetooth', 'online'].includes(save.gameMode) ? save.gameMode : 'ai';
+        gameMode = ['ai', 'campaign', 'local', 'bluetooth', 'online'].includes(save.gameMode) ? save.gameMode : 'ai';
         humanTeam = save.humanTeam === 'blue' ? 'blue' : 'orange';
-        aiTeam = gameMode === 'ai' ? (humanTeam === 'orange' ? 'blue' : 'orange') : null;
+        aiTeam = gameMode === 'ai' ? (humanTeam === 'orange' ? 'blue' : 'orange')
+          : gameMode === 'campaign' ? 'blue' : null;
+        activeCampaignLevel = gameMode === 'campaign' ? campaignBoardConfig : null;
+        campaignCollectedBags = Array.isArray(save.campaignCollectedBags)
+          ? save.campaignCollectedBags.filter((code) => typeof code === 'string')
+          : [];
+        campaignObjectiveRegions = gameMode === 'campaign'
+          ? (activeCampaignLevel?.objectiveRegions || [])
+          : [];
         gameSpeed = Math.max(1, Math.min(3, Number(save.gameSpeed) || 1));
         currentTeam = save.currentTeam === 'blue' ? 'blue' : 'orange';
         currentTurn = Math.max(1, Number(save.currentTurn) || 1);
@@ -39470,12 +39493,16 @@
       }
     }
 
+    function isCampaignGame() {
+      return gameMode === 'campaign' && !!activeCampaignLevel;
+    }
+
     function updateWarAvailability() {
       warButton.disabled = isGameOver || isWarRunning ||
         (isBluetoothGame() && !bluetoothConnected) ||
         (isOnlineGame() && (!onlineSocket || onlineSocket.readyState !== WebSocket.OPEN ||
           (onlineTeam !== 'orange' && ![6, 13, 18, 25].includes(currentTurn)))) ||
-        ![6, 13, 18, 25].includes(currentTurn);
+        (!isCampaignGame() && ![6, 13, 18, 25].includes(currentTurn));
     }
 
     function getGameSnapshot() {
@@ -39502,7 +39529,7 @@
         wheatBalances: { ...wheatBalances },
         blockedMoves: turnMoveHistory
           .filter((move) => move.team === aiTeam)
-          .map(({ source, target }) => ({ source, target })),
+          .map(({ source, target, amount }) => ({ source, target, amount })),
         recycledPieces: turnRecycledPieces
           .filter((piece) => piece.team === aiTeam)
           .map(({ source, stage }) => ({ source, stage })),
@@ -39553,9 +39580,24 @@
       return (moveCostByLayer[getRegionLayer(regionCode)] || 0) * amount;
     }
 
-    function isReverseMoveBlocked(team, sourceCode, targetCode) {
-      return turnMoveHistory.some((move) =>
+    function getMaxMovableSoldiers(team, sourceCode, targetCode) {
+      const available = getTeamSoldierCount(sourceCode, team);
+      if (available < 2) return 0;
+
+      const reverseMoves = turnMoveHistory.filter((move) =>
         move.team === team && move.source === targetCode && move.target === sourceCode);
+      if (!reverseMoves.length) return available - 1;
+
+      let lockedSoldiers = 0;
+      for (const move of reverseMoves) {
+        if (!Number.isInteger(move.amount) || move.amount < 1) return 0;
+        lockedSoldiers += move.amount;
+      }
+      return Math.max(0, Math.min(available - 1, available - lockedSoldiers));
+    }
+
+    function isReverseMoveBlocked(team, sourceCode, targetCode, amount = 1) {
+      return amount > getMaxMovableSoldiers(team, sourceCode, targetCode);
     }
 
     function getPromotionCost(regionCode, amount) {
@@ -39563,6 +39605,7 @@
     }
 
     function getRotationStep(layerNumber) {
+      if (isCampaignGame() && activeCampaignLevel.rotationEnabled === false) return 0;
       return rotationStepByLayer[layerNumber] || 0;
     }
 
@@ -39615,11 +39658,13 @@
       const teamLabel = currentTeam === 'orange' ? 'laranja' : 'azul';
       turnNumber.textContent = `Turn ${currentTurn}`;
       turnPlayer.textContent = `Vez: ${teamLabel}`;
-      turnPoints.textContent = `Pontos: ${Number(pontosDoTurn[currentTeam]).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
-      const wheatTotals = getWheatTotals(currentTeam);
-      const netWheatPerTurn = wheatTotals.production - wheatTotals.consumption;
-      const netWheatSign = netWheatPerTurn >= 0 ? '+' : '−';
-      turnWheatValue.textContent = `Trigo: ${formatStatisticsNumber(wheatBalances[currentTeam])} · ${netWheatSign}${formatStatisticsNumber(Math.abs(netWheatPerTurn))} líquido/turno`;
+      turnPoints.textContent = `Moedas: ${Number(pontosDoTurn[currentTeam]).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
+      campaignObjective.classList.toggle('is-hidden', !isCampaignGame());
+      if (isCampaignGame()) {
+        campaignObjective.textContent = `Campanha · ${activeCampaignLevel.name}: conquiste ${campaignObjectiveRegions.join(', ') || 'as regiões azuis'}`;
+      }
+      const wheatProduction = getWheatTotals(currentTeam).production;
+      turnWheatValue.textContent = `Trigo: ${formatStatisticsNumber(wheatBalances[currentTeam])} · +${formatStatisticsNumber(wheatProduction)}/turno`;
       const shortageReport = lastWheatTurnReport?.team === currentTeam &&
         lastWheatTurnReport.turn === currentTurn &&
         lastWheatTurnReport.shortage > 0
@@ -39916,6 +39961,9 @@
     }
 
     function getCombatNeighbors(regionCode) {
+      if (regionGeometryByCode[regionCode]?.shape === 'quadrilateral') {
+        return [...(regionNeighborCache[regionCode]?.sameRank || [])];
+      }
       const neighbors = [...(regionNeighborCache[regionCode]?.inferior || [])];
       const rightNeighbor = getNeighborRegionCode(regionCode, 'right');
       if (rightNeighbor) neighbors.push(rightNeighbor);
@@ -40089,6 +40137,8 @@
         orange: getTeamPieceCount(regionCode, 'orange'),
         blue: getTeamPieceCount(regionCode, 'blue')
       };
+      turnMoveHistory = turnMoveHistory.filter((move) =>
+        move.source !== regionCode && move.target !== regionCode);
     }
 
     function recalculatePieceCounts() {
@@ -40137,7 +40187,8 @@
 
     async function startWar(isAutomatic = false, allowUnscheduled = false) {
       if (isWarRunning || !allRegionMasks ||
-          (!isAutomatic && !allowUnscheduled && ![6, 13, 18, 25].includes(currentTurn))) return;
+          (!isCampaignGame() && !isAutomatic && !allowUnscheduled &&
+            ![6, 13, 18, 25].includes(currentTurn))) return;
       isWarRunning = true;
       if (gameMode === 'bluetooth' && bluetoothRole === 'host' && bluetoothConnected) {
         sendBluetoothMessage({ type: 'war_start' });
@@ -40177,6 +40228,8 @@
         const centerWinner = getCenterConqueror();
         if (centerWinner && (!isOnlineGame() || onlineTeam === 'orange')) {
           finishGame(centerWinner, 'center');
+        } else if (finishCampaignIfObjectiveMet()) {
+          return;
         } else if (isAutomatic && (!isOnlineGame() || onlineTeam === 'orange')) {
           finishGame(null, 'turn30');
         }
@@ -40204,7 +40257,10 @@
           void pieces.offsetWidth;
           pieces.classList.add('war-flash');
           const losingRegions = winner === block.attacker ? block.enemyRegions : block.alliedRegions;
-          losingRegions.forEach((regionCode) => setRegionTeamOwnership(regionCode, winner));
+          losingRegions.forEach((regionCode) => {
+            setRegionTeamOwnership(regionCode, winner);
+            collectCampaignBagAtRegion(regionCode, winner);
+          });
           recalculatePieceCounts();
           recalculateRegionForces();
           refreshRegionVisuals();
@@ -40226,6 +40282,8 @@
       const centerWinner = getCenterConqueror();
       if (centerWinner && (!isOnlineGame() || onlineTeam === 'orange')) {
         finishGame(centerWinner, 'center');
+      } else if (finishCampaignIfObjectiveMet()) {
+        return;
       } else if (isAutomatic && (!isOnlineGame() || onlineTeam === 'orange')) {
         finishGame(null, 'turn30');
       }
@@ -40309,6 +40367,20 @@
 
     function getNeighborRegionCode(regionCode, direction) {
       if (!regionCode) return null;
+      const geometry = regionGeometryByCode[regionCode];
+      if (geometry?.shape === 'quadrilateral') {
+        const neighbors = getRegionNeighborSummary(regionCode).sameRank || [];
+        const candidates = neighbors.filter((candidate) => getRegionLayer(candidate) === geometry.layer);
+        const horizontal = candidates.filter((candidate) => {
+          const candidateX = regionGeometryByCode[candidate]?.centerX;
+          return direction === 'left'
+            ? Number.isFinite(candidateX) && candidateX < geometry.centerX
+            : Number.isFinite(candidateX) && candidateX > geometry.centerX;
+        });
+        return horizontal.sort((first, second) =>
+          Math.abs(regionGeometryByCode[first].centerX - geometry.centerX) -
+          Math.abs(regionGeometryByCode[second].centerX - geometry.centerX))[0] || null;
+      }
       const match = String(regionCode).match(/^L(\d+)-(\d+)$/);
       if (!match) return null;
       const layerNumber = Number(match[1]);
@@ -40337,10 +40409,12 @@
       if (sourceFinalPieces > sourceLimit) return [];
 
       const targets = [];
-      for (const direction of ['left', 'right']) {
-        const targetCode = getNeighborRegionCode(sourceCode, direction);
-        if (!targetCode || targets.some((target) => target.code === targetCode)) continue;
-        if (isReverseMoveBlocked(team, sourceCode, targetCode)) continue;
+      const candidateTargets = regionGeometryByCode[sourceCode]?.shape === 'quadrilateral'
+        ? (regionNeighborCache[sourceCode]?.sameRank || [])
+        : ['left', 'right'].map((direction) => getNeighborRegionCode(sourceCode, direction)).filter(Boolean);
+      for (const targetCode of candidateTargets) {
+        if (targets.some((target) => target.code === targetCode)) continue;
+        if (isReverseMoveBlocked(team, sourceCode, targetCode, amount)) continue;
         if (!isRegionAvailableForTeam(targetCode, team)) continue;
         ensureRegionPieces(targetCode);
         const targetCounts = { ...regionPiecesByRegion[targetCode][team], g: getTeamSoldierCount(targetCode, team) + amount };
@@ -40348,7 +40422,7 @@
         if (getFinalPieceCountForTeam(targetCounts) > getRegionPieceLimit(targetCode)) continue;
         const cost = getMoveCost(sourceCode, amount);
         if (!canAfford(cost)) continue;
-        targets.push({ code: targetCode, type: 'move', direction });
+        targets.push({ code: targetCode, type: 'move' });
       }
       return targets;
     }
@@ -40437,9 +40511,19 @@
     function finishPieceDrag(clientX, clientY) {
       if (!pieceDragState) return;
       const overTrash = isPointerOverTrash(clientX, clientY);
-      const { sourceCode, amount, pieceStage } = pieceDragState;
+      const { sourceCode, amount, pieceStage, canRecycle, startX, startY } = pieceDragState;
+      const moved = pieceDragState.moved ||
+        Math.hypot(clientX - startX, clientY - startY) >= 6;
+      if (!moved) {
+        selectedRegionCode = sourceCode;
+        updateSelectedRegionPanel(selectedRegionCode);
+        updateMobileRotationControls();
+        focusRegion(sourceCode);
+        clearPieceDrag();
+        return;
+      }
       if (overTrash) {
-        const recycled = recyclePiece(sourceCode, currentTeam, pieceStage);
+        const recycled = canRecycle && recyclePiece(sourceCode, currentTeam, pieceStage);
         if (!recycled) readout.textContent = 'Não foi possível descartar essa peça.';
         clearPieceDrag();
         return;
@@ -40448,7 +40532,7 @@
       const target = pieceDragState.targets.find((candidate) => candidate.code === targetCode);
       const completed = target
         ? target.type === 'move'
-          ? (selectedRegionCode = sourceCode, performMove(target.direction, amount), true)
+          ? (selectedRegionCode = sourceCode, performMoveTo(target.code, amount), true)
           : target.type === 'promotion'
             ? (performPromotion(target.code, amount), true)
             : (performRelegation(target.code, pieceStage), true)
@@ -40464,18 +40548,13 @@
       const piece = findPieceAtPointer(event.clientX, event.clientY, sourceCode);
       if (!piece) return false;
       const pieceStage = piece.dataset.stage;
-      if (wasPieceCreatedThisTurn(sourceCode, currentTeam, pieceStage)) {
-        readout.textContent = `${sourceCode}: uma peça ${pieceStage.toUpperCase()} recém-promovida não pode ser reciclada neste turno.`;
-        return false;
-      }
       const amount = soldierWeights[pieceStage] || 0;
       const availablePieces = getTeamPieceCount(sourceCode, currentTeam);
-      if (availablePieces < 2) {
-        readout.textContent = 'Para descartar uma peça, a região precisa ter pelo menos 2 peças.';
-        return false;
-      }
       const targets = getDragTargets(sourceCode, currentTeam, amount, pieceStage);
       if (!amount || !Object.prototype.hasOwnProperty.call(soldierWeights, pieceStage)) return false;
+      const canRecycle = availablePieces >= 2 &&
+        !wasPieceCreatedThisTurn(sourceCode, currentTeam, pieceStage);
+      if (!targets.length && !canRecycle) return false;
       const dragPiece = document.createElement('img');
       dragPiece.className = 'drag-piece';
       dragPiece.style.width = `${30 / Math.max(1, stageZoom)}px`;
@@ -40484,15 +40563,30 @@
       dragPiece.alt = piece.alt;
       pieces.appendChild(dragPiece);
       piece.classList.add('is-drag-source');
-      pieceDragState = { sourceCode, amount, pieceStage, targets, dragPiece, sourcePiece: piece };
+      pieceDragState = {
+        sourceCode,
+        amount,
+        pieceStage,
+        targets,
+        dragPiece,
+        sourcePiece: piece,
+        canRecycle,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false
+      };
       stage.classList.add('is-dragging');
       drawDragOverlay(targets.map((target) => target.code));
       const stageRect = stagePanel.getBoundingClientRect();
       trashDropZone.style.left = `${Math.max(8, stageRect.left - 74)}px`;
       trashDropZone.style.top = `${stageRect.top + stageRect.height / 2}px`;
-      trashDropRefund.textContent = `+${getRecycleRefund(sourceCode, pieceStage)} pts`;
-      trashDropZone.classList.remove('is-hidden');
-      window.requestAnimationFrame(() => trashDropZone.classList.add('is-visible'));
+      trashDropRefund.textContent = `+${getRecycleRefund(sourceCode, pieceStage)} moedas`;
+      if (canRecycle) {
+        trashDropZone.classList.remove('is-hidden');
+        window.requestAnimationFrame(() => trashDropZone.classList.add('is-visible'));
+      } else {
+        trashDropZone.classList.add('is-hidden');
+      }
       updateDraggedPiece(event.clientX, event.clientY);
       try {
         stage.setPointerCapture?.(event.pointerId);
@@ -40506,6 +40600,9 @@
 
     function updateDraggedPiece(clientX, clientY) {
       if (!pieceDragState?.dragPiece) return;
+      if (Math.hypot(clientX - pieceDragState.startX, clientY - pieceDragState.startY) >= 6) {
+        pieceDragState.moved = true;
+      }
       const rect = stage.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
       const x = ((clientX - rect.left) / rect.width) * 100;
@@ -40662,8 +40759,8 @@
       showActionFeedback(regionCode, refund, 'recycle', '+');
       updateReadout();
       readout.textContent = refund > 0
-        ? `${regionCode}: peça ${pieceStage.toUpperCase()} descartada. +${refund} pontos.`
-        : `${regionCode}: peça ${pieceStage.toUpperCase()} descartada. Sem pontos de retorno.`;
+        ? `${regionCode}: peça ${pieceStage.toUpperCase()} descartada. +${refund} moedas.`
+        : `${regionCode}: peça ${pieceStage.toUpperCase()} descartada. Sem moedas de retorno.`;
       publishBluetoothAction({
         type: 'recycle',
         team,
@@ -40828,7 +40925,21 @@
       return Math.sqrt(minimumSquaredDistance);
     }
 
+    function areQuadrilateralRegionsNeighbors(first, second) {
+      const firstGeometry = regionGeometryByCode[first];
+      const secondGeometry = regionGeometryByCode[second];
+      if (firstGeometry?.shape !== 'quadrilateral' ||
+          secondGeometry?.shape !== 'quadrilateral' ||
+          firstGeometry.block !== secondGeometry.block) return null;
+      return firstGeometry.cells.some((firstCell) =>
+        secondGeometry.cells.some((secondCell) =>
+          Math.abs(firstCell.row - secondCell.row) +
+          Math.abs(firstCell.column - secondCell.column) === 1));
+    }
+
     function areRegionsNeighbors(first, second) {
+      const quadrilateralResult = areQuadrilateralRegionsNeighbors(first, second);
+      if (quadrilateralResult !== null) return quadrilateralResult;
       const distance = getCircularRegionDistance(first, second);
       if (distance !== null) return distance < 5;
 
@@ -41014,28 +41125,58 @@
       modal.classList.add('is-hidden');
     }
 
-    function getMoveAmountOptions(direction) {
-      const neighbor = getNeighborRegionCode(selectedRegionCode, direction);
+    function getMoveAmountOptions(target) {
+      const geometry = regionGeometryByCode[selectedRegionCode];
+      const neighbor = geometry?.shape === 'quadrilateral'
+        ? target
+        : getNeighborRegionCode(selectedRegionCode, target);
       if (!neighbor || !isRegionAvailableForTeam(neighbor, currentTeam)) return [];
+      if (geometry?.shape === 'quadrilateral' &&
+          !(regionNeighborCache[selectedRegionCode]?.sameRank || []).includes(neighbor)) return [];
       const available = getTeamSoldierCount(selectedRegionCode, currentTeam);
       const layer = getRegionLayer(selectedRegionCode);
       const costPerUnit = moveCostByLayer[layer] || 0;
       const maxByPoints = costPerUnit ? Math.floor(pontosDoTurn[currentTeam] / costPerUnit) : 0;
-      const maxAmount = Math.min(Math.max(0, available - 1), maxByPoints);
+      const maxAmount = Math.min(
+        getMaxMovableSoldiers(currentTeam, selectedRegionCode, neighbor),
+        maxByPoints
+      );
       return Object.entries(soldierWeights)
         .filter(([, amount]) => amount <= maxAmount)
         .sort((left, right) => left[1] - right[1]);
     }
 
     function openMoveModal() {
+      if (regionGeometryByCode[selectedRegionCode]?.shape === 'quadrilateral') {
+        moveDirectionOptions.replaceChildren();
+        (regionNeighborCache[selectedRegionCode]?.sameRank || [])
+          .filter((code) => getRegionLayer(code) === getRegionLayer(selectedRegionCode))
+          .forEach((code) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = code;
+            button.addEventListener('click', () => renderMoveAmountOptions(code));
+            moveDirectionOptions.appendChild(button);
+          });
+        moveModal.querySelector('#move-modal-instructions').textContent = 'Escolha a região quadricular vizinha.';
+      } else {
+        moveDirectionOptions.innerHTML = '<button type="button" data-direction="left">Esquerda</button><button type="button" data-direction="right">Direita</button>';
+        moveDirectionOptions.querySelectorAll('[data-direction]').forEach((button) => {
+          button.addEventListener('click', () => renderMoveAmountOptions(button.dataset.direction));
+        });
+        moveModal.querySelector('#move-modal-instructions').textContent = 'Escolha uma direção.';
+      }
       moveDirectionOptions.classList.remove('is-hidden');
       moveAmountOptions.classList.add('is-hidden');
       moveAmountOptions.innerHTML = '';
       moveModal.classList.remove('is-hidden');
     }
 
-    function renderMoveAmountOptions(direction) {
-      const options = getMoveAmountOptions(direction);
+    function renderMoveAmountOptions(target) {
+      const options = getMoveAmountOptions(target);
+      const targetCode = regionGeometryByCode[selectedRegionCode]?.shape === 'quadrilateral'
+        ? target
+        : getNeighborRegionCode(selectedRegionCode, target);
       moveDirectionOptions.classList.add('is-hidden');
       moveAmountOptions.classList.remove('is-hidden');
       moveAmountOptions.innerHTML = '';
@@ -41045,12 +41186,12 @@
         button.innerHTML = `<img src="${currentTeam === 'orange' ? 'peca_laranja' : 'peca_azul'}_${stage}.png" alt=""> ${stage.toUpperCase()} · ${amount}`;
         button.addEventListener('click', () => {
           closeModal(moveModal);
-          performMove(direction, amount);
+          performMoveTo(targetCode, amount);
         });
         moveAmountOptions.appendChild(button);
       });
       if (!options.length) {
-        moveAmountOptions.innerHTML = '<p>Pontos ou unidades insuficientes para mover.</p>';
+        moveAmountOptions.innerHTML = '<p>Moedas ou unidades insuficientes para mover.</p>';
       }
     }
 
@@ -41089,7 +41230,7 @@
           promotionAmountOptions.appendChild(button);
         });
       if (!promotionAmountOptions.children.length) {
-        promotionAmountOptions.innerHTML = '<p>Pontos insuficientes para promover.</p>';
+        promotionAmountOptions.innerHTML = '<p>Moedas insuficientes para promover.</p>';
       }
     }
 
@@ -41643,7 +41784,7 @@
       }
       const cost = getRecruitmentCost(regionReference, stage);
       if (!spendTurnPoints(cost)) {
-        readout.textContent = `${regionReference}: pontos insuficientes para comprar uma peça ${stage.toUpperCase()}.`;
+        readout.textContent = `${regionReference}: moedas insuficientes para comprar uma peça ${stage.toUpperCase()}.`;
         return;
       }
 
@@ -41962,7 +42103,223 @@
       };
     }
 
+    function rotateQuadrilateralMatrix(matrix, direction) {
+      const rotated = matrix.map((row) => [...row]);
+      const rotateRing = (top, left, size) => {
+        if (size <= 1) return;
+        const perimeter = [];
+        for (let column = left; column < left + size; column += 1) perimeter.push([top, column]);
+        for (let row = top + 1; row < top + size; row += 1) perimeter.push([row, left + size - 1]);
+        for (let column = left + size - 2; column >= left; column -= 1) perimeter.push([top + size - 1, column]);
+        for (let row = top + size - 2; row > top; row -= 1) perimeter.push([row, left]);
+        const values = perimeter.map(([row, column]) => matrix[row][column]);
+        const offset = direction === 'left' ? 1 : -1;
+        perimeter.forEach(([row, column], index) => {
+          const destination = perimeter[(index + offset + perimeter.length) % perimeter.length];
+          rotated[destination[0]][destination[1]] = values[index];
+        });
+        rotateRing(top + 1, left + 1, size - 2);
+      };
+      rotateRing(0, 0, matrix.length);
+      return rotated;
+    }
+
+    function prepareQuadrilateralBoard(data) {
+      if (data?.boardType !== 'quadrilateral') return null;
+      if (!Array.isArray(data.blocks) || !data.blocks.length) {
+        throw new Error('o tabuleiro quadricular não contém blocos');
+      }
+
+      const blocks = [];
+      const regionDefinitions = new Map();
+      let left = Number.POSITIVE_INFINITY;
+      let top = Number.POSITIVE_INFINITY;
+      let right = Number.NEGATIVE_INFINITY;
+      let bottom = Number.NEGATIVE_INFINITY;
+
+      data.blocks.forEach((block) => {
+        if (!block || block.type !== 'quadrilateral' || !Array.isArray(block.matrix)) {
+          throw new Error('bloco quadricular inválido');
+        }
+        const size = Number(block.matrixSize || block.matrix.length);
+        const height = Number(block.L1);
+        const width = Number(block.L2);
+        const initialCenter = block.C_inicial || block.initialCenter;
+        const centerX = Number(initialCenter?.x ?? initialCenter?.c_x_inicial);
+        const centerY = Number(initialCenter?.y ?? initialCenter?.c_y_inicial);
+        if (!Number.isInteger(size) || size < 1 || block.matrix.length !== size ||
+            block.matrix.some((row) => !Array.isArray(row) || row.length !== size) ||
+            !Number.isFinite(height) || height <= 0 ||
+            !Number.isFinite(width) || width <= 0 ||
+            !Number.isFinite(centerX) || !Number.isFinite(centerY) ||
+            !Array.isArray(block.regions)) {
+          throw new Error(`dimensões ou matriz inválidas no bloco ${block.name || ''}`);
+        }
+
+        const regionByAlias = new Map();
+        block.regions.forEach((region) => {
+          const match = String(region?.rank || region?.code || region?.name || '').match(/L(\d+)/);
+          const layer = Number(region?.layer || match?.[1]);
+          const regionMatch = String(region?.code || region?.name || '').match(/L\d+-(\d+)/);
+          const regionNumber = Number(region?.region || regionMatch?.[1]);
+          const code = String(region?.code || region?.name || `L${layer}-${regionNumber}`);
+          if (!Number.isInteger(layer) || layer < 1 || layer > 8 ||
+              !Number.isInteger(regionNumber) || regionNumber < 1 ||
+              !/^L\d+-\d+$/.test(code)) {
+            throw new Error(`identificador ou rank inválido no bloco ${block.name}`);
+          }
+          const initialPieces = Array.isArray(region.initialPieces) ? region.initialPieces.map((piece) => {
+            if (!piece || !['orange', 'blue'].includes(piece.team) ||
+                !Object.prototype.hasOwnProperty.call(soldierWeights, piece.stage)) {
+              throw new Error(`peça inicial inválida para ${code}`);
+            }
+            return { team: piece.team, stage: piece.stage };
+          }) : [];
+          const definition = {
+            ...region,
+            code,
+            layer,
+            region: regionNumber,
+            initialPieces
+          };
+          regionDefinitions.set(code, definition);
+          [region.identifier, region.id, region.name, region.code]
+            .filter((alias) => typeof alias === 'string' && alias)
+            .forEach((alias) => regionByAlias.set(alias, code));
+        });
+
+        const matrix = block.matrix.map((row) => row.map((entry) => {
+          if (entry == null || entry === '') return null;
+          const alias = typeof entry === 'object' ? entry.code || entry.identifier || entry.id : String(entry);
+          const code = regionByAlias.get(alias) || (regionDefinitions.has(alias) ? alias : null);
+          if (!code || !regionDefinitions.has(code)) {
+            throw new Error(`a matriz do bloco ${block.name} referencia uma região desconhecida: ${alias}`);
+          }
+          return code;
+        }));
+        const positionsByCode = {};
+        matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
+          if (!code) return;
+          if (!positionsByCode[code]) positionsByCode[code] = [];
+          positionsByCode[code].push(`${rowIndex + 1},${columnIndex + 1}`);
+        }));
+        block.regions.forEach((region) => {
+          const code = regionByAlias.get(region.code || region.name || region.identifier || region.id);
+          const positions = region.positions || region.posicoes;
+          if (!code || !Array.isArray(positions)) return;
+          const declared = positions.map((position) => {
+            if (Array.isArray(position) && position.length === 2) return `${Number(position[0])},${Number(position[1])}`;
+            if (position && typeof position === 'object') {
+              return `${Number(position.row || position.linha)},${Number(position.column || position.coluna)}`;
+            }
+            return '';
+          }).sort();
+          const mapped = [...(positionsByCode[code] || [])].sort();
+          if (declared.some((position) => !/^\d+,\d+$/.test(position)) ||
+              declared.join('|') !== mapped.join('|')) {
+            throw new Error(`as posições declaradas não correspondem à matriz M para ${code}`);
+          }
+        });
+        const blockLeft = centerX - width / 2;
+        const blockTop = centerY - height / 2;
+        left = Math.min(left, blockLeft);
+        top = Math.min(top, blockTop);
+        right = Math.max(right, centerX + (size - 1) * width + width / 2);
+        bottom = Math.max(bottom, centerY + (size - 1) * height + height / 2);
+        blocks.push({
+          name: String(block.name || ''),
+          size,
+          width,
+          height,
+          centerX,
+          centerY,
+          matrix,
+          rotationEnabled: block.rotationEnabled !== false,
+          regions: block.regions
+        });
+      });
+
+      const tileColumns = Number(data.coordinateSystem?.tileColumns) || 226;
+      const tileRows = Number(data.coordinateSystem?.tileRows) || 226;
+      const tileSize = Number(data.coordinateSystem?.tileSize) || 4;
+      const tileOffset = Number(data.coordinateSystem?.tileCenterOffset) || tileSize / 2;
+      const scale = Math.min(908 / (right - left), 908 / (bottom - top));
+      const offsetX = (908 - (right - left) * scale) / 2 - left * scale;
+      const offsetY = (908 - (bottom - top) * scale) / 2 - top * scale;
+      const matrices = {};
+      const cellsByRegion = {};
+      const cellOwners = {};
+
+      blocks.forEach((block) => {
+        matrices[block.name] = block.matrix.map((row) => [...row]);
+        block.matrix.forEach((row, rowIndex) => {
+          row.forEach((code, columnIndex) => {
+            if (!code) return;
+            const cellKey = `${block.name}:${rowIndex + 1}:${columnIndex + 1}`;
+            if (cellOwners[cellKey]) throw new Error(`célula duplicada na matriz do bloco ${block.name}`);
+            cellOwners[cellKey] = code;
+            if (!cellsByRegion[code]) cellsByRegion[code] = [];
+            cellsByRegion[code].push({
+              block: block.name,
+              row: rowIndex + 1,
+              column: columnIndex + 1,
+              x: offsetX + (block.centerX + rowIndex * block.width) * scale,
+              y: offsetY + (block.centerY + columnIndex * block.height) * scale,
+              width: block.width * scale,
+              height: block.height * scale
+            });
+          });
+        });
+      });
+
+      const masks = {};
+      const geometry = {};
+      Object.entries(cellsByRegion).forEach(([code, cells]) => {
+        const definition = regionDefinitions.get(code);
+        if (!definition) throw new Error(`faltam metadados para a região ${code}`);
+        const layerName = String(definition.layer);
+        if (!masks[layerName]) masks[layerName] = {};
+        const tiles = new Set();
+        cells.forEach((cell) => {
+          const firstColumn = Math.max(0, Math.floor((cell.x - cell.width / 2) / tileSize));
+          const lastColumn = Math.min(tileColumns - 1, Math.ceil((cell.x + cell.width / 2) / tileSize));
+          const firstRow = Math.max(0, Math.floor((cell.y - cell.height / 2) / tileSize));
+          const lastRow = Math.min(tileRows - 1, Math.ceil((cell.y + cell.height / 2) / tileSize));
+          for (let row = firstRow; row <= lastRow; row += 1) {
+            const y = row * tileSize + tileOffset;
+            if (y < cell.y - cell.height / 2 || y >= cell.y + cell.height / 2) continue;
+            for (let column = firstColumn; column <= lastColumn; column += 1) {
+              const x = column * tileSize + tileOffset;
+              if (x >= cell.x - cell.width / 2 && x < cell.x + cell.width / 2) {
+                tiles.add(`${column},${row}`);
+              }
+            }
+          }
+        });
+        masks[layerName][String(definition.region)] = [...tiles];
+        geometry[code] = {
+          block: cells[0].block,
+          shape: 'quadrilateral',
+          layer: definition.layer,
+          centerX: cells.reduce((sum, cell) => sum + cell.x, 0) / cells.length,
+          centerY: cells.reduce((sum, cell) => sum + cell.y, 0) / cells.length,
+          cells,
+          maxPieces: Number(definition.maxPieces) || definition.layer,
+          farmProductionPerTurn: Number(definition.farmProductionPerTurn) || 0,
+          bagCoins: Math.max(0, Number(definition.bagCoins) || 0),
+          initialPieces: definition.initialPieces
+        };
+      });
+
+      return { blocks, matrices, cellsByRegion, cellOwners, masks, geometry, campaign: data.campaign || null };
+    }
+
     function normalizeImportedRegionMasks(data) {
+      quadrilateralBoard = null;
+      if (data?.boardType === 'quadrilateral') {
+        quadrilateralBoard = prepareQuadrilateralBoard(data);
+        return quadrilateralBoard.masks;
+      }
       const normalized = {};
       const addRegion = (layerKey, regionKey, regionValue) => {
         const layerName = String(layerKey);
@@ -42098,6 +42455,7 @@
     }
 
     function normalizeImportedRegionGeometry(data) {
+      if (data?.boardType === 'quadrilateral') return quadrilateralBoard?.geometry || {};
       const normalized = {};
       if (!data || !Array.isArray(data.blocks)) return normalized;
 
@@ -42167,6 +42525,36 @@
       }[layer] || '#ffffff';
     }
 
+    function rotateQuadrilateralBlocksForLayer(layerNumber, direction) {
+      if (!quadrilateralBoard || !currentBoardData) return false;
+      const rotatableNames = quadrilateralBoard.blocks
+        .filter((block) => block.rotationEnabled && block.regions.some((region) =>
+          Number(region.layer || String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]) === layerNumber))
+        .map((block) => block.name);
+      if (!rotatableNames.length) return false;
+
+      rotatableNames.forEach((blockName) => {
+        const matrix = rotateQuadrilateralMatrix(quadrilateralBoard.matrices[blockName], direction);
+        const sourceBlock = currentBoardData.blocks.find((block) => String(block.name || '') === blockName);
+        if (!sourceBlock) throw new Error(`bloco quadricular ausente: ${blockName}`);
+        sourceBlock.matrix = matrix;
+        const positionsByCode = {};
+        matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
+          if (!code) return;
+          if (!positionsByCode[code]) positionsByCode[code] = [];
+          positionsByCode[code].push([rowIndex + 1, columnIndex + 1]);
+        }));
+        sourceBlock.regions.forEach((region) => {
+          const code = region.code || region.name || region.identifier || region.id;
+          const propertyName = Array.isArray(region.posicoes) ? 'posicoes' : 'positions';
+          region[propertyName] = positionsByCode[code] || [];
+        });
+      });
+
+      applyRegionData(currentBoardData);
+      return true;
+    }
+
     function getCircularRegionPath(geometry) {
       const { centerX, centerY, innerRadius, outerRadius, startAngle, endAngle } = geometry;
       const span = endAngle - startAngle;
@@ -42213,6 +42601,49 @@
       return path.join(' ');
     }
 
+    function getQuadrilateralRegionPath(geometry) {
+      return geometry.cells.map((cell) => {
+        const left = cell.x - cell.width / 2;
+        const top = cell.y - cell.height / 2;
+        const right = left + cell.width;
+        const bottom = top + cell.height;
+        return `M ${left} ${top} H ${right} V ${bottom} H ${left} Z`;
+      }).join(' ');
+    }
+
+    function appendCampaignBagIcon(layerElement, code, geometry, svgNamespace, iconScale) {
+      if (!geometry.bagCoins || campaignCollectedBags.includes(code)) return;
+      const icon = document.createElementNS(svgNamespace, 'g');
+      icon.setAttribute('transform', `translate(${geometry.centerX} ${geometry.centerY}) scale(${iconScale})`);
+      icon.setAttribute('pointer-events', 'none');
+      icon.dataset.region = code;
+      icon.setAttribute('aria-label', `Saco com ${geometry.bagCoins} moedas`);
+      const sack = document.createElementNS(svgNamespace, 'path');
+      sack.setAttribute('d', 'M-7 -11 Q0 -7 7 -11 L5 -5 Q12 1 10 9 Q8 15 0 15 Q-8 15 -10 9 Q-12 1 -5 -5 Z');
+      sack.setAttribute('fill', '#a56b31');
+      sack.setAttribute('stroke', '#54351f');
+      sack.setAttribute('stroke-width', '1.5');
+      icon.appendChild(sack);
+      const tie = document.createElementNS(svgNamespace, 'path');
+      tie.setAttribute('d', 'M-5 -6 Q0 -3 5 -6 M-3 -10 Q0 -7 3 -10');
+      tie.setAttribute('fill', 'none');
+      tie.setAttribute('stroke', '#f2d18a');
+      tie.setAttribute('stroke-width', '1.5');
+      icon.appendChild(tie);
+      const coin = document.createElementNS(svgNamespace, 'circle');
+      coin.setAttribute('cx', '0');
+      coin.setAttribute('cy', '5');
+      coin.setAttribute('r', '4');
+      coin.setAttribute('fill', '#f6d65b');
+      coin.setAttribute('stroke', '#805b1d');
+      coin.setAttribute('stroke-width', '1');
+      icon.appendChild(coin);
+      const title = document.createElementNS(svgNamespace, 'title');
+      title.textContent = `Saco em ${code}: ${geometry.bagCoins} moedas`;
+      icon.appendChild(title);
+      layerElement.appendChild(icon);
+    }
+
     function renderBoardLayers() {
       const svgNamespace = 'http://www.w3.org/2000/svg';
       const farmTiers = [250, 1000, 4000, 16000, 50000];
@@ -42221,10 +42652,12 @@
         layerElement.replaceChildren();
         const regions = Object.entries(regionGeometryByCode)
           .filter(([, geometry]) => geometry.layer === layer)
-          .sort((left, right) => left[1].startAngle - right[1].startAngle);
+          .sort((left, right) => (left[1].startAngle || 0) - (right[1].startAngle || 0));
 
         regions.forEach(([code, geometry]) => {
-          const pathData = getCircularRegionPath(geometry);
+          const pathData = geometry.shape === 'quadrilateral'
+            ? getQuadrilateralRegionPath(geometry)
+            : getCircularRegionPath(geometry);
           const shape = document.createElementNS(svgNamespace, pathData ? 'path' : 'circle');
           if (pathData) {
             shape.setAttribute('d', pathData);
@@ -42242,8 +42675,15 @@
         });
 
         regions.forEach(([code, geometry]) => {
+          if (geometry.shape === 'quadrilateral') {
+            appendCampaignBagIcon(layerElement, code, geometry, svgNamespace, iconScale);
+            return;
+          }
           const production = Math.max(0, Number(geometry.farmProductionPerTurn) || 0);
-          if (!production) return;
+          if (!production) {
+            appendCampaignBagIcon(layerElement, code, geometry, svgNamespace, iconScale);
+            return;
+          }
           const tier = Math.max(1, Math.min(5, farmTiers.findIndex((value) => production <= value) + 1));
           const angle = ((geometry.startAngle + geometry.endAngle) / 2) * Math.PI / 180;
           const radius = (geometry.innerRadius + geometry.outerRadius) / 2;
@@ -42295,6 +42735,7 @@
           title.textContent = `Fazenda em ${code}: ${formatStatisticsNumber(production)} trigo por turno`;
           icon.appendChild(title);
           layerElement.appendChild(icon);
+          appendCampaignBagIcon(layerElement, code, geometry, svgNamespace, iconScale);
         });
       });
     }
@@ -42334,6 +42775,7 @@
     }
 
     function applyRegionData(data) {
+      currentBoardData = data;
       const normalizedMasks = normalizeImportedRegionMasks(data);
       const importedProbeBoxes = normalizeImportedRegionProbeBoxes(data);
 
@@ -42342,6 +42784,16 @@
       }
 
       regionGeometryByCode = normalizeImportedRegionGeometry(data);
+      const nextCampaignBoardConfig = data?.campaign && typeof data.campaign === 'object'
+        ? {
+          ...data.campaign,
+          objectiveRegions: Object.entries(regionGeometryByCode)
+            .filter(([, geometry]) => geometry.initialPieces.some((piece) => piece.team === 'blue'))
+            .map(([code]) => code)
+        }
+        : null;
+      if (nextCampaignBoardConfig?.id !== campaignBoardConfig?.id) campaignCollectedBags = [];
+      campaignBoardConfig = nextCampaignBoardConfig;
       renderBoardLayers();
       allRegionMasks = normalizedMasks;
       regionNeighborCache = {};
@@ -42354,13 +42806,15 @@
       });
 
       const layer8Regions = allRegionMasks['8'] || {};
-      if (!layer8Regions || Object.keys(layer8Regions).length !== 8) {
-        throw new Error('o JSON não contém as oito regiões de L8');
+      if (!layer8Regions || !Object.keys(layer8Regions).length) {
+        throw new Error('o JSON não contém regiões de L8');
       }
 
       regionMasks = layer8Regions;
       const counts = Object.entries(regionMasks).map(([region, tiles]) => `L8-${region}: ${Array.isArray(tiles) ? tiles.length : 0}`).join(' · ');
-      debugStatus.textContent = `JSON carregado · ${counts}`;
+      debugStatus.textContent = data?.boardType === 'quadrilateral'
+        ? `JSON carregado · ${data.campaign?.name || 'tabuleiro quadricular'} · ${Object.keys(regionGeometryByCode).length} regiões`
+        : `JSON carregado · ${counts}`;
       drawRegionDebug();
       Object.entries(regionMasks).forEach(([region, tiles]) => {
         if (!regionSlots[8]) regionSlots[8] = {};
@@ -42391,8 +42845,20 @@
       updateReadout();
       updateTurnState();
       updateWarAvailability();
-      if (gameMode === 'ai' && isGameStarted && currentTeam === aiTeam) scheduleAiTurn();
+      if ((gameMode === 'ai' || isCampaignGame()) && isGameStarted && currentTeam === aiTeam) scheduleAiTurn();
       startOnlineMatchWhenReady();
+    }
+
+    async function loadBoardFile(fileName) {
+      if (location.protocol === 'file:' && window.AndroidBluetooth?.readGameAsset) {
+        const boardJson = window.AndroidBluetooth.readGameAsset(fileName);
+        if (!boardJson) throw new Error(`O Android não encontrou ${fileName} nos recursos do aplicativo.`);
+        applyRegionData(JSON.parse(boardJson));
+        return;
+      }
+      const response = await fetch(fileName);
+      if (!response.ok) throw new Error(`${fileName}: HTTP ${response.status}`);
+      applyRegionData(await response.json());
     }
 
     async function loadRegionMasks() {
@@ -42480,6 +42946,32 @@
           controls.classList.remove('is-rotation-picker-open');
           app.classList.remove('is-rotation-picker-open');
           const step = getRotationStep(layerNumber);
+          if (quadrilateralBoard?.blocks.some((block) => block.rotationEnabled &&
+              block.regions.some((region) =>
+                Number(region.layer || String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]) === layerNumber))) {
+            resetStageZoom();
+            playRotationSound();
+            if (!rotateQuadrilateralBlocksForLayer(layerNumber, direction)) return;
+            rotationAnimationVersion += 1;
+            hasRotatedThisTurn = true;
+            lastRotatedLayer = layerNumber;
+            lastRotatedBy = currentTeam;
+            rotationLockTurn = currentTurn + 1;
+            updateRotationControls();
+            recalculateRegionForces();
+            refreshRegionVisuals();
+            updateSelectedRegionPanel(selectedRegionCode);
+            updateReadout();
+            saveGame();
+            publishBluetoothAction({
+              type: 'rotate',
+              team: currentTeam,
+              layer: layerNumber,
+              direction
+            });
+            finishIfCenterConquered();
+            return;
+          }
           resetStageZoom();
           stagePanel.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
           playRotationSound();
@@ -42599,6 +43091,7 @@
       const totalBlue = Object.keys(regionPiecesByRegion).reduce((sum, code) => sum + getTeamSoldierCount(code, 'blue'), 0);
       const winnerLabel = winner === 'orange' ? 'Laranja' : winner === 'blue' ? 'Azul' : 'Empate';
       const endReason = reason === 'center' ? 'Vitória por conquista do centro.' :
+        reason === 'campaign' ? `Level concluído: ${activeCampaignLevel?.name || 'Campanha'}.` :
         reason === 'turn30' ? 'Fim do turno 30.' :
           reason === 'inactivity' ? 'Derrota por ficar mais de 40 segundos sem interagir.' :
             reason === 'surrender' ? 'Partida encerrada por abandono.' :
@@ -42664,6 +43157,27 @@
       return true;
     }
 
+    function finishCampaignIfObjectiveMet() {
+      if (!isCampaignGame() || !campaignObjectiveRegions.length ||
+          !campaignObjectiveRegions.every((regionCode) => getRegionDominador(regionCode) === 'orange')) {
+        return false;
+      }
+      finishGame('orange', 'campaign');
+      return true;
+    }
+
+    async function failCampaignLevel() {
+      if (!isCampaignGame() || campaignResetPending || isGameOver) return;
+      campaignResetPending = true;
+      isAiTurnRunning = false;
+      readout.textContent = `Level fracassado. ${activeCampaignLevel.name} será reiniciado...`;
+      await waitForWarAnimation(1800);
+      if (!isGameOver && isCampaignGame()) {
+        campaignResetPending = false;
+        await beginConfiguredGame();
+      }
+    }
+
     function showGameBoard() {
       startScreen.classList.add('is-hidden');
       app.classList.remove('is-hidden');
@@ -42674,7 +43188,7 @@
       focusStrongestRegionForTeam(currentTeam);
       updateSelectedRegionPanel(selectedRegionCode);
       updateTurnState();
-      if (gameMode === 'ai' && currentTeam === aiTeam) scheduleAiTurn();
+      if ((gameMode === 'ai' || isCampaignGame()) && currentTeam === aiTeam) scheduleAiTurn();
     }
 
     async function showTurnTransition(roundResult = null) {
@@ -42716,7 +43230,8 @@
     }
 
     async function scheduleAiTurn() {
-      if (gameMode !== 'ai' || !isGameStarted || isGameOver || currentTeam !== aiTeam || isAiTurnRunning) return;
+      if ((gameMode !== 'ai' && !isCampaignGame()) || !isGameStarted ||
+          isGameOver || currentTeam !== aiTeam || isAiTurnRunning) return;
       isAiTurnRunning = true;
       passTurnButton.disabled = true;
       turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA pensando`;
@@ -42745,8 +43260,7 @@
         } else if (action.type === 'move' && action.source && action.target) {
           pendingAiFollowUp = null;
           selectedRegionCode = action.source;
-          const direction = getNeighborRegionCode(action.source, 'left') === action.target ? 'left' : 'right';
-          performMove(direction, action.amount || 1);
+          performMoveTo(action.target, action.amount || 1);
         } else if (action.type === 'promote' && action.source && action.target) {
           pendingAiFollowUp = null;
           selectedRegionCode = action.source;
@@ -42809,6 +43323,11 @@
       passTurnButton.disabled = true;
       const roundResult = scoreCurrentRound();
       if (finishIfCenterConquered()) return;
+      if (isCampaignGame() && currentTeam === aiTeam &&
+          currentTurn >= Number(activeCampaignLevel.turnLimit || 1) * 2) {
+        if (!finishCampaignIfObjectiveMet()) await failCampaignLevel();
+        return;
+      }
       currentTeam = currentTeam === 'orange' ? 'blue' : 'orange';
       currentTurn += 1;
       turnMoveHistory = turnMoveHistory.filter((move) => move.team !== currentTeam);
@@ -42816,8 +43335,10 @@
       turnCreatedPieces = turnCreatedPieces.filter((piece) => piece.team !== currentTeam);
       hasRotatedThisTurn = false;
       updateRotationControls();
-      pontosDoTurn[currentTeam] = getTurnPointIncome(currentTurn);
-      const wheatReport = applyWheatForTurn(currentTeam);
+      pontosDoTurn[currentTeam] = isCampaignGame()
+        ? Number(activeCampaignLevel.coinsPerTurn) || 4
+        : getTurnPointIncome(currentTurn);
+      const wheatReport = isCampaignGame() ? null : applyWheatForTurn(currentTeam);
       renderPiecePurchaseButtons();
       recalculateRegionForces();
       focusStrongestRegionForTeam(currentTeam);
@@ -42845,7 +43366,7 @@
         if (!isOnlineGame() || onlineTeam === 'orange') await startWar(true);
         return;
       }
-      if (gameMode === 'ai' && currentTeam === aiTeam) scheduleAiTurn();
+      if ((gameMode === 'ai' || isCampaignGame()) && currentTeam === aiTeam) scheduleAiTurn();
     }
 
     passTurnButton.addEventListener('click', passTurnToNextPlayer);
@@ -42878,7 +43399,7 @@
       if (amount <= 0) return;
       const cost = getPromotionCost(selectedRegionCode, amount);
       if (!spendTurnPoints(cost)) {
-        readout.textContent = `${selectedRegionCode}: pontos insuficientes para promover (${cost}).`;
+        readout.textContent = `${selectedRegionCode}: moedas insuficientes para promover (${cost}).`;
         return;
       }
       ensureRegionPieces(targetCode);
@@ -42886,6 +43407,7 @@
       moveSoldierCountBetweenRegions(selectedRegionCode, targetCode, currentTeam, amount);
       mergeRegionTeam(selectedRegionCode, currentTeam);
       mergeRegionTeam(targetCode, currentTeam, targetCountsBefore);
+      collectCampaignBagAtRegion(targetCode, currentTeam);
       recalculateRegionForces();
       refreshRegionVisuals();
       showActionFeedback(targetCode, cost, 'promote');
@@ -42928,6 +43450,7 @@
         Number(regionPiecesByRegion[targetCode][currentTeam][stage] || 0) + 1;
       mergeRegionTeam(sourceCode, currentTeam);
       mergeRegionTeam(targetCode, currentTeam, targetCountsBefore);
+      collectCampaignBagAtRegion(targetCode, currentTeam);
       const refund = getRelegationRefund(sourceCode, targetCode, stage);
       pontosDoTurn[currentTeam] += refund;
       recalculatePieceCounts();
@@ -42938,7 +43461,7 @@
       updateTurnState();
       showActionFeedback(targetCode, refund, 'relegate', '+');
       readout.textContent = refund > 0
-        ? `${sourceCode} → ${targetCode}: peça ${stage.toUpperCase()} rebaixada. +${refund.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} pontos.`
+        ? `${sourceCode} → ${targetCode}: peça ${stage.toUpperCase()} rebaixada. +${refund.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} moedas.`
         : `${sourceCode} → ${targetCode}: peça ${stage.toUpperCase()} rebaixada. Sem restituição.`;
       publishBluetoothAction({
         type: 'relegate',
@@ -42950,23 +43473,50 @@
       finishIfCenterConquered();
     }
 
+    function collectCampaignBagAtRegion(regionCode, team) {
+      if (!isCampaignGame() || getTeamSoldierCount(regionCode, team) <= 0 ||
+          campaignCollectedBags.includes(regionCode)) return 0;
+      const coins = Math.max(0, Number(regionGeometryByCode[regionCode]?.bagCoins) || 0);
+      if (!coins) return 0;
+      campaignCollectedBags.push(regionCode);
+      pontosDoTurn[team] += coins;
+      renderBoardLayers();
+      showActionFeedback(regionCode, coins, 'bag', '+');
+      readout.textContent = `${team === 'orange' ? 'Laranja' : 'Azul'} encontrou um saco com ${coins} moedas em ${regionCode}.`;
+      updateTurnState();
+      return coins;
+    }
+
     function performMove(direction, amount) {
+      const targetCode = getNeighborRegionCode(selectedRegionCode, direction);
+      if (targetCode) performMoveTo(targetCode, amount);
+    }
+
+    function performMoveTo(neighbor, amount) {
       if (!isApplyingBluetoothAction && !isLocalPlayersTurn()) return;
       if (!selectedRegionCode) return;
-      const neighbor = getNeighborRegionCode(selectedRegionCode, direction);
       if (!neighbor) return;
-      if (isReverseMoveBlocked(currentTeam, selectedRegionCode, neighbor)) {
-        readout.textContent = `${selectedRegionCode} → ${neighbor}: movimento de retorno bloqueado neste turno.`;
+      const sourceCode = selectedRegionCode;
+      const sameRankNeighbors = regionNeighborCache[sourceCode]?.sameRank || [];
+      const isNeighbor = sameRankNeighbors.includes(neighbor) ||
+        getNeighborRegionCode(sourceCode, 'left') === neighbor ||
+        getNeighborRegionCode(sourceCode, 'right') === neighbor;
+      if (!isNeighbor || getRegionLayer(sourceCode) !== getRegionLayer(neighbor)) {
+        readout.textContent = `${neighbor}: a região não é uma vizinha de movimento válida.`;
         return;
       }
-      ensureRegionPieces(selectedRegionCode);
+      if (isReverseMoveBlocked(currentTeam, sourceCode, neighbor, amount)) {
+        readout.textContent = `${sourceCode} → ${neighbor}: não há soldados disponíveis para retornar por esse caminho neste turno.`;
+        return;
+      }
+      ensureRegionPieces(sourceCode);
       ensureRegionPieces(neighbor);
       if (!isRegionAvailableForTeam(neighbor, currentTeam)) {
         readout.textContent = `${neighbor}: região dominada pelo oponente.`;
         return;
       }
-      const available = getTeamSoldierCount(selectedRegionCode, currentTeam);
-      const sourceCounts = { ...regionPiecesByRegion[selectedRegionCode][currentTeam] };
+      const available = getTeamSoldierCount(sourceCode, currentTeam);
+      const sourceCounts = { ...regionPiecesByRegion[sourceCode][currentTeam] };
       const targetCounts = { ...regionPiecesByRegion[neighbor][currentTeam] };
       const projectedSource = { ...sourceCounts };
       const projectedTarget = { ...targetCounts };
@@ -42978,34 +43528,35 @@
       }
       const sourceFinalPieces = getFinalPieceCountForTeam(projectedSource);
       const targetFinalPieces = getFinalPieceCountForTeam(projectedTarget);
-      const sourceLimit = getRegionPieceLimit(selectedRegionCode);
+      const sourceLimit = getRegionPieceLimit(sourceCode);
       const destinationLimit = getRegionPieceLimit(neighbor);
       if (amount < 1 || amount > available || available - amount < 1 || sourceFinalPieces > sourceLimit || targetFinalPieces > destinationLimit) {
-        readout.textContent = `${selectedRegionCode}: não é possível mover esse número de soldados.`;
+        readout.textContent = `${sourceCode}: não é possível mover esse número de soldados.`;
         return;
       }
-      const cost = getMoveCost(selectedRegionCode, amount);
+      const cost = getMoveCost(sourceCode, amount);
       if (!spendTurnPoints(cost)) {
-        readout.textContent = `${selectedRegionCode}: pontos insuficientes para mover (${cost}).`;
+        readout.textContent = `${sourceCode}: moedas insuficientes para mover (${cost}).`;
         return;
       }
-      if (!removeSoldierAmountFromRegion(selectedRegionCode, currentTeam, amount)) {
-        readout.textContent = `${selectedRegionCode}: quantidade inválida para mover.`;
+      if (!removeSoldierAmountFromRegion(sourceCode, currentTeam, amount)) {
+        readout.textContent = `${sourceCode}: quantidade inválida para mover.`;
         return;
       }
       addSoldierAmountToRegion(neighbor, currentTeam, amount);
-      mergeRegionTeam(selectedRegionCode, currentTeam);
+      mergeRegionTeam(sourceCode, currentTeam);
       mergeRegionTeam(neighbor, currentTeam, targetCounts);
-      turnMoveHistory.push({ team: currentTeam, source: selectedRegionCode, target: neighbor });
+      turnMoveHistory.push({ team: currentTeam, source: sourceCode, target: neighbor, amount });
+      collectCampaignBagAtRegion(neighbor, currentTeam);
       recalculateRegionForces();
       refreshRegionVisuals();
       showActionFeedback(neighbor, cost, 'move');
-      updateSelectedRegionPanel(selectedRegionCode);
+      updateSelectedRegionPanel(sourceCode);
       updateReadout();
       publishBluetoothAction({
         type: 'move',
         team: currentTeam,
-        source: selectedRegionCode,
+        source: sourceCode,
         target: neighbor,
         amount
       });
@@ -43059,9 +43610,7 @@
         updateMobileRotationControls();
         return;
       }
-      if (selectedRegionCode === regionCode && beginPieceDrag(event, regionCode)) {
-        return;
-      }
+      if (beginPieceDrag(event, regionCode)) return;
       selectedRegionCode = regionCode;
       updateSelectedRegionPanel(selectedRegionCode);
       updateMobileRotationControls();
@@ -43743,8 +44292,7 @@
           addPiece(action.team, action.stage);
         } else if (action.type === 'move' && source && action.target && Number.isInteger(action.amount)) {
           selectedRegionCode = source;
-          const direction = getNeighborRegionCode(source, 'left') === action.target ? 'left' : 'right';
-          performMove(direction, action.amount);
+          performMoveTo(action.target, action.amount);
         } else if (action.type === 'promote' && source && action.target && Number.isInteger(action.amount)) {
           selectedRegionCode = source;
           performPromotion(action.target, action.amount);
@@ -43933,7 +44481,8 @@
           return;
         }
         gameMode = button.dataset.mode;
-        if (gameMode === 'online') selectedStartSpeed = '1';
+        if (gameMode === 'online' || gameMode === 'campaign') selectedStartSpeed = '1';
+        if (gameMode === 'campaign') selectedStartColor = 'orange';
         updateStartModeSelection();
         startMessage.textContent = gameMode === 'bluetooth' && !window.AndroidBluetooth
           ? 'O modo Bluetooth está disponível somente no aplicativo Android.'
@@ -43980,7 +44529,7 @@
 
     bluetoothHostButton.addEventListener('click', () => {
       if (!selectedStartSpeed) {
-        startMessage.textContent = 'Escolha a velocidade de pontos antes de criar a sala.';
+        startMessage.textContent = 'Escolha a velocidade de moedas antes de criar a sala.';
         return;
       }
       if (!window.AndroidBluetooth) {
@@ -44007,8 +44556,17 @@
       window.AndroidBluetooth.discover();
     });
 
-    function beginConfiguredGame() {
+    async function beginConfiguredGame() {
+      if (gameMode === 'campaign') {
+        try {
+          await loadBoardFile('tabuleiro-01.json');
+        } catch (error) {
+          startMessage.textContent = `Não foi possível carregar o level da campanha: ${error.message}`;
+          return;
+        }
+      }
       if ((gameMode === 'ai' && !selectedStartColor) ||
+          (gameMode === 'campaign' && !campaignBoardConfig) ||
           (!selectedStartSpeed && !isOnlineGame()) || !allRegionMasks) {
         startMessage.textContent = 'Escolha as opções da partida antes de começar.';
         return;
@@ -44016,16 +44574,30 @@
       humanTeam = gameMode === 'online' ? onlineTeam :
         gameMode === 'bluetooth' ? 'orange' :
           (gameMode === 'ai' ? selectedStartColor : 'orange');
-      aiTeam = gameMode === 'ai' ? (humanTeam === 'orange' ? 'blue' : 'orange') : null;
-      gameSpeed = isOnlineGame() ? 1 : Number(selectedStartSpeed);
+      aiTeam = gameMode === 'ai' ? (humanTeam === 'orange' ? 'blue' : 'orange')
+        : gameMode === 'campaign' ? 'blue' : null;
+      gameSpeed = isOnlineGame() || gameMode === 'campaign' ? 1 : Number(selectedStartSpeed);
+      activeCampaignLevel = gameMode === 'campaign' ? campaignBoardConfig : null;
       localStorage.removeItem('will-of-many-save');
       resetGameState();
       placeBoardInitialPieces();
+      if (isCampaignGame()) {
+        campaignObjectiveRegions = [...(activeCampaignLevel.objectiveRegions || [])];
+        if (!campaignObjectiveRegions.length) {
+          startMessage.textContent = 'O level da campanha não define regiões iniciais azuis para conquistar.';
+          isGameStarted = false;
+          return;
+        }
+        pontosDoTurn.orange = Number(activeCampaignLevel.coinsPerTurn) || 4;
+        pontosDoTurn.blue = Number(activeCampaignLevel.coinsPerTurn) || 4;
+      }
+      renderBoardLayers();
       for (let layer = 1; layer <= 8; layer += 1) {
         if (allRegionMasks[layer]) recomputeNeighborCacheForLayer(layer);
       }
       recalculateRegionForces();
-      const wheatReport = applyWheatForTurn(currentTeam);
+      if (isCampaignGame()) focusStrongestRegionForTeam('orange');
+      const wheatReport = isCampaignGame() ? null : applyWheatForTurn(currentTeam);
       refreshRegionVisuals();
       updateRotationControls();
       updateSelectedRegionPanel();
@@ -44054,16 +44626,16 @@
       localModeHint.classList.toggle('is-hidden', gameMode !== 'local');
       bluetoothOptions.classList.toggle('is-hidden', gameMode !== 'bluetooth');
       onlineOptions.classList.toggle('is-hidden', gameMode !== 'online');
-      document.querySelector('#speed-options').classList.toggle('is-hidden', gameMode === 'online');
-      document.querySelector('#speed-choice-label').classList.toggle('is-hidden', gameMode === 'online');
+      document.querySelector('#speed-options').classList.toggle('is-hidden', gameMode === 'online' || gameMode === 'campaign');
+      document.querySelector('#speed-choice-label').classList.toggle('is-hidden', gameMode === 'online' || gameMode === 'campaign');
       startGameButton.classList.toggle('is-hidden', gameMode === 'bluetooth' || gameMode === 'online');
       startGameButton.disabled = gameMode === 'ai'
         ? !selectedStartColor || !selectedStartSpeed
-        : !selectedStartSpeed;
+        : gameMode === 'campaign' ? false : !selectedStartSpeed;
       bluetoothDevices.replaceChildren();
     }
 
-    function continueSavedGame() {
+    async function continueSavedGame() {
       let saved;
       try {
         saved = JSON.parse(localStorage.getItem('will-of-many-save') || 'null');
@@ -44074,6 +44646,14 @@
       if (saved?.gameMode === 'bluetooth' && !bluetoothConnected) {
         startMessage.textContent = 'Uma partida Bluetooth desconectada não pode ser retomada. Inicie uma nova sala.';
         return;
+      }
+      if (saved?.gameMode === 'campaign') {
+        try {
+          await loadBoardFile('tabuleiro-01.json');
+        } catch (error) {
+          startMessage.textContent = `Não foi possível carregar o level salvo: ${error.message}`;
+          return;
+        }
       }
       if (!loadSavedGame()) {
         startMessage.textContent = 'Nenhum jogo salvo foi encontrado.';

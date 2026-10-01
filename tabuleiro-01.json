@@ -1,0 +1,96 @@
+{
+  "boardType": "quadrilateral",
+  "version": 1,
+  "coordinateSystem": {
+    "unit": "pixel",
+    "tileColumns": 226,
+    "tileRows": 226,
+    "tileSize": 4,
+    "tileCenterOffset": 2
+  },
+  "campaign": {
+    "id": "tabuleiro-01",
+    "name": "Tabuleiro 01",
+    "coinsPerTurn": 4,
+    "turnLimit": 1,
+    "rotationEnabled": false,
+    "objective": {
+      "type": "captureInitialBlueRegions"
+    }
+  },
+  "blocks": [
+    {
+      "name": "BQ01",
+      "type": "quadrilateral",
+      "matrixSize": 5,
+      "matrix": [
+        [null, null, null, null, null],
+        [null, null, null, null, null],
+        ["L8-1", "L8-2", "L8-3", "L8-4", "L8-5"],
+        [null, null, null, null, null],
+        [null, null, null, null, null]
+      ],
+      "L1": 75,
+      "L2": 250,
+      "C_inicial": {
+        "x": 125,
+        "y": 37.5
+      },
+      "regions": [
+        {
+          "name": "L8-1",
+          "code": "L8-1",
+          "rank": "L8",
+          "layer": 8,
+          "region": 1,
+          "shape": "quadrilateral",
+          "positions": [[3, 1]],
+          "maxPieces": 8,
+          "initialPieces": [{"team": "blue", "stage": "g"}]
+        },
+        {
+          "name": "L8-2",
+          "code": "L8-2",
+          "rank": "L8",
+          "layer": 8,
+          "region": 2,
+          "shape": "quadrilateral",
+          "positions": [[3, 2]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-3",
+          "code": "L8-3",
+          "rank": "L8",
+          "layer": 8,
+          "region": 3,
+          "shape": "quadrilateral",
+          "positions": [[3, 3]],
+          "maxPieces": 8,
+          "bagCoins": 3
+        },
+        {
+          "name": "L8-4",
+          "code": "L8-4",
+          "rank": "L8",
+          "layer": 8,
+          "region": 4,
+          "shape": "quadrilateral",
+          "positions": [[3, 4]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-5",
+          "code": "L8-5",
+          "rank": "L8",
+          "layer": 8,
+          "region": 5,
+          "shape": "quadrilateral",
+          "positions": [[3, 5]],
+          "maxPieces": 8,
+          "initialPieces": [{"team": "orange", "stage": "g"}]
+        }
+      ]
+    }
+  ]
+}

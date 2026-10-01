@@ -152,10 +152,24 @@
       return match ? Number(match[1]) : 0;
     }
 
-    function isReverseMoveBlocked(source, target) {
-      return blockedMoves.some(function (move) {
+    function getMaxMovableSoldiers(source, target) {
+      var available = force(source, team);
+      var reverseMoves = blockedMoves.filter(function (move) {
         return move && move.source === target && move.target === source;
       });
+      if (!reverseMoves.length) return available;
+
+      var lockedSoldiers = 0;
+      for (var index = 0; index < reverseMoves.length; index += 1) {
+        var amount = reverseMoves[index].amount;
+        if (!Number.isInteger(amount) || amount < 1) return 0;
+        lockedSoldiers += amount;
+      }
+      return Math.max(0, available - lockedSoldiers);
+    }
+
+    function isReverseMoveBlocked(source, target, amount) {
+      return (Number(amount) || 1) > getMaxMovableSoldiers(source, target);
     }
 
     function wasPieceCreatedThisTurn(source, stage) {
@@ -420,7 +434,7 @@
         var type = targetLayer === sourceLayer ? 'move'
           : targetLayer === sourceLayer - 1 ? 'promote' : null;
         if (!type) continue;
-        if (type === 'move' && isReverseMoveBlocked(source, target)) continue;
+        if (type === 'move' && isReverseMoveBlocked(source, target, 1)) continue;
         var cost = (type === 'move' ? moveCosts[sourceLayer] : promotionCosts[sourceLayer]) || Infinity;
         if (remainingPoints < cost || (type === 'promote' && promotionBudget(source) < 1)) continue;
         var sourceAfter = buildStageCounts(sourceForce - 1);
@@ -466,7 +480,7 @@
         object(regions[pendingFollowUp.target]).owner;
       if (pendingLayer && pendingCost && points >= pendingCost * pendingAmount &&
           !(pendingFollowUp.type === 'move' &&
-            isReverseMoveBlocked(pendingFollowUp.source, pendingFollowUp.target)) &&
+            isReverseMoveBlocked(pendingFollowUp.source, pendingFollowUp.target, pendingAmount)) &&
           !owns(pendingFollowUp.target, human) &&
           (!pendingTargetOwner || pendingTargetOwner === 'free' || pendingTargetOwner === team) &&
           (pendingFollowUp.type === 'move'
@@ -695,7 +709,7 @@
         var isMove = targetLayer === sourceLayer;
         var isPromotion = targetLayer === sourceLayer - 1;
         if ((!isMove && !isPromotion) ||
-            (isMove && isReverseMoveBlocked(source, target)) ||
+            (isMove && isReverseMoveBlocked(source, target, 1)) ||
             !transferPreservesComposition(source, target, team, 1)) return;
         var compactedTarget = compositionAfterTransfer(target, team, 1, true);
         if (compactedTarget.g >= targetCounts.g ||
@@ -781,7 +795,7 @@
         var isMove = targetLayer === sourceLayer;
         var isPromotion = targetLayer === sourceLayer - 1;
         if ((!isMove && !isPromotion) || owns(target, human)) return;
-        if (isMove && isReverseMoveBlocked(source, target)) return;
+        if (isMove && isReverseMoveBlocked(source, target, 1)) return;
         var targetOwner = object(regions[target]).dominator || object(regions[target]).owner;
         if (targetOwner && targetOwner !== 'free' && targetOwner !== team) return;
         var costPerUnit = isMove ? moveCosts[sourceLayer] : promotionCosts[sourceLayer];
@@ -836,7 +850,6 @@
         var isMove = targetLayer === sourceLayer;
         var isPromotion = targetLayer === sourceLayer - 1;
         if ((!isMove && !isPromotion) || owns(target, human)) return;
-        if (isMove && isReverseMoveBlocked(source, target)) return;
         var targetOwner = object(regions[target]).dominator || object(regions[target]).owner;
         if (targetOwner && targetOwner !== 'free' && targetOwner !== team) return;
         var costPerUnit = isMove ? moveCost : promoteCost;
@@ -847,6 +860,7 @@
         var seenAmounts = {};
         candidateAmounts.forEach(function (amount) {
           if (amount <= 0 || amount >= sourceForce || amount > weakestUnits ||
+              (isMove && isReverseMoveBlocked(source, target, amount)) ||
               amount > maxByPoints || seenAmounts[amount] ||
               !keepsLayerBalance(source, amount)) return;
           seenAmounts[amount] = true;
@@ -892,7 +906,7 @@
         var targetIsFree = !owns(target, team) && !owns(target, human);
         if (!targetIsFree) return;
         if (targetLayer === layer(source)) {
-          if (!isReverseMoveBlocked(source, target) &&
+          if (!isReverseMoveBlocked(source, target, 1) &&
               points >= (moveCosts[layer(source)] || Infinity) &&
               transferPreservesComposition(source, target, team, 1)) {
             freeMoves.push({ source: source, target: target, force: sourceForce });
@@ -979,7 +993,7 @@
       if (!owns(source, team) || sourceForce < 2 || !keepsLayerBalance(source, 1) ||
           !hasValidComposition(stageCounts(source, team))) return;
       adjacent(source).forEach(function (target) {
-        if (owns(target, human) || isReverseMoveBlocked(source, target) ||
+        if (owns(target, human) || isReverseMoveBlocked(source, target, 1) ||
             !transferPreservesComposition(source, target, team, 1)) return;
         enemyMoves.push({ source: source, target: target, force: sourceForce });
       });
