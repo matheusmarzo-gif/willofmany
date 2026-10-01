@@ -152,7 +152,7 @@
     .statistics-table th:first-child, .statistics-table td:first-child { text-align:left; }
     .statistics-table tbody tr:nth-child(even) { background:rgba(32,33,31,.035); }
     .game-modal-card h2 { margin:0 0 14px; font-size:18px; }
-    .war-status { position:absolute; top:43%; left:50%; z-index:35; width:min(88%,340px); padding:16px; border:1px solid var(--accent); background:rgba(255,250,244,.94); box-shadow:0 12px 30px rgba(32,33,31,.2); text-align:center; transform:translate(-50%,-50%); }
+    .war-status { position:fixed; top:max(12px,env(safe-area-inset-top)); left:50%; z-index:210; width:min(88%,340px); padding:16px; border:1px solid var(--accent); background:rgba(255,250,244,.97); box-shadow:0 12px 30px rgba(32,33,31,.3); text-align:center; transform:translateX(-50%); }
     .war-status.is-hidden { display:none; }
     .war-status h2 { margin:0 0 8px; font-size:17px; }
     .war-status p { margin:4px 0; color:var(--muted); font-size:12px; line-height:1.4; }
@@ -445,11 +445,11 @@
     <section class="stage-wrap" aria-label="Composição dos oito discos">
       <div class="stage-panel" id="stage-panel">
         <button class="stage-panel-close" id="stage-panel-close" type="button" aria-label="Voltar para a visão global">×</button>
-        <div class="war-status is-hidden" id="war-status" aria-live="polite"></div>
         <div class="stage" id="stage">
           <div class="pieces" id="pieces" aria-live="polite"></div>
         </div>
       </div>
+      <div class="war-status is-hidden" id="war-status" aria-live="polite"></div>
       <div class="piece-controls" id="piece-controls" aria-label="Comprar peças"></div>
       <aside class="region-panel" id="region-panel" aria-live="polite">
         <p class="region-panel-label">Região selecionada</p>
