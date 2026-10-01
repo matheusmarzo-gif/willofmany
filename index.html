@@ -20,6 +20,8 @@
     .new-game-options h2 { margin:0; font-family:Georgia,"Times New Roman",serif; font-size:28px; font-weight:400; }
     .new-game-options p { margin:12px 0 6px; color:var(--muted); font-size:12px; }
     .choice-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+    #game-mode-options { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    #game-mode-options [data-mode="campaign"] { grid-column:1/-1; }
     .choice-row button { min-height:38px; }
     .choice-row button.is-active { color:#fffaf4; background:var(--accent); border-color:var(--accent); }
     .start-confirm { margin-top:16px; }
@@ -162,6 +164,12 @@
     .turn-transition-message { display:grid; gap:10px; min-width:min(78vw,360px); margin:0; padding:clamp(22px,5vw,42px); border:1px solid rgba(255,255,255,.26); background:rgba(31,34,34,.88); box-shadow:0 18px 60px rgba(0,0,0,.32); font-family:Georgia,"Palatino Linotype",serif; text-align:center; }
     .turn-transition-player { color:#f2b270; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:clamp(13px,2.5vw,18px); font-weight:750; letter-spacing:.2em; }
     .turn-transition-message[data-team="blue"] .turn-transition-player { color:#8db9ff; }
+    .campaign-defeat { position:fixed; inset:0; z-index:450; display:grid; place-items:center; padding:20px; background:rgba(24,24,22,.84); color:#fff; backdrop-filter:blur(5px); animation:campaign-intro-fade .3s ease both; }
+    .campaign-defeat.is-hidden { display:none; }
+    .campaign-defeat-card { display:grid; justify-items:center; gap:12px; width:min(440px,100%); padding:clamp(26px,6vw,44px); border:1px solid rgba(255,255,255,.28); background:linear-gradient(145deg,#332e2b,#1f2222); box-shadow:0 24px 90px rgba(0,0,0,.5); text-align:center; animation:campaign-defeat-rise .45s cubic-bezier(.2,.8,.25,1) both; }
+    .campaign-defeat-mark { display:grid; place-items:center; width:58px; height:58px; border:1px solid #c77962; border-radius:50%; color:#e49a81; font:400 38px/1 Georgia,"Times New Roman",serif; }
+    .campaign-defeat-card strong { color:#f0a188; font:400 clamp(26px,7vw,38px)/1.1 Georgia,"Times New Roman",serif; }
+    .campaign-defeat-card span:last-child { color:rgba(255,255,255,.76); font-size:14px; line-height:1.55; }
     .campaign-intro { position:fixed; inset:0; z-index:400; display:grid; place-items:center; padding:20px; background:rgba(17,19,20,.82); backdrop-filter:blur(6px); animation:campaign-intro-fade .3s ease both; }
     .campaign-intro.is-hidden { display:none; }
     .campaign-intro-dismiss { display:grid; grid-template-columns:88px 1fr; align-items:center; gap:22px; width:min(560px,100%); padding:clamp(22px,5vw,38px); border:1px solid rgba(255,255,255,.26); background:linear-gradient(145deg,#f9f5ec,#e8dfd0); box-shadow:0 24px 90px rgba(0,0,0,.45); text-align:left; white-space:normal; animation:campaign-intro-rise .42s cubic-bezier(.2,.8,.25,1) both; }
@@ -192,6 +200,7 @@
     @keyframes action-cost-pop { 0% { opacity:0; translate:0 5px; } 12% { opacity:1; translate:0 0; } 78% { opacity:1; } 100% { opacity:0; translate:0 -8px; } }
     @keyframes campaign-intro-fade { from { opacity:0; } to { opacity:1; } }
     @keyframes campaign-intro-rise { from { opacity:0; translate:0 18px; scale:.98; } to { opacity:1; translate:0 0; scale:1; } }
+    @keyframes campaign-defeat-rise { from { opacity:0; translate:0 18px; scale:.96; } to { opacity:1; translate:0 0; scale:1; } }
     @media (max-width:760px) { body { overflow-x:hidden; } .app { grid-template-columns:1fr; gap:20px; align-content:start; padding:calc(18px + env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left)); } .intro { text-align:center; } h1,.description { margin-left:auto; margin-right:auto; } h1 { font-size:clamp(38px,12vw,56px); } .description { max-width:340px; } .rule { margin-left:auto; margin-right:auto; } .controls { margin:0 auto; width:min(100%,360px); grid-template-columns:repeat(2,minmax(0,1fr)); } .controls .layer-controls:not(.is-mobile-visible) { display:none; } .turn-panel,.region-panel { width:min(100%,360px); margin-left:auto; margin-right:auto; } .stage-wrap { order:-1; width:100%; } .stage-panel { width:min(100%,calc(100vw - 28px)); } .piece { width:30px; height:30px; } .piece-controls { flex-wrap:wrap; margin-top:16px; } .piece-button { min-width:70px; } .debug-tools { flex-wrap:wrap; } .readout { line-height:1.5; } }
     @media (max-width:760px) { .controls { justify-items:center; } .controls .layer-controls.is-mobile-visible { grid-column:1 / -1; justify-self:center; width:min(100%,180px); } }
     @media (max-width:520px) { .campaign-intro-dismiss { grid-template-columns:1fr; justify-items:center; gap:14px; text-align:center; } .campaign-avatar { width:72px; height:72px; } .campaign-avatar svg { width:50px; height:50px; } }
@@ -275,7 +284,7 @@
       .game-modal-card { max-height:96vh; padding:12px; }
       .statistics-table-wrap { max-height:76vh; }
     }
-    @media (prefers-reduced-motion:reduce) { .layer,.pieces,.debug-canvas,button { transition:none; } .campaign-intro,.campaign-intro-dismiss { animation:none; } }
+    @media (prefers-reduced-motion:reduce) { .layer,.pieces,.debug-canvas,button { transition:none; } .campaign-intro,.campaign-intro-dismiss,.campaign-defeat,.campaign-defeat-card { animation:none; } }
   </style>
 </head>
 <body>
@@ -292,8 +301,8 @@
         <h2>Novo jogo</h2>
         <p>Modo de jogo</p>
         <div class="choice-row" id="game-mode-options">
-          <button type="button" data-mode="ai">Contra IA</button>
           <button type="button" data-mode="campaign">Campanha</button>
+          <button type="button" data-mode="ai">Contra IA</button>
           <button type="button" data-mode="local">Dois jogadores</button>
           <button type="button" data-mode="bluetooth">Bluetooth</button>
           <button type="button" data-mode="online">Online</button>
@@ -543,6 +552,13 @@
         <span class="campaign-intro-hint">Toque na mensagem para começar</span>
       </span>
     </button>
+  </section>
+  <section class="campaign-defeat is-hidden" id="campaign-defeat" role="alertdialog" aria-modal="true" aria-labelledby="campaign-defeat-title" aria-describedby="campaign-defeat-message" aria-hidden="true">
+    <div class="campaign-defeat-card">
+      <span class="campaign-defeat-mark" aria-hidden="true">×</span>
+      <strong id="campaign-defeat-title">Você foi derrotado</strong>
+      <span id="campaign-defeat-message">O level será reiniciado.</span>
+    </div>
   </section>
   <script src="will-of-many-ai.js"></script>
   <script type="application/json" id="embedded-region-data">{
@@ -39226,6 +39242,8 @@
     const campaignRestartButton = document.querySelector('#campaign-restart-button');
     const campaignIntro = document.querySelector('#campaign-intro');
     const campaignIntroDismiss = document.querySelector('#campaign-intro-dismiss');
+    const campaignDefeat = document.querySelector('#campaign-defeat');
+    const campaignDefeatMessage = document.querySelector('#campaign-defeat-message');
     const stagePanel = document.querySelector('#stage-panel');
     const trashDropZone = document.querySelector('#trash-drop-zone');
     const trashDropRefund = document.querySelector('#trash-drop-refund');
@@ -39435,6 +39453,8 @@
       campaignIntroPending = false;
       campaignIntro.classList.add('is-hidden');
       campaignIntro.setAttribute('aria-hidden', 'true');
+      campaignDefeat.classList.add('is-hidden');
+      campaignDefeat.setAttribute('aria-hidden', 'true');
       trashDropZone.classList.add('is-hidden');
       trashDropZone.classList.remove('is-visible', 'is-target');
     }
@@ -43235,10 +43255,14 @@
       localStorage.removeItem('will-of-many-save');
       passTurnButton.disabled = true;
       readout.textContent = `${message} ${activeCampaignLevel.name} será reiniciado...`;
-      await waitForWarAnimation(1800);
+      campaignDefeatMessage.textContent = `${message} ${activeCampaignLevel.name} será reiniciado...`;
+      campaignDefeat.classList.remove('is-hidden');
+      campaignDefeat.setAttribute('aria-hidden', 'false');
+      await waitForWarAnimation(2200);
       if (sessionVersion === gameSessionVersion && isCampaignGame()) {
-        campaignResetPending = false;
-        await beginConfiguredGame();
+        campaignDefeat.classList.add('is-hidden');
+        campaignDefeat.setAttribute('aria-hidden', 'true');
+        await restartCampaignLevel();
       }
     }
 
@@ -43268,6 +43292,8 @@
       campaignIntroPending = false;
       localStorage.removeItem('will-of-many-save');
       dismissCampaignIntro();
+      campaignDefeat.classList.add('is-hidden');
+      campaignDefeat.setAttribute('aria-hidden', 'true');
       campaignActions.classList.add('is-hidden');
       finalModal.classList.add('is-hidden');
       turnTransition.classList.remove('is-visible');
@@ -43289,6 +43315,8 @@
       isWarRunning = false;
       campaignResetPending = false;
       dismissCampaignIntro();
+      campaignDefeat.classList.add('is-hidden');
+      campaignDefeat.setAttribute('aria-hidden', 'true');
       finalModal.classList.add('is-hidden');
       campaignRestartButton.disabled = true;
       finalRestartCampaignButton.disabled = true;
