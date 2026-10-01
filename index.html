@@ -39616,8 +39616,10 @@
       turnNumber.textContent = `Turn ${currentTurn}`;
       turnPlayer.textContent = `Vez: ${teamLabel}`;
       turnPoints.textContent = `Pontos: ${Number(pontosDoTurn[currentTeam]).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
-      const wheatProduction = getWheatTotals(currentTeam).production;
-      turnWheatValue.textContent = `Trigo: ${formatStatisticsNumber(wheatBalances[currentTeam])} · +${formatStatisticsNumber(wheatProduction)}/turno`;
+      const wheatTotals = getWheatTotals(currentTeam);
+      const netWheatPerTurn = wheatTotals.production - wheatTotals.consumption;
+      const netWheatSign = netWheatPerTurn >= 0 ? '+' : '−';
+      turnWheatValue.textContent = `Trigo: ${formatStatisticsNumber(wheatBalances[currentTeam])} · ${netWheatSign}${formatStatisticsNumber(Math.abs(netWheatPerTurn))} líquido/turno`;
       const shortageReport = lastWheatTurnReport?.team === currentTeam &&
         lastWheatTurnReport.turn === currentTurn &&
         lastWheatTurnReport.shortage > 0
@@ -42395,17 +42397,39 @@
 
     async function loadRegionMasks() {
       const candidates = ['regioes-will-of-many-circular.json', 'will-of-many-final.json', 'regioes-will-of-many.json'];
+      if (location.protocol === 'file:' && window.AndroidBluetooth?.readGameAsset) {
+        try {
+          const regionJson = window.AndroidBluetooth.readGameAsset(candidates[0]);
+          if (!regionJson) {
+            throw new Error(`O Android não conseguiu ler ${candidates[0]} dos recursos instalados.`);
+          }
+          applyRegionData(JSON.parse(regionJson));
+          debugStatus.textContent = `JSON carregado · ${candidates[0]} (Android)`;
+          return;
+        } catch (error) {
+          const message = `Falha ao carregar o tabuleiro no Android: ${error.message}`;
+          debugStatus.textContent = message;
+          readout.textContent = message;
+          console.error(message, error);
+          return;
+        }
+      }
+
       let loadedFile = null;
+      let lastLoadError = null;
       for (const fileName of candidates) {
         try {
           const response = await fetch(fileName);
-          if (!response.ok) continue;
+          if (!response.ok) {
+            lastLoadError = new Error(`${fileName}: HTTP ${response.status}`);
+            continue;
+          }
           loadedFile = fileName;
           applyRegionData(await response.json());
           debugStatus.textContent = `JSON carregado · ${loadedFile}`;
           return;
         } catch (error) {
-          // continue trying the next fallback JSON file
+          lastLoadError = error;
         }
       }
       const embeddedRegionData = document.querySelector('#embedded-region-data');
@@ -42418,8 +42442,10 @@
           debugStatus.textContent = `JSON incorporado inválido: ${error.message}`;
         }
       }
-      debugStatus.textContent = 'JSON não carregado automaticamente. Use Carregar JSON.';
-      readout.textContent = 'Não foi possível carregar as regiões.';
+      const message = `JSON do tabuleiro não carregado automaticamente.${lastLoadError ? ` Último erro: ${lastLoadError.message}` : ''} Use Carregar JSON.`;
+      debugStatus.textContent = message;
+      readout.textContent = message;
+      console.error(message, lastLoadError);
     }
 
     for (let index = 0; index < 8; index += 1) {

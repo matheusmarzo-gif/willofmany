@@ -173,6 +173,28 @@ public final class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public String readGameAsset(String fileName) {
+            if (!"regioes-will-of-many-circular.json".equals(fileName)) {
+                Log.w(TAG, "Rejeitando arquivo de tabuleiro não permitido: " + fileName);
+                return "";
+            }
+            try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(getAssets().open(fileName), StandardCharsets.UTF_8)
+            )) {
+                StringBuilder contents = new StringBuilder();
+                char[] buffer = new char[4096];
+                int length;
+                while ((length = reader.read(buffer)) != -1) {
+                    contents.append(buffer, 0, length);
+                }
+                return contents.toString();
+            } catch (IOException error) {
+                Log.e(TAG, "Não foi possível ler o JSON do tabuleiro empacotado.", error);
+                return "";
+            }
+        }
+
+        @JavascriptInterface
         public void createRoom() {
             runOnUiThread(() -> beginBluetoothAction("create", null));
         }
