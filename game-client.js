@@ -318,6 +318,8 @@
       pieceCounts.orange = 0;
       pieceCounts.blue = 0;
       rotations.fill(0);
+      rotationAnimationVersion += 1;
+      circularDiskAnimatedRotations.clear();
       initializeCircularDiskRotations();
       currentTurn = 1;
       currentTeam = 'orange';
@@ -325,6 +327,10 @@
       lastRotatedLayer = null;
       lastRotatedBy = null;
       rotationLockTurn = null;
+      selectedCircularRotationBlock = null;
+      controls.classList.remove('is-rotation-picker-open', 'is-selecting-rotation-block');
+      app.classList.remove('is-rotation-picker-open', 'is-campaign-guiding', 'is-rotation-guide');
+      campaignGuide.classList.remove('is-rotation-picker-open');
       selectedRegionCode = null;
       warSpotlightRegionCodes = [];
       focusedRegionCode = null;
@@ -852,12 +858,13 @@
             button.dataset.rotationBlock = String(block.name);
             button.dataset.disco = disco;
             button.dataset.direction = direction;
-            button.textContent = disco === 'C'
-              ? (direction === 'left' ? '← C' : 'C →')
-              : `${disco} ${direction === 'right' ? '→' : '←'}`;
+            const displayedDirection = disco === 'C'
+              ? (direction === 'right' ? 'left' : 'right')
+              : direction;
+            button.textContent = displayedDirection === 'left' ? `← ${disco}` : `${disco} →`;
             button.setAttribute(
               'aria-label',
-              `Girar disco ${disco} para a ${direction === 'left' ? 'esquerda' : 'direita'}`
+              `Girar disco ${disco} para a ${displayedDirection === 'left' ? 'esquerda' : 'direita'}`
             );
             button.addEventListener('click', () =>
               rotateCircularDisk(block.name, disco, direction));
@@ -7269,7 +7276,8 @@
       }
       if ((gameMode === 'ai' && !selectedStartColor) ||
           (gameMode === 'campaign' && !campaignBoardConfig) ||
-          (!selectedStartSpeed && !isOnlineGame()) || !allRegionMasks) {
+          (!selectedStartSpeed && !isOnlineGame() && gameMode !== 'campaign') ||
+          !allRegionMasks) {
         startMessage.textContent = 'Escolha as opções da partida antes de começar.';
         return;
       }

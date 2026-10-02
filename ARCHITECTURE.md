@@ -103,6 +103,8 @@ acessam variáveis e elementos DOM declarados no mesmo script.
    regiões do mesmo disco juntas; se houver mais de um bloco circular rotativo,
    o seletor pede primeiro o bloco. Geometria, peças e vizinhança são atualizadas
    em conjunto. Blocos quadriculares continuam usando o caminho por camada.
+   Reiniciar um level também reinicia o passo do guia e limpa bloqueios e
+   animações de rotação pendentes.
 6. O JSON de nível descreve dados da campanha; o estado vivo da partida e seu save
    ficam no cliente. O servidor online mantém estado/mensagens da partida online.
 
