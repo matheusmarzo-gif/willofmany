@@ -66,6 +66,120 @@ test('region layer parsing preserves invalid-code behavior', () => {
   assert.equal(rules.getRegionLayer(null), 0);
 });
 
+test('war visits higher ranks first, descending region number within each rank', () => {
+  assert.deepEqual(rules.getWarRegionOrder([
+    'L2-1', 'L1-1', 'L2-2', 'L1-2', 'L8-1', 'L8-16', 'L2-4', 'L2-3'
+  ]), [
+    'L1-2', 'L1-1', 'L2-4', 'L2-3', 'L2-2', 'L2-1', 'L8-16', 'L8-1'
+  ]);
+});
+
+test('war groups all unspent adjacent armies and skips a region after it fought', () => {
+  const regionOrder = rules.getWarRegionOrder([
+    'L8-10', 'L8-11', 'L8-9'
+  ]);
+  const conflicts = rules.buildWarConflicts(regionOrder, {
+    'L8-11': ['L8-10'],
+    'L8-10': ['L8-11', 'L8-9'],
+    'L8-9': ['L8-10']
+  }, {
+    'L8-11': 'orange',
+    'L8-10': 'orange',
+    'L8-9': 'blue'
+  });
+
+  assert.deepEqual(conflicts, [{
+    regionCode: 'L8-10',
+    alliedRegions: ['L8-10', 'L8-11'],
+    enemyRegions: ['L8-9'],
+    attacker: 'orange'
+  }]);
+});
+
+test('war conflict flags are fresh for every new iteration', () => {
+  const regionOrder = rules.getWarRegionOrder(['L8-1', 'L8-2']);
+  const neighbors = { 'L8-1': ['L8-2'], 'L8-2': ['L8-1'] };
+  const dominators = { 'L8-1': 'orange', 'L8-2': 'blue' };
+
+  assert.deepEqual(
+    rules.buildWarConflicts(regionOrder, neighbors, dominators),
+    rules.buildWarConflicts(regionOrder, neighbors, dominators)
+  );
+});
+
+test('quadrilateral cells are neighbors across blocks when rotated edges touch', () => {
+  const levelThreeL8OneAtThreeThree = { x: 1250, y: 375, width: 500, height: 150 };
+  const levelThreeL8SevenAtOneOne = { x: 1750, y: 375, width: 500, height: 150 };
+
+  assert.equal(
+    rules.areAxisAlignedCellsNeighbors(
+      levelThreeL8OneAtThreeThree,
+      levelThreeL8SevenAtOneOne
+    ),
+    true
+  );
+  assert.equal(
+    rules.areAxisAlignedCellsNeighbors(
+      levelThreeL8OneAtThreeThree,
+      { ...levelThreeL8SevenAtOneOne, y: 525 }
+    ),
+    false,
+    'corner-only contact is not a move neighbor'
+  );
+  assert.equal(
+    rules.areAxisAlignedCellsNeighbors(
+      levelThreeL8OneAtThreeThree,
+      { ...levelThreeL8SevenAtOneOne, x: 1752 }
+    ),
+    false,
+    'a real gap between cells is not a neighbor'
+  );
+});
+
+test('BQ04 rotates its configured 2x2 area without moving regions into another block', () => {
+  const initial = [
+    [null, null, null, null],
+    ['L8-10', 'L8-11', null, null],
+    [null, null, null, null],
+    [null, null, null, null]
+  ];
+  const expectedRight = [
+    ['L8-10', null, null, null],
+    ['L8-11', null, null, null],
+    [null, null, null, null],
+    [null, null, null, null]
+  ];
+  const area = { row: 1, column: 1, size: 2 };
+
+  assert.deepEqual(rules.rotateQuadrilateralMatrix(initial, 'right', area), expectedRight);
+  assert.deepEqual(
+    rules.rotateQuadrilateralMatrix(
+      rules.rotateQuadrilateralMatrix(initial, 'right', area),
+      'left',
+      area
+    ),
+    initial,
+    'rotating right then left restores the original block'
+  );
+  assert.deepEqual(initial[1], ['L8-10', 'L8-11', null, null],
+    'rotation does not mutate the source matrix');
+});
+
+test('quadrilateral blocks without a custom area keep recursive ring rotation', () => {
+  assert.deepEqual(
+    rules.rotateQuadrilateralMatrix([
+      ['a', 'b', 'c'],
+      ['d', 'e', 'f'],
+      ['g', 'h', 'i']
+    ], 'right'),
+    [
+      ['d', 'a', 'b'],
+      ['g', 'e', 'c'],
+      ['h', 'i', 'f']
+    ]
+  );
+});
+
 test('recruitment costs include promotion costs from lower layers', () => {
   assert.equal(rules.getRecruitmentCost(8, 'g'), 1);
   assert.equal(rules.getRecruitmentCost(7, 'f'), 28);

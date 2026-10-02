@@ -45,7 +45,9 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
    Evite despejar ou ler o arquivo todo sem necessidade.
 5. Leia os JSONs do tabuleiro ou dados de região envolvidos antes de alterar
    valores codificados. O tabuleiro de campanha é configurado em
-   `tabuleiro-01.json` e `tabuleiro-02.json`.
+   `tabuleiro-01.json`, `tabuleiro-02.json` e `tabuleiro-03.json`. Blocos
+   quadriculares rotativos são selecionados individualmente, e a rotação
+   recursiva dos anéis é definida pela matriz quadrada do bloco.
 6. Leia os testes relacionados e procure consumidores da regra em IA, campanha,
    Android, servidor, save e protocolos antes de mudar comportamento.
 
@@ -59,8 +61,8 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
 - `game-rules.js`: regras puras de composição, contagem e custo; exporta
   `window.WillOfManyRules` no navegador e CommonJS nos testes.
 - `will-of-many-ai.js`: decisões da IA.
-- `tabuleiro-01.json` / `tabuleiro-02.json`: dados específicos dos níveis de
-  campanha.
+- `tabuleiro-01.json` / `tabuleiro-02.json` / `tabuleiro-03.json`: dados
+  específicos dos níveis de campanha.
 - `regioes-will-of-many-circular.json`: dados-base carregados para o tabuleiro
   misto/circular padrão.
 - `android-app/app/src/main/java/com/willofmany/app/MainActivity.java`: WebView,

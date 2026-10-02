@@ -18,6 +18,7 @@
     "name": "Tabuleiro 02",
     "initialCoins": 4,
     "coinsPerTurn": 0,
+    "preserveCoinsBetweenTurns": true,
     "turnLimit": 5,
     "aiActionsEnabled": false,
     "rotationEnabled": true,

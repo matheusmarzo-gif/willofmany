@@ -1,0 +1,308 @@
+{
+  "boardType": "quadrilateral",
+  "version": 1,
+  "displayScale": 1,
+  "regionFocusScale": 5.2,
+  "coordinateSystem": {
+    "unit": "pixel",
+    "tileColumns": 226,
+    "tileRows": 226,
+    "tileSize": 4,
+    "tileCenterOffset": 2
+  },
+  "campaign": {
+    "id": "tabuleiro-03",
+    "name": "Tabuleiro 03",
+    "initialCoins": 4,
+    "coinsPerTurn": 0,
+    "preserveCoinsBetweenTurns": true,
+    "aiActionsEnabled": false,
+    "rotationEnabled": true,
+    "objectiveRegions": ["L8-16"],
+    "objective": {
+      "type": "captureInitialBlueRegions"
+    }
+  },
+  "blocks": [
+    {
+      "name": "BQ01",
+      "type": "quadrilateral",
+      "matrixSize": 3,
+      "matrix": [
+        ["L8-1", "L8-4", "L8-5"],
+        ["L8-2", null, null],
+        ["L8-3", null, null]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 250,
+        "y": 75
+      },
+      "rotationEnabled": true,
+      "regions": [
+        {
+          "name": "L8-1",
+          "code": "L8-1",
+          "rank": "L8",
+          "layer": 8,
+          "region": 1,
+          "shape": "quadrilateral",
+          "positions": [[1, 1]],
+          "maxPieces": 8,
+          "initialPieces": [{"team": "orange", "stage": "g"}]
+        },
+        {
+          "name": "L8-2",
+          "code": "L8-2",
+          "rank": "L8",
+          "layer": 8,
+          "region": 2,
+          "shape": "quadrilateral",
+          "positions": [[2, 1]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-3",
+          "code": "L8-3",
+          "rank": "L8",
+          "layer": 8,
+          "region": 3,
+          "shape": "quadrilateral",
+          "positions": [[3, 1]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-4",
+          "code": "L8-4",
+          "rank": "L8",
+          "layer": 8,
+          "region": 4,
+          "shape": "quadrilateral",
+          "positions": [[1, 2]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-5",
+          "code": "L8-5",
+          "rank": "L8",
+          "layer": 8,
+          "region": 5,
+          "shape": "quadrilateral",
+          "positions": [[1, 3]],
+          "maxPieces": 8
+        }
+      ]
+    },
+    {
+      "name": "BQ02",
+      "type": "quadrilateral",
+      "matrixSize": 2,
+      "matrix": [
+        ["L8-6", null],
+        ["L8-7", null]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 1750,
+        "y": 375
+      },
+      "rotationEnabled": true,
+      "regions": [
+        {
+          "name": "L8-6",
+          "code": "L8-6",
+          "rank": "L8",
+          "layer": 8,
+          "region": 6,
+          "shape": "quadrilateral",
+          "positions": [[1, 1]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-7",
+          "code": "L8-7",
+          "rank": "L8",
+          "layer": 8,
+          "region": 7,
+          "shape": "quadrilateral",
+          "positions": [[2, 1]],
+          "maxPieces": 8,
+          "bagCoins": 7
+        }
+      ]
+    },
+    {
+      "name": "BQ03",
+      "type": "quadrilateral",
+      "matrixSize": 2,
+      "matrix": [
+        ["L8-10", null],
+        ["L8-11", null]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 2750,
+        "y": 375
+      },
+      "rotationEnabled": true,
+      "regions": [
+        {
+          "name": "L8-10",
+          "code": "L8-10",
+          "rank": "L8",
+          "layer": 8,
+          "region": 10,
+          "shape": "quadrilateral",
+          "positions": [[1, 1]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-11",
+          "code": "L8-11",
+          "rank": "L8",
+          "layer": 8,
+          "region": 11,
+          "shape": "quadrilateral",
+          "positions": [[2, 1]],
+          "maxPieces": 8,
+          "initialPieces": [{"team": "blue", "stage": "f"}]
+        }
+      ]
+    },
+    {
+      "name": "BQ04",
+      "type": "quadrilateral",
+      "matrixSize": 4,
+      "matrix": [
+        [null, null, null, null],
+        ["L8-8", "L8-9", null, null],
+        [null, null, null, null],
+        [null, null, null, null]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "rotationArea": {
+        "row": 1,
+        "column": 1,
+        "size": 2
+      },
+      "C_inicial": {
+        "x": 2750,
+        "y": 75
+      },
+      "rotationEnabled": true,
+      "regions": [
+        {
+          "name": "L8-8",
+          "code": "L8-8",
+          "rank": "L8",
+          "layer": 8,
+          "region": 8,
+          "shape": "quadrilateral",
+          "positions": [[2, 1]],
+          "maxPieces": 8,
+          "bagCoins": 6
+        },
+        {
+          "name": "L8-9",
+          "code": "L8-9",
+          "rank": "L8",
+          "layer": 8,
+          "region": 9,
+          "shape": "quadrilateral",
+          "positions": [[2, 2]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "blue", "stage": "f"},
+            {"team": "blue", "stage": "f"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BQ05",
+      "type": "quadrilateral",
+      "matrixSize": 6,
+      "matrix": [
+        ["L8-12", "L8-13", "L8-14", "L7-1", "L8-15", "L8-16"],
+        [null, null, null, null, null, null],
+        [null, null, null, null, null, null],
+        [null, null, null, null, null, null],
+        [null, null, null, null, null, null],
+        [null, null, null, null, null, null]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 1750,
+        "y": 675
+      },
+      "rotationEnabled": false,
+      "regions": [
+        {
+          "name": "L8-12",
+          "code": "L8-12",
+          "rank": "L8",
+          "layer": 8,
+          "region": 12,
+          "shape": "quadrilateral",
+          "positions": [[1, 1]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-13",
+          "code": "L8-13",
+          "rank": "L8",
+          "layer": 8,
+          "region": 13,
+          "shape": "quadrilateral",
+          "positions": [[1, 2]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-14",
+          "code": "L8-14",
+          "rank": "L8",
+          "layer": 8,
+          "region": 14,
+          "shape": "quadrilateral",
+          "positions": [[1, 3]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L7-1",
+          "code": "L7-1",
+          "rank": "L7",
+          "layer": 7,
+          "region": 1,
+          "shape": "quadrilateral",
+          "positions": [[1, 4]],
+          "maxPieces": 7
+        },
+        {
+          "name": "L8-15",
+          "code": "L8-15",
+          "rank": "L8",
+          "layer": 8,
+          "region": 15,
+          "shape": "quadrilateral",
+          "positions": [[1, 5]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-16",
+          "code": "L8-16",
+          "rank": "L8",
+          "layer": 8,
+          "region": 16,
+          "shape": "quadrilateral",
+          "positions": [[1, 6]],
+          "maxPieces": 8
+        }
+      ]
+    }
+  ]
+}

@@ -36,11 +36,11 @@ continuar pequenas e cobertas por testes.
 | `index.html` | Entrada e marcação do jogo web. | Alterar a estrutura da página ou a ordem dos recursos do cliente. |
 | `game.css` | Estilos de desktop, mobile, campanha e tabuleiro. | Alteração visual ou responsiva. |
 | `game-client.js` | Estado de partida, interações, desenho do tabuleiro, menus, campanha e integrações web. Carregado depois dos módulos de regras/IA. | Mecânica ou fluxo do cliente ainda não extraído. |
-| `game-rules.js` | Funções puras compartilhadas de composição, contagem, custo e reembolso de peças. Expõe `WillOfManyRules` no navegador e CommonJS para testes. | Alterar regras determinísticas sem acesso ao DOM. |
+| `game-rules.js` | Funções puras compartilhadas de composição, contagem, custo, reembolso e agrupamento de conflitos. Expõe `WillOfManyRules` no navegador e CommonJS para testes. | Alterar regras determinísticas sem acesso ao DOM. |
 | `will-of-many-ai.js` | Escolha de ações da IA; exporta `window.WillOfManyAI.chooseAction(snapshot)`. | Comportamento do oponente automático. |
 | `tests/game-rules.test.js` | Testes de caracterização do módulo de regras, usando `node:test` sem dependências adicionais. | Validar composição, conversões de unidades, custos e reembolsos. |
 | `tests/asset-entrypoints.test.js` | Garante a ordem dos recursos de entrada e sua inclusão nos builds Android e servidor. | Alterar caminhos, módulos web externos ou configurações de empacotamento. |
-| `tabuleiro-01.json`, `tabuleiro-02.json` | Configuração de campanha por nível: regiões, blocos, peças iniciais, moedas, objetivo, rotação e limite de turnos. Regiões de blocos circulares declaram também `disco`. | Criar ou ajustar um nível de campanha e a qual disco cada região pertence. |
+| `tabuleiro-01.json`, `tabuleiro-02.json`, `tabuleiro-03.json` | Configuração de campanha por nível: regiões, blocos, peças iniciais, moedas, objetivo, escala de exibição/foco, rotação e limite de turnos. `preserveCoinsBetweenTurns` mantém o saldo ao passar o turno; `aiActionsEnabled: false` faz a IA passar automaticamente. Regiões de blocos circulares declaram também `disco`; blocos quadriculares podem definir `rotationArea` para girar uma submatriz específica em vez de toda a matriz. | Criar ou ajustar um nível de campanha e a qual disco cada região pertence. |
 | `regioes-will-of-many-circular.json`, `regioes-will-of-many.json`, `will-of-many-final.json` | Máscaras/regiões usadas para compor o tabuleiro e derivar geometria e vizinhança. O tabuleiro circular é a fonte padrão para todos os modos não campanha; os outros JSONs são apenas fallbacks de carregamento inicial. No tabuleiro circular atual, `disco` identifica o anel rotativo de cada região. | Geometria, regiões, dados-base e vizinhança do tabuleiro padrão. |
 | `regioes-will-of-many-l8.json` | Dados auxiliares de regiões L8 usados por ferramentas/edição. Confirme os pontos de leitura antes de tratá-lo como fonte do tabuleiro ativo. | Investigação de geometria e edição de regiões L8. |
 | `editor-regioes.html` | Ferramenta visual de edição/inspeção de regiões e dados auxiliares. | Ajustar ou depurar máscaras e caixas de região. |
@@ -76,11 +76,12 @@ Para encontrar um ponto de entrada, use a busca do editor pelo nome da função:
 | Carregamento de tabuleiro | `loadRegionMasks`, `loadBoardFile`, `applyRegionData`, `normalizeImportedRegionGeometry` | Carregamento inicial das máscaras e carregamento explícito de níveis. |
 | Geometria e vizinhança | `regionGeometryByCode`, `regionNeighborCache`, `recomputeNeighborCacheForLayer`, `getRegionCalculationOrder` | Geometria, rotação e vizinhança também alimentam regras e destaques. |
 | Compra e composição | `renderPiecePurchaseButtons`, `addPiece`, `mergeRegionTeam`, `refreshRegionVisuals` | A compra altera o estado lógico e depois atualiza peças, forças e painéis. |
+| Economia da campanha | `getCampaignCoinsPerTurn`, `passTurnToNextPlayer`, `activeCampaignLevel.preserveCoinsBetweenTurns` | Configure renda, moedas iniciais e persistência do saldo nos metadados do JSON do nível. |
 | Movimento e descarte | `beginPieceDrag`, `finishPieceDrag`, `getDragTargets`, `performRelegation`, `performRecycle` | O arraste usa hit-testing, alvos válidos e uma camada visual própria. |
-| Promoção e guerra | `refreshPromotionControls`, `startWar`, `recalculateRegionForces`, `updateWarAvailability` | Promoção, propriedade, força, guerra e condição de vitória são interdependentes. |
-| Rotação | `getRotatableCircularBlocks`, `renderCircularRotationControls`, `rotateCircularDisk`, `rotateQuadrilateralBlocksForLayer` | A seleção parte dos blocos circulares rotativos; dentro do bloco, `disco` agrupa regiões que giram juntas. Os ângulos dos discos são salvos separadamente. Blocos quadriculares mantêm o caminho por camada. |
+| Promoção e guerra | `refreshPromotionControls`, `startWar`, `recalculateRegionForces`, `updateWarAvailability` | Promoção, propriedade, força, guerra e condição de vitória são interdependentes. Em todos os tabuleiros, a guerra visita primeiro o maior rank (L1), seguindo em ordem decrescente do número de região dentro de cada rank; cada região pode participar de um único bloco por guerra. Cada bloco mantém sua animação antes de ser resolvido, e a marcação de participação é reiniciada no começo da próxima guerra. |
+| Rotação | `getRotatableCircularBlocks`, `getRotatableQuadrilateralBlocks`, `renderCircularRotationControls`, `rotateCircularDisk`, `rotateQuadrilateralBlock`, `rotateQuadrilateralMatrix` | Blocos circulares selecionam o bloco e o `disco`; cada bloco quadricular rotativo também é selecionado individualmente. A matriz gira seus anéis exteriores e internos recursivamente. |
 | Renderização do tabuleiro | `renderBoardLayers`, `refreshRegionVisuals`, `updateBoardFocusOverlay` | As regiões são desenhadas em SVG; peças são elementos separados sobre o tabuleiro. |
-| Campanha e guia | `beginConfiguredGame`, `showCampaignGuide`, `hideCampaignGuide`, `continueCampaignGuide`, `maybeAdvanceLevel2Guide` | O guia depende de eventos da partida e estados persistidos; não é só uma camada de texto. |
+| Campanha e guia | `beginConfiguredGame`, `showCampaignGuide`, `hideCampaignGuide`, `continueCampaignGuide`, `maybeAdvanceLevel2Guide`, `maybeAdvanceLevelThreeGuide` | O guia depende de eventos da partida e estados persistidos; no Level 3, a introdução percorre L8-1 → L8-16 → L8-1 em seis segundos. A mensagem sobre rótulos centraliza instantaneamente L8-1, redesenha tabuleiro/realces e usa essa região como exemplo. As duas mensagens não chamam `scrollIntoView` para SVGs ampliados: isso poderia rolar o conteúdo interno do painel e deslocar o tabuleiro/controle ×. As outras dicas avançam por ações do jogador. |
 | Turno e IA | `passTurnToNextPlayer`, `scheduleAiTurn`, `getGameSnapshot` | A IA escolhe ações com um snapshot do estado; a aplicação das ações permanece no cliente. |
 | Salvamento e retomada | `saveGame`, `loadSavedGame`, `continueSavedGame` | Alterações no estado persistente precisam ser compatíveis com saves existentes. |
 | Bluetooth | `publishBluetoothAction`, `applyBluetoothAction` e mensagens tratadas em `MainActivity.java` | Cliente, ponte nativa e protocolo precisam continuar alinhados. |
@@ -101,15 +102,43 @@ acessam variáveis e elementos DOM declarados no mesmo script.
    também os caminhos diretos de início por Bluetooth e Online.
 3. No modo campanha, `beginConfiguredGame` carrega o JSON do nível antes de
    preparar peças iniciais, objetivo e estado do guia.
+   O mapa `campaignLevelFiles` mantém a ordem de desbloqueio dos níveis. Configure
+   `initialCoins`, `coinsPerTurn`, `preserveCoinsBetweenTurns` e
+   `aiActionsEnabled` no bloco `campaign`, sem criar exceções por número de
+   level no fluxo de turnos.
 4. Ações como comprar, mover, promover, descartar, girar ou resolver uma guerra
    atualizam `regionPiecesByRegion` e estruturas relacionadas.
 5. As ações que alteram a composição/posição atualizam forças, visuais, controles
    e painel da região; muitas também salvam e publicam a ação para Bluetooth ou
    online.
+   Ao iniciar uma guerra, `game-rules.js` ordena todas as regiões por rank
+   ascendente (L1→L8) e número descendente dentro do rank, e agrupa vizinhos
+   aliados/inimigos ainda não participantes em blocos de conflito. O cliente
+   anima e resolve cada bloco nessa ordem; a lista de participantes é local à
+   guerra e começa vazia na próxima iteração.
 6. A rotação circular usa a identidade do bloco e o campo `disco` para mover as
    regiões do mesmo disco juntas; se houver mais de um bloco circular rotativo,
    o seletor pede primeiro o bloco. Geometria, peças e vizinhança são atualizadas
-   em conjunto. Blocos quadriculares continuam usando o caminho por camada.
+   em conjunto. Blocos quadriculares rotativos são selecionados um por vez e
+   aplicam a rotação recursiva dos anéis da matriz apenas ao bloco escolhido.
+   `rotateQuadrilateralBlocksForLayer` reaplica o tabuleiro após atualizar a
+   matriz; `applyRegionData` recompõe máscaras e recalcula as vizinhanças de
+   todas as camadas. Regiões quadriculares de blocos distintos também podem ser
+   vizinhas quando suas células compartilham uma borda física após as rotações.
+   `game-rules.js` fornece `areAxisAlignedCellsNeighbors` para a mesma verificação
+   dentro e entre blocos quadriculares. O helper de rotação usa a matriz inteira
+   por padrão; `rotationArea` (linha, coluna e tamanho, com índices iniciando em
+   1) restringe a rotação recursiva a uma submatriz, como em BQ04 no Level 3.
+   `displayScale` maior que 1 amplia a geometria para além da área usada no
+   hit-testing; em tabuleiros extensos, mantenha o valor em 1 e use
+   `regionFocusScale` para ampliar apenas a região em foco. No Level 3, o foco
+   usa escala 5.2 e cada região quadricular dispõe até oito posições de peça em
+   uma grade 4×2; os ícones mantêm 30 px visuais durante o zoom.
+   Etiquetas temporárias de custo são posicionadas na camada do painel para
+   manter o tamanho visual durante o zoom; a transição de turno do Level 3 dura
+   metade do tempo padrão (1,75 s). Os contornos de foco e guerra usam traços
+   estreitos para não encobrir regiões ampliadas. Saves anteriores à troca dos
+   códigos L8-8…L8-11 têm seus códigos de região remapeados ao retomar a partida.
    Reiniciar um level também reinicia o passo do guia e limpa bloqueios e
    animações de rotação pendentes.
 7. O JSON de nível descreve dados da campanha; o estado vivo da partida e seu save
