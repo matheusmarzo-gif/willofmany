@@ -143,6 +143,7 @@
       "regions": [
         {
           "name": "L8-6",
+          "disco": "C",
           "code": "L8-6",
           "rank": "L8",
           "layer": 8,
@@ -156,6 +157,7 @@
         },
         {
           "name": "L8-7",
+          "disco": "C",
           "code": "L8-7",
           "rank": "L8",
           "layer": 8,
@@ -169,6 +171,7 @@
         },
         {
           "name": "L8-8",
+          "disco": "C",
           "code": "L8-8",
           "rank": "L8",
           "layer": 8,
@@ -183,6 +186,7 @@
         },
         {
           "name": "L8-9",
+          "disco": "C",
           "code": "L8-9",
           "rank": "L8",
           "layer": 8,

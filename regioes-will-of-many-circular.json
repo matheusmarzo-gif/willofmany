@@ -18,6 +18,7 @@
       "regions": [
         {
           "name": "L8-1",
+          "disco": "L8",
           "code": "L8-1",
           "rank": "L8",
           "layer": 8,
@@ -39,6 +40,7 @@
         },
         {
           "name": "L8-2",
+          "disco": "L8",
           "code": "L8-2",
           "rank": "L8",
           "layer": 8,
@@ -53,6 +55,7 @@
         },
         {
           "name": "L8-3",
+          "disco": "L8",
           "code": "L8-3",
           "rank": "L8",
           "layer": 8,
@@ -67,6 +70,7 @@
         },
         {
           "name": "L8-4",
+          "disco": "L8",
           "code": "L8-4",
           "rank": "L8",
           "layer": 8,
@@ -88,6 +92,7 @@
         },
         {
           "name": "L8-5",
+          "disco": "L8",
           "code": "L8-5",
           "rank": "L8",
           "layer": 8,
@@ -102,6 +107,7 @@
         },
         {
           "name": "L8-6",
+          "disco": "L8",
           "code": "L8-6",
           "rank": "L8",
           "layer": 8,
@@ -116,6 +122,7 @@
         },
         {
           "name": "L8-7",
+          "disco": "L8",
           "code": "L8-7",
           "rank": "L8",
           "layer": 8,
@@ -130,6 +137,7 @@
         },
         {
           "name": "L8-8",
+          "disco": "L8",
           "code": "L8-8",
           "rank": "L8",
           "layer": 8,
@@ -144,6 +152,7 @@
         },
         {
           "name": "L7-1",
+          "disco": "L7",
           "code": "L7-1",
           "rank": "L7",
           "layer": 7,
@@ -158,6 +167,7 @@
         },
         {
           "name": "L7-2",
+          "disco": "L7",
           "code": "L7-2",
           "rank": "L7",
           "layer": 7,
@@ -173,6 +183,7 @@
         },
         {
           "name": "L7-3",
+          "disco": "L7",
           "code": "L7-3",
           "rank": "L7",
           "layer": 7,
@@ -187,6 +198,7 @@
         },
         {
           "name": "L7-4",
+          "disco": "L7",
           "code": "L7-4",
           "rank": "L7",
           "layer": 7,
@@ -201,6 +213,7 @@
         },
         {
           "name": "L7-5",
+          "disco": "L7",
           "code": "L7-5",
           "rank": "L7",
           "layer": 7,
@@ -216,6 +229,7 @@
         },
         {
           "name": "L7-6",
+          "disco": "L7",
           "code": "L7-6",
           "rank": "L7",
           "layer": 7,
@@ -230,6 +244,7 @@
         },
         {
           "name": "L7-7",
+          "disco": "L7",
           "code": "L7-7",
           "rank": "L7",
           "layer": 7,
@@ -244,6 +259,7 @@
         },
         {
           "name": "L6-1",
+          "disco": "L6",
           "code": "L6-1",
           "rank": "L6",
           "layer": 6,
@@ -258,6 +274,7 @@
         },
         {
           "name": "L6-2",
+          "disco": "L6",
           "code": "L6-2",
           "rank": "L6",
           "layer": 6,
@@ -273,6 +290,7 @@
         },
         {
           "name": "L6-3",
+          "disco": "L6",
           "code": "L6-3",
           "rank": "L6",
           "layer": 6,
@@ -287,6 +305,7 @@
         },
         {
           "name": "L6-4",
+          "disco": "L6",
           "code": "L6-4",
           "rank": "L6",
           "layer": 6,
@@ -302,6 +321,7 @@
         },
         {
           "name": "L6-5",
+          "disco": "L6",
           "code": "L6-5",
           "rank": "L6",
           "layer": 6,
@@ -316,6 +336,7 @@
         },
         {
           "name": "L6-6",
+          "disco": "L6",
           "code": "L6-6",
           "rank": "L6",
           "layer": 6,
@@ -330,6 +351,7 @@
         },
         {
           "name": "L5-1",
+          "disco": "L5",
           "code": "L5-1",
           "rank": "L5",
           "layer": 5,
@@ -344,6 +366,7 @@
         },
         {
           "name": "L5-2",
+          "disco": "L5",
           "code": "L5-2",
           "rank": "L5",
           "layer": 5,
@@ -359,6 +382,7 @@
         },
         {
           "name": "L5-3",
+          "disco": "L5",
           "code": "L5-3",
           "rank": "L5",
           "layer": 5,
@@ -373,6 +397,7 @@
         },
         {
           "name": "L5-4",
+          "disco": "L5",
           "code": "L5-4",
           "rank": "L5",
           "layer": 5,
@@ -388,6 +413,7 @@
         },
         {
           "name": "L5-5",
+          "disco": "L5",
           "code": "L5-5",
           "rank": "L5",
           "layer": 5,
@@ -402,6 +428,7 @@
         },
         {
           "name": "L4-1",
+          "disco": "L4",
           "code": "L4-1",
           "rank": "L4",
           "layer": 4,
@@ -416,6 +443,7 @@
         },
         {
           "name": "L4-2",
+          "disco": "L4",
           "code": "L4-2",
           "rank": "L4",
           "layer": 4,
@@ -431,6 +459,7 @@
         },
         {
           "name": "L4-3",
+          "disco": "L4",
           "code": "L4-3",
           "rank": "L4",
           "layer": 4,
@@ -445,6 +474,7 @@
         },
         {
           "name": "L4-4",
+          "disco": "L4",
           "code": "L4-4",
           "rank": "L4",
           "layer": 4,
@@ -460,6 +490,7 @@
         },
         {
           "name": "L3-1",
+          "disco": "L3",
           "code": "L3-1",
           "rank": "L3",
           "layer": 3,
@@ -475,6 +506,7 @@
         },
         {
           "name": "L3-2",
+          "disco": "L3",
           "code": "L3-2",
           "rank": "L3",
           "layer": 3,
@@ -490,6 +522,7 @@
         },
         {
           "name": "L3-3",
+          "disco": "L3",
           "code": "L3-3",
           "rank": "L3",
           "layer": 3,
@@ -505,6 +538,7 @@
         },
         {
           "name": "L2-1",
+          "disco": "L2",
           "code": "L2-1",
           "rank": "L2",
           "layer": 2,
@@ -519,6 +553,7 @@
         },
         {
           "name": "L2-2",
+          "disco": "L2",
           "code": "L2-2",
           "rank": "L2",
           "layer": 2,
@@ -533,6 +568,7 @@
         },
         {
           "name": "L1-1",
+          "disco": "L1",
           "code": "L1-1",
           "rank": "L1",
           "layer": 1,

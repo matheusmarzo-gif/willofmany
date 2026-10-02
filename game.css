@@ -61,6 +61,14 @@
     .controls { display:grid; grid-template-columns:repeat(4,minmax(80px,1fr)); gap:8px; max-width:360px; }
     .rotation-picker-open, .rotation-picker-close { display:none; }
     .layer-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:3px; }
+    #controls .rotation-disk-controls.is-rotation-group-hidden,
+    #controls .layer-controls.is-suppressed-by-circular-picker { display:none !important; }
+    .rotation-block-picker { grid-column:1 / -1; display:grid; justify-items:center; gap:8px; }
+    .rotation-block-picker[hidden], .rotation-block-label[hidden],
+    .rotation-block-choices[hidden], .rotation-block-back[hidden] { display:none !important; }
+    .rotation-block-label { margin:0; color:var(--accent); font-size:11px; font-weight:700; }
+    .rotation-block-choices { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+    .rotation-block-button, .rotation-block-back { min-height:38px; padding:8px 12px; }
     button { border:1px solid var(--line); border-radius:2px; color:var(--ink); background:rgba(255,255,255,.22); cursor:pointer; font:700 11px/1 "Trebuchet MS","Gill Sans",sans-serif; letter-spacing:.08em; transition:background .2s ease,border-color .2s ease,color .2s ease,transform .2s ease; }
     button:hover, button:focus-visible { border-color:var(--accent); color:var(--accent); background:#fffaf4; outline:none; transform:translateY(-2px); }
     button.is-active { border-color:var(--accent); color:#fffaf4; background:var(--accent); }
@@ -222,6 +230,7 @@
     @keyframes region-outline-pulse { from { opacity:.48; } to { opacity:1; } }
     @media (max-width:760px) { body { overflow-x:hidden; } .app { grid-template-columns:1fr; gap:20px; align-content:start; padding:calc(18px + env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left)); } .intro { text-align:center; } h1,.description { margin-left:auto; margin-right:auto; } h1 { font-size:clamp(38px,12vw,56px); } .description { max-width:340px; } .rule { margin-left:auto; margin-right:auto; } .controls { margin:0 auto; width:min(100%,360px); grid-template-columns:repeat(2,minmax(0,1fr)); } .controls .layer-controls:not(.is-mobile-visible) { display:none; } .turn-panel,.region-panel { width:min(100%,360px); margin-left:auto; margin-right:auto; } .stage-wrap { order:-1; width:100%; } .stage-panel { width:min(100%,calc(100vw - 28px)); } .piece { width:30px; height:30px; } .piece-controls { flex-wrap:wrap; margin-top:16px; } .piece-button { min-width:70px; } .debug-tools { flex-wrap:wrap; } .readout { line-height:1.5; } }
     @media (max-width:760px) { .controls { justify-items:center; } .controls .layer-controls.is-mobile-visible { grid-column:1 / -1; justify-self:center; width:min(100%,180px); } }
+    @media (max-width:760px) { #controls.is-rotation-picker-open .layer-controls:not(.is-suppressed-by-circular-picker):not(.is-rotation-group-hidden) { display:grid; } }
     @media (max-width:520px) { .campaign-intro-dismiss { grid-template-columns:1fr; justify-items:center; gap:14px; text-align:center; } .campaign-avatar { width:72px; height:72px; } .campaign-avatar svg { width:50px; height:50px; } }
     @media (orientation:landscape) and (max-height:600px) and (max-width:1000px) {
       html, body { width:100%; height:100%; min-height:0; overflow:hidden; }
@@ -290,9 +299,12 @@
       .app.is-rotation-guide #rotate-picker-button .turn-button-label { position:static; width:auto; height:auto; overflow:visible; clip:auto; clip-path:none; font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
       .rotation-picker-trigger { display:grid !important; }
       .controls-label { display:none; }
-      #controls { position:fixed; z-index:30; inset:0; display:none; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:center; width:100%; max-width:none; padding:46px 16px 16px; gap:8px; background:rgba(24,24,22,.88); }
+      #controls { position:fixed; z-index:30; inset:0; display:none; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:center; width:100%; max-width:none; padding:46px 16px 16px; gap:8px; overflow:auto; background:rgba(24,24,22,.88); }
       #controls.is-rotation-picker-open { display:grid; }
       #controls .layer-controls { display:grid !important; width:min(100%,220px); margin:0 auto; }
+      #controls .rotation-block-picker { width:100%; }
+      #controls .rotation-block-label { color:#fffaf4; }
+      #controls .rotation-block-button, #controls .rotation-block-back { color:#fffaf4; border-color:rgba(255,255,255,.3); background:rgba(255,255,255,.12); }
       #controls .layer-button { min-height:34px; color:#fffaf4; border-color:rgba(255,255,255,.3); background:rgba(255,255,255,.12); font-size:10px; }
       #controls .layer-button:disabled { color:rgba(255,255,255,.4); background:rgba(120,120,120,.35); }
       .rotation-picker-close { position:fixed; z-index:32; top:8px; right:10px; display:none; min-height:34px; padding:8px 12px; color:#fffaf4; border-color:rgba(255,255,255,.5); background:rgba(255,255,255,.12); }

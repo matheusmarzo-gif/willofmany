@@ -40,8 +40,8 @@ continuar pequenas e cobertas por testes.
 | `will-of-many-ai.js` | Escolha de ações da IA; exporta `window.WillOfManyAI.chooseAction(snapshot)`. | Comportamento do oponente automático. |
 | `tests/game-rules.test.js` | Testes de caracterização do módulo de regras, usando `node:test` sem dependências adicionais. | Validar composição, conversões de unidades, custos e reembolsos. |
 | `tests/asset-entrypoints.test.js` | Garante a ordem dos recursos de entrada e sua inclusão nos builds Android e servidor. | Alterar caminhos, módulos web externos ou configurações de empacotamento. |
-| `tabuleiro-01.json`, `tabuleiro-02.json` | Configuração de campanha por nível: regiões, blocos, peças iniciais, moedas, objetivo, rotação e limite de turnos. | Criar ou ajustar um nível de campanha. |
-| `regioes-will-of-many-circular.json`, `regioes-will-of-many.json`, `will-of-many-final.json` | Máscaras/regiões usadas para compor o tabuleiro e derivar geometria e vizinhança. O cliente tenta carregá-las nesta ordem. | Geometria, regiões, dados-base e vizinhança do tabuleiro padrão. |
+| `tabuleiro-01.json`, `tabuleiro-02.json` | Configuração de campanha por nível: regiões, blocos, peças iniciais, moedas, objetivo, rotação e limite de turnos. Regiões de blocos circulares declaram também `disco`. | Criar ou ajustar um nível de campanha e a qual disco cada região pertence. |
+| `regioes-will-of-many-circular.json`, `regioes-will-of-many.json`, `will-of-many-final.json` | Máscaras/regiões usadas para compor o tabuleiro e derivar geometria e vizinhança. O cliente tenta carregá-las nesta ordem. No tabuleiro circular atual, `disco` identifica o anel rotativo de cada região. | Geometria, regiões, dados-base e vizinhança do tabuleiro padrão. |
 | `regioes-will-of-many-l8.json` | Dados auxiliares de regiões L8 usados por ferramentas/edição. Confirme os pontos de leitura antes de tratá-lo como fonte do tabuleiro ativo. | Investigação de geometria e edição de regiões L8. |
 | `editor-regioes.html` | Ferramenta visual de edição/inspeção de regiões e dados auxiliares. | Ajustar ou depurar máscaras e caixas de região. |
 | `peca_*.png`, `l1.png`–`l8.png`, `final*.png`, `tutorial-*.svg` | Imagens de peças, camadas, telas finais e tutorial. | Arte, ícones e recursos empacotados. |
@@ -78,7 +78,7 @@ Para encontrar um ponto de entrada, use a busca do editor pelo nome da função:
 | Compra e composição | `renderPiecePurchaseButtons`, `addPiece`, `mergeRegionTeam`, `refreshRegionVisuals` | A compra altera o estado lógico e depois atualiza peças, forças e painéis. |
 | Movimento e descarte | `beginPieceDrag`, `finishPieceDrag`, `getDragTargets`, `performRelegation`, `performRecycle` | O arraste usa hit-testing, alvos válidos e uma camada visual própria. |
 | Promoção e guerra | `refreshPromotionControls`, `startWar`, `recalculateRegionForces`, `updateWarAvailability` | Promoção, propriedade, força, guerra e condição de vitória são interdependentes. |
-| Rotação | `updateRotationControls`, handlers dos `.layer-button`, `rotateQuadrilateralBlocksForLayer`, `animateMixedCircularBlocks` | O caminho varia entre discos circulares e blocos quadriculares. |
+| Rotação | `getRotatableCircularBlocks`, `renderCircularRotationControls`, `rotateCircularDisk`, `rotateQuadrilateralBlocksForLayer` | A seleção parte dos blocos circulares rotativos; dentro do bloco, `disco` agrupa regiões que giram juntas. Os ângulos dos discos são salvos separadamente. Blocos quadriculares mantêm o caminho por camada. |
 | Renderização do tabuleiro | `renderBoardLayers`, `refreshRegionVisuals`, `updateBoardFocusOverlay` | As regiões são desenhadas em SVG; peças são elementos separados sobre o tabuleiro. |
 | Campanha e guia | `beginConfiguredGame`, `showCampaignGuide`, `hideCampaignGuide`, `continueCampaignGuide`, `maybeAdvanceLevel2Guide` | O guia depende de eventos da partida e estados persistidos; não é só uma camada de texto. |
 | Turno e IA | `passTurnToNextPlayer`, `scheduleAiTurn`, `getGameSnapshot` | A IA escolhe ações com um snapshot do estado; a aplicação das ações permanece no cliente. |
@@ -99,8 +99,10 @@ acessam variáveis e elementos DOM declarados no mesmo script.
 4. As ações que alteram a composição/posição atualizam forças, visuais, controles
    e painel da região; muitas também salvam e publicam a ação para Bluetooth ou
    online.
-5. A rotação afeta geometria, regiões visuais, posições das peças e vizinhança.
-   Nos tabuleiros mistos, blocos circulares e quadriculares têm caminhos distintos.
+5. A rotação circular usa a identidade do bloco e o campo `disco` para mover as
+   regiões do mesmo disco juntas; se houver mais de um bloco circular rotativo,
+   o seletor pede primeiro o bloco. Geometria, peças e vizinhança são atualizadas
+   em conjunto. Blocos quadriculares continuam usando o caminho por camada.
 6. O JSON de nível descreve dados da campanha; o estado vivo da partida e seu save
    ficam no cliente. O servidor online mantém estado/mensagens da partida online.
 

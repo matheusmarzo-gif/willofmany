@@ -170,7 +170,8 @@
     const gameRules = window.WillOfManyRules;
     if (!gameRules) throw new Error('O módulo de regras do jogo não foi carregado.');
     const rotations = Array(8).fill(0);
-    const mixedCircularRotationAngles = new Map();
+    const circularDiskAnimatedRotations = new Map();
+    const circularDiskRotations = {};
     const pieceCounts = { blue:0, orange:0 };
     const pieceTargets = { blue:{code:'L8-4',region:4,label:'região L8-4',slots:[]}, orange:{code:'L8-1',region:1,label:'região L8-1',slots:[]} };
     const maxPieces = 16;
@@ -253,6 +254,7 @@
     let onlineSessionLoading = false;
     let isApplyingBluetoothAction = false;
     let isAiTurnRunning = false;
+    let selectedCircularRotationBlock = null;
     let rotationAnimationVersion = 0;
     let hasRotatedThisTurn = false;
     let lastRotatedLayer = null;
@@ -316,16 +318,7 @@
       pieceCounts.orange = 0;
       pieceCounts.blue = 0;
       rotations.fill(0);
-      if (currentBoardData?.boardType === 'mixed') {
-        currentBoardData.blocks.forEach((block) => {
-          if (block.type !== 'circular') return;
-          const initialRotation = Number(block.initialRotation) || 0;
-          (block.regions || []).forEach((region) => {
-            const layer = Number(region.layer || String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]);
-            if (layer >= 1 && layer <= rotations.length) rotations[layer - 1] = initialRotation;
-          });
-        });
-      }
+      initializeCircularDiskRotations();
       currentTurn = 1;
       currentTeam = 'orange';
       hasRotatedThisTurn = false;
@@ -378,12 +371,13 @@
       const save = {
         gameMode, humanTeam, aiTeam, gameSpeed, currentTeam, currentTurn,
         campaignLevelId: activeCampaignLevel?.id || null,
-        boardRotationConfigVersion: 3,
+        boardRotationConfigVersion: 4,
         campaignCollectedBags: [...campaignCollectedBags],
         campaignGuideStep,
         campaignLevel2SeenSectors: [...campaignLevel2SeenSectors],
         hasRotatedThisTurn, lastRotatedLayer, lastRotatedBy, rotationLockTurn,
-        rotations: [...rotations], pontosDoTurn: { ...pontosDoTurn },
+        rotations: [...rotations], circularDiskRotations: { ...circularDiskRotations },
+        pontosDoTurn: { ...pontosDoTurn },
         turnMoveHistory: JSON.parse(JSON.stringify(turnMoveHistory)),
         turnRecycledPieces: JSON.parse(JSON.stringify(turnRecycledPieces)),
         turnCreatedPieces: JSON.parse(JSON.stringify(turnCreatedPieces)),
@@ -430,10 +424,15 @@
         lastRotatedBy = save.lastRotatedBy || null;
         rotationLockTurn = save.rotationLockTurn || null;
         (save.rotations || []).forEach((value, index) => { rotations[index] = Number(value) || 0; });
+        initializeCircularDiskRotations(true);
+        Object.entries(save.circularDiskRotations || {}).forEach(([key, value]) => {
+          const rotation = Number(value);
+          if (Number.isFinite(rotation)) circularDiskRotations[key] = rotation;
+        });
         campaignLevel2SeenSectors = Array.isArray(save.campaignLevel2SeenSectors)
           ? save.campaignLevel2SeenSectors.filter((code) => /^L8-[6-9]$/.test(code))
           : [];
-        if (save.boardRotationConfigVersion !== 3 && currentBoardData?.boardType === 'mixed') {
+        if (![3, 4].includes(save.boardRotationConfigVersion) && currentBoardData?.boardType === 'mixed') {
           currentBoardData.blocks.forEach((block) => {
             if (block.type !== 'circular') return;
             const initialRotation = Number(block.initialRotation) || 0;
@@ -442,7 +441,8 @@
               if (layer >= 1 && layer <= rotations.length) rotations[layer - 1] = initialRotation;
             });
           });
-        }
+            initializeCircularDiskRotations(true);
+          }
         const savedOrangePoints = Number(save.pontosDoTurn?.orange);
         const savedBluePoints = Number(save.pontosDoTurn?.blue);
         pontosDoTurn.orange = Number.isFinite(savedOrangePoints) ? savedOrangePoints : getTurnPointIncome(currentTurn);
@@ -496,6 +496,7 @@
           };
         });
         recalculatePieceCounts();
+        renderBoardLayers();
         isGameStarted = true;
         isGameOver = false;
         return true;
@@ -515,11 +516,11 @@
 
     function isRegionInRotatableBlock(regionCode) {
       const geometry = regionGeometryByCode[regionCode];
-      if (!geometry || geometry.shape !== 'circular' ||
-          currentBoardData?.boardType !== 'mixed' ||
-          currentBoardData.campaign?.rotationEnabled === false) return false;
-      const block = currentBoardData.blocks.find((item) => item.name === geometry.block);
-      return block?.type === 'circular' && block.rotationEnabled !== false;
+      if (!geometry || geometry.shape !== 'circular') return false;
+      const block = getRotatableCircularBlocks().find((item) =>
+        String(item.name) === geometry.block);
+      const regions = getCircularDiskRegions(block, geometry.disco);
+      return !!block && regions.length > 0 && getCircularDiskRotationStep(block, regions) > 0;
     }
 
     function updateWarAvailability() {
@@ -633,8 +634,97 @@
       return (promotionCostBySourceLayer[getRegionLayer(regionCode)] || 0) * amount;
     }
 
+    function getRegionDiskName(region) {
+      const layer = Number(region.layer || String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]);
+      return String(region.disco || `L${layer}`);
+    }
+
+    function isCircularBoardBlock(block) {
+      return block?.type === 'circular' ||
+        (currentBoardData?.boardType === 'circular' &&
+          Array.isArray(block?.regions) &&
+          block.regions.some((region) => (region.shape || region.geometry?.shape) === 'circular'));
+    }
+
+    function getCircularBlocks() {
+      if (!Array.isArray(currentBoardData?.blocks)) return [];
+      return currentBoardData.blocks.filter((block) =>
+        isCircularBoardBlock(block) &&
+        (block.regions || []).some((region) => (region.shape || region.geometry?.shape) === 'circular'));
+    }
+
+    function getRotatableCircularBlocks() {
+      if (currentBoardData?.campaign?.rotationEnabled === false) return [];
+      return getCircularBlocks().filter((block) => block.rotationEnabled !== false);
+    }
+
+    function getCircularDiskKey(blockName, disco) {
+      return `${blockName}::${disco}`;
+    }
+
+    function getRegionCircularDiskKey(geometry) {
+      return geometry?.shape === 'circular' && geometry.block && geometry.disco
+        ? getCircularDiskKey(geometry.block, geometry.disco)
+        : null;
+    }
+
+    function getCircularDiskRotation(blockName, disco, layerNumber) {
+      const key = getCircularDiskKey(blockName, disco);
+      const rotation = Number(circularDiskRotations[key]);
+      return Number.isFinite(rotation) ? rotation : rotations[layerNumber - 1] || 0;
+    }
+
+    function getCircularDiskRegions(block, disco) {
+      return (block?.regions || []).filter((region) =>
+        (region.shape || region.geometry?.shape) === 'circular' &&
+        getRegionDiskName(region) === disco);
+    }
+
+    function getCircularDiskRotationStep(block, regions) {
+      return Number(block.rotationStep) ||
+        rotationStepByLayer[Number(regions[0]?.layer || String(regions[0]?.rank || regions[0]?.code || regions[0]?.name).match(/L(\d+)/)?.[1])] ||
+        0;
+    }
+
+    function canRotateCircularDisk(block, regions) {
+      const layerNumber = Number(regions[0]?.layer ||
+        String(regions[0]?.rank || regions[0]?.code || regions[0]?.name).match(/L(\d+)/)?.[1]);
+      if (!isApplyingBluetoothAction && !isLocalPlayersTurn()) return false;
+      if (hasRotatedThisTurn || getCircularDiskRotationStep(block, regions) <= 0) return false;
+      return !(currentTurn === rotationLockTurn &&
+        lastRotatedLayer === layerNumber &&
+        lastRotatedBy !== currentTeam);
+    }
+
+    function initializeCircularDiskRotations(useLayerRotations = false) {
+      Object.keys(circularDiskRotations).forEach((key) => delete circularDiskRotations[key]);
+      getCircularBlocks().forEach((block) => {
+        const disks = new Map();
+        (block.regions || []).forEach((region) => {
+          if ((region.shape || region.geometry?.shape) !== 'circular') return;
+          const disco = getRegionDiskName(region);
+          if (!disks.has(disco)) disks.set(disco, []);
+          disks.get(disco).push(region);
+        });
+        disks.forEach((regions, disco) => {
+          const layerNumber = Number(regions[0].layer ||
+            String(regions[0].rank || regions[0].code || regions[0].name).match(/L(\d+)/)?.[1]);
+          const rotation = useLayerRotations
+            ? Number(rotations[layerNumber - 1]) || 0
+            : Number(block.initialRotation) || 0;
+          circularDiskRotations[getCircularDiskKey(block.name, disco)] = rotation;
+          regions.forEach((region) => {
+            const layer = Number(region.layer ||
+              String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]);
+            if (layer >= 1 && layer <= rotations.length) rotations[layer - 1] = rotation;
+          });
+        });
+      });
+    }
+
     function getRotationStep(layerNumber) {
-      if (isCampaignGame() && activeCampaignLevel.rotationEnabled === false) return 0;
+      if (isCampaignGame() &&
+          (activeCampaignLevel || campaignBoardConfig)?.rotationEnabled === false) return 0;
       if (currentBoardData?.boardType === 'mixed') {
         const circularBlock = currentBoardData.blocks.find((block) =>
           block.type === 'circular' && (block.regions || []).some((region) =>
@@ -651,6 +741,135 @@
       return !(currentTurn === rotationLockTurn && lastRotatedLayer === layerNumber && lastRotatedBy !== currentTeam);
     }
 
+    function updateCircularRotationBlockPicker(blocks) {
+      const picker = controls.querySelector('.rotation-block-picker');
+      if (!picker) {
+        controls.classList.remove('is-selecting-rotation-block');
+        return;
+      }
+      const choices = picker.querySelector('.rotation-block-choices');
+      const backButton = picker.querySelector('.rotation-block-back');
+      const choosingBlock = blocks.length > 1 && !selectedCircularRotationBlock;
+      controls.classList.toggle('is-selecting-rotation-block', choosingBlock);
+      picker.hidden = blocks.length < 2;
+      picker.querySelector('.rotation-block-label').hidden = !choosingBlock;
+      choices.hidden = !choosingBlock;
+      backButton.hidden = choosingBlock;
+      backButton.textContent = `Trocar bloco (${selectedCircularRotationBlock})`;
+      controls.querySelectorAll('.rotation-disk-controls').forEach((group) => {
+        group.classList.toggle(
+          'is-rotation-group-hidden',
+          choosingBlock || group.dataset.rotationBlock !== selectedCircularRotationBlock
+        );
+      });
+    }
+
+    function renderCircularRotationControls() {
+      controls.querySelectorAll('.rotation-block-picker, .rotation-disk-controls')
+        .forEach((element) => element.remove());
+      const blocks = getRotatableCircularBlocks();
+      const circularLayers = new Set();
+      const rotatableQuadrilateralLayers = new Set();
+      blocks.forEach((block) => (block.regions || []).forEach((region) => {
+        if ((region.shape || region.geometry?.shape) !== 'circular') return;
+        const layer = Number(region.layer ||
+          String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]);
+        if (layer >= 1 && layer <= 8) circularLayers.add(layer);
+      }));
+      if (blocks.length) {
+        (currentBoardData.blocks || [])
+          .filter((block) => block.type === 'quadrilateral' && block.rotationEnabled !== false)
+          .forEach((block) => (block.regions || []).forEach((region) => {
+            const layer = Number(region.layer ||
+              String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]);
+            if (layer >= 1 && layer <= 8) rotatableQuadrilateralLayers.add(layer);
+          }));
+      }
+      controls.querySelectorAll('.layer-controls').forEach((group) => {
+        const layer = Number(group.dataset.layer);
+        group.classList.toggle(
+          'is-suppressed-by-circular-picker',
+          circularLayers.has(layer) ||
+            (blocks.length > 0 && !rotatableQuadrilateralLayers.has(layer))
+        );
+      });
+
+      selectedCircularRotationBlock = blocks.length === 1 ? blocks[0].name : null;
+      if (blocks.length > 1) {
+        const picker = document.createElement('div');
+        picker.className = 'rotation-block-picker';
+        const label = document.createElement('p');
+        label.className = 'rotation-block-label';
+        label.textContent = 'Selecione o bloco circular';
+        picker.appendChild(label);
+        const choices = document.createElement('div');
+        choices.className = 'rotation-block-choices';
+        blocks.forEach((block) => {
+          const button = document.createElement('button');
+          button.className = 'rotation-block-button';
+          button.type = 'button';
+          button.textContent = block.name;
+          button.setAttribute('aria-label', `Selecionar bloco circular ${block.name}`);
+          button.addEventListener('click', () => {
+            selectedCircularRotationBlock = block.name;
+            updateCircularRotationBlockPicker(blocks);
+          });
+          choices.appendChild(button);
+        });
+        picker.appendChild(choices);
+        const backButton = document.createElement('button');
+        backButton.className = 'rotation-block-back';
+        backButton.type = 'button';
+        backButton.addEventListener('click', () => {
+          selectedCircularRotationBlock = null;
+          updateCircularRotationBlockPicker(blocks);
+        });
+        picker.appendChild(backButton);
+        controls.insertBefore(picker, controls.firstChild);
+      }
+
+      blocks.forEach((block) => {
+        const disks = new Map();
+        (block.regions || []).forEach((region) => {
+          if ((region.shape || region.geometry?.shape) !== 'circular') return;
+          const disco = getRegionDiskName(region);
+          if (!disks.has(disco)) disks.set(disco, []);
+          disks.get(disco).push(region);
+        });
+        disks.forEach((regions, disco) => {
+          const layerNumber = Number(regions[0].layer ||
+            String(regions[0].rank || regions[0].code || regions[0].name).match(/L(\d+)/)?.[1]);
+          const group = document.createElement('div');
+          group.className = 'layer-controls rotation-disk-controls';
+          group.dataset.layer = String(layerNumber);
+          group.dataset.rotationBlock = String(block.name);
+          group.dataset.disco = disco;
+          ['right', 'left'].forEach((direction) => {
+            const button = document.createElement('button');
+            button.className = 'layer-button';
+            button.type = 'button';
+            button.dataset.layer = String(layerNumber);
+            button.dataset.rotationBlock = String(block.name);
+            button.dataset.disco = disco;
+            button.dataset.direction = direction;
+            button.textContent = disco === 'C'
+              ? (direction === 'left' ? '← C' : 'C →')
+              : `${disco} ${direction === 'right' ? '→' : '←'}`;
+            button.setAttribute(
+              'aria-label',
+              `Girar disco ${disco} para a ${direction === 'left' ? 'esquerda' : 'direita'}`
+            );
+            button.addEventListener('click', () =>
+              rotateCircularDisk(block.name, disco, direction));
+            group.appendChild(button);
+          });
+          controls.appendChild(group);
+        });
+      });
+      updateCircularRotationBlockPicker(blocks);
+      updateRotationControls();
+    }
+
     function updateRotationControls() {
       const layerNumbers = [...new Set(
         [...document.querySelectorAll('.layer-button')].map((button) => Number(button.dataset.layer))
@@ -661,6 +880,14 @@
           button.disabled = disabled;
           button.setAttribute('aria-disabled', String(disabled));
         });
+      });
+      controls.querySelectorAll('.layer-button[data-rotation-block]').forEach((button) => {
+        const block = getRotatableCircularBlocks().find((item) =>
+          String(item.name) === button.dataset.rotationBlock);
+        const regions = getCircularDiskRegions(block, button.dataset.disco);
+        const disabled = !block || !canRotateCircularDisk(block, regions);
+        button.disabled = disabled;
+        button.setAttribute('aria-disabled', String(disabled));
       });
       updateMobileRotationControls();
     }
@@ -2845,10 +3072,11 @@
       window.requestAnimationFrame(animate);
     }
 
-    function captureMixedCircularPiecePositions(layerNumber) {
+    function captureCircularDiskPiecePositions(regionCodes) {
+      const regionCodeSet = new Set(regionCodes);
       return new Map(
-        [...pieces.querySelectorAll(`.piece[data-layer="${layerNumber}"]`)]
-          .filter((piece) => regionGeometryByCode[piece.dataset.region]?.shape === 'circular')
+        [...pieces.querySelectorAll('.piece')]
+          .filter((piece) => regionCodeSet.has(piece.dataset.region))
           .map((piece) => [piece, {
             x: parseFloat(piece.style.left) / 100 * 908,
             y: parseFloat(piece.style.top) / 100 * 908,
@@ -2857,27 +3085,27 @@
       );
     }
 
-    function animateMixedCircularBlocks(layerNumber, startRotation, targetRotation, animationVersion, startPositions) {
-      const groups = [...(boardLayerElements.get(layerNumber)?.querySelectorAll('[data-circular-rotation-group]') || [])];
+    function animateCircularDisk(blockName, disco, regionCodes, layerNumbers,
+      startRotation, targetRotation, animationVersion, startPositions) {
+      const diskKey = getCircularDiskKey(blockName, disco);
+      const groups = [...boardLayerElements.values()]
+        .flatMap((layerElement) => [...layerElement.querySelectorAll('[data-circular-rotation-group]')])
+        .filter((group) => group.dataset.circularRotationGroup === diskKey);
       if (!groups.length) return;
-      mixedCircularRotationAngles.set(layerNumber, startRotation);
+      circularDiskAnimatedRotations.set(diskKey, startRotation);
       const startedAt = performance.now();
       const duration = 3000;
-      const centers = groups.map((group) => ({
-        group,
-        x: Number(group.dataset.centerX),
-        y: Number(group.dataset.centerY),
-        block: group.dataset.circularRotationGroup
-      }));
-      const animatedPieces = [...pieces.querySelectorAll(`.piece[data-layer="${layerNumber}"]`)]
-        .filter((piece) => centers.some(({ block }) =>
-          regionGeometryByCode[piece.dataset.region]?.block === block && startPositions.has(piece)));
+      const center = {
+        x: Number(groups[0].dataset.centerX),
+        y: Number(groups[0].dataset.centerY)
+      };
+      const regionCodeSet = new Set(regionCodes);
+      const animatedPieces = [...pieces.querySelectorAll('.piece')]
+        .filter((piece) => regionCodeSet.has(piece.dataset.region) && startPositions.has(piece));
       const piecePaths = animatedPieces.map((piece) => {
-        const geometry = regionGeometryByCode[piece.dataset.region];
         const start = startPositions.get(piece);
         return {
           piece,
-          center: centers.find((item) => item.block === geometry.block),
           startX: start.x,
           startY: start.y,
           targetLeft: piece.style.left,
@@ -2885,8 +3113,8 @@
           targetTransform: piece.style.transform
         };
       });
-      centers.forEach(({ group, x, y }) =>
-        group.setAttribute('transform', `rotate(${startRotation} ${x} ${y})`));
+      groups.forEach((group) =>
+        group.setAttribute('transform', `rotate(${startRotation} ${center.x} ${center.y})`));
       piecePaths.forEach(({ piece }) => {
         const start = startPositions.get(piece);
         piece.style.left = `${start.x / 908 * 100}%`;
@@ -2898,14 +3126,13 @@
         if (animationVersion !== rotationAnimationVersion) return;
         const progress = Math.min(1, (now - startedAt) / duration);
         const angle = startRotation + (targetRotation - startRotation) * rotationEasing(progress);
-        mixedCircularRotationAngles.set(layerNumber, angle);
-        centers.forEach(({ group, x, y }) => {
-          group.setAttribute('transform', `rotate(${angle} ${x} ${y})`);
-        });
+        circularDiskAnimatedRotations.set(diskKey, angle);
+        groups.forEach((group) =>
+          group.setAttribute('transform', `rotate(${angle} ${center.x} ${center.y})`));
         const delta = (angle - startRotation) * Math.PI / 180;
         const cosine = Math.cos(delta);
         const sine = Math.sin(delta);
-        piecePaths.forEach(({ piece, center, startX, startY, targetLeft, targetTop, targetTransform }) => {
+        piecePaths.forEach(({ piece, startX, startY, targetLeft, targetTop, targetTransform }) => {
           if (progress >= 1) {
             piece.style.left = targetLeft;
             piece.style.top = targetTop;
@@ -2921,15 +3148,142 @@
           piece.style.transform =
             `translate(-50%,-50%) rotate(${angle}deg)`;
         });
-        updateBoardFocusOverlayTransforms(layerNumber);
+        layerNumbers.forEach((layerNumber) => updateBoardFocusOverlayTransforms(layerNumber));
         if (progress < 1) {
           window.requestAnimationFrame(animate);
         } else {
-          mixedCircularRotationAngles.delete(layerNumber);
+          circularDiskAnimatedRotations.delete(diskKey);
           updateBoardFocusOverlay();
         }
       };
       window.requestAnimationFrame(animate);
+    }
+
+    function captureMixedCircularPiecePositions(layerNumber) {
+      const regionCodes = Object.entries(regionGeometryByCode)
+        .filter(([, geometry]) => geometry.layer === layerNumber && geometry.shape === 'circular')
+        .map(([code]) => code);
+      return captureCircularDiskPiecePositions(regionCodes);
+    }
+
+    function animateMixedCircularBlocks(layerNumber, startRotation, targetRotation,
+      animationVersion, startPositions) {
+      const diskRegions = new Map();
+      Object.entries(regionGeometryByCode).forEach(([code, geometry]) => {
+        if (geometry.layer !== layerNumber || geometry.shape !== 'circular') return;
+        const diskKey = getRegionCircularDiskKey(geometry);
+        if (!diskKey) return;
+        if (!diskRegions.has(diskKey)) {
+          diskRegions.set(diskKey, {
+            block: geometry.block,
+            disco: geometry.disco,
+            codes: [],
+            layers: new Set()
+          });
+        }
+        diskRegions.get(diskKey).codes.push(code);
+        diskRegions.get(diskKey).layers.add(geometry.layer);
+      });
+      diskRegions.forEach(({ block, disco, codes, layers }) => {
+        circularDiskRotations[getCircularDiskKey(block, disco)] = targetRotation;
+        const diskPositions = new Map([...startPositions].filter(([piece]) =>
+          codes.includes(piece.dataset.region)));
+        animateCircularDisk(
+          block,
+          disco,
+          codes,
+          [...layers],
+          startRotation,
+          targetRotation,
+          animationVersion,
+          diskPositions
+        );
+      });
+    }
+
+    function rotateCircularDisk(blockName, disco, direction) {
+      const block = getRotatableCircularBlocks().find((item) => String(item.name) === blockName);
+      const regions = getCircularDiskRegions(block, disco);
+      if (!block || !regions.length) return;
+      if (!canRotateCircularDisk(block, regions)) {
+        const firstRegion = regions[0];
+        const layer = Number(firstRegion.layer ||
+          String(firstRegion.rank || firstRegion.code || firstRegion.name).match(/L(\d+)/)?.[1]);
+        readout.textContent = hasRotatedThisTurn
+          ? 'Você já girou um disco neste turn.'
+          : `Disco ${disco}: indisponível neste turn.`;
+        if (layer >= 1 && layer <= 8) updateRotationControls();
+        return;
+      }
+
+      const step = getCircularDiskRotationStep(block, regions);
+      const rotationDelta = direction === 'left' ? -step : step;
+      const diskKey = getCircularDiskKey(blockName, disco);
+      const regionCodes = regions.map((region) => region.code || region.name);
+      const layerNumbers = [...new Set(regions.map((region) => Number(region.layer ||
+        String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1])))];
+      const primaryLayer = layerNumbers[0];
+      const previousRotation = getCircularDiskRotation(blockName, disco, primaryLayer);
+      const targetRotation = previousRotation + rotationDelta;
+      const startingPiecePositions = captureCircularDiskPiecePositions(regionCodes);
+
+      controls.classList.remove('is-rotation-picker-open', 'is-selecting-rotation-block');
+      app.classList.remove('is-rotation-picker-open');
+      campaignGuide.classList.remove('is-rotation-picker-open');
+      resetStageZoom();
+      stagePanel.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      playRotationSound();
+
+      circularDiskRotations[diskKey] = targetRotation;
+      layerNumbers.forEach((layerNumber) => {
+        rotations[layerNumber - 1] = targetRotation;
+        recomputeNeighborCacheForLayer(layerNumber);
+      });
+      if (layerNumbers.includes(8)) {
+        updateActiveRegions();
+        updateL8AttachedLayers();
+      }
+      rotationAnimationVersion += 1;
+      hasRotatedThisTurn = true;
+      lastRotatedLayer = primaryLayer;
+      lastRotatedBy = currentTeam;
+      rotationLockTurn = currentTurn + 1;
+      if (isCampaignLevelTwo() &&
+          ['level2-rotate', 'level2-rotate-again'].includes(campaignGuideStep)) {
+        hideCampaignGuide();
+        campaignGuideStep = 'await-circular';
+      }
+      updateRotationControls();
+      recalculateRegionForces();
+      refreshRegionVisuals();
+      animateCircularDisk(
+        blockName,
+        disco,
+        regionCodes,
+        layerNumbers,
+        previousRotation,
+        targetRotation,
+        rotationAnimationVersion,
+        startingPiecePositions
+      );
+      updateBoardFocusOverlay();
+      updateSelectedRegionPanel(selectedRegionCode);
+      updateReadout();
+      if (!debugCanvas.classList.contains('is-hidden') &&
+          layerNumbers.includes(currentDebugLayer)) {
+        drawRegionDebug();
+        updateDebugCanvasRotation();
+      }
+      saveGame();
+      publishBluetoothAction({
+        type: 'rotate',
+        team: currentTeam,
+        layer: primaryLayer,
+        block: blockName,
+        disco,
+        direction
+      });
+      finishIfCenterConquered();
     }
 
     function addPiece(team, stage) {
@@ -3014,7 +3368,7 @@
 
     function getRegionRotationCenter(regionCode) {
       const geometry = regionGeometryByCode[regionCode];
-      if (currentBoardData?.boardType === 'mixed' && geometry?.shape === 'circular') {
+      if (geometry?.shape === 'circular') {
         return { x: geometry.centerX, y: geometry.centerY };
       }
       return { x: 454, y: 454 };
@@ -3023,7 +3377,10 @@
     function getRegionVisualRotation(regionCode) {
       const geometry = regionGeometryByCode[regionCode];
       if (!geometry) return 0;
-      const animatedRotation = mixedCircularRotationAngles.get(geometry.layer);
+      const diskKey = getRegionCircularDiskKey(geometry);
+      const animatedRotation = diskKey
+        ? circularDiskAnimatedRotations.get(diskKey)
+        : circularDiskAnimatedRotations.get(geometry.layer);
       if (geometry.shape === 'circular' && Number.isFinite(animatedRotation)) {
         return animatedRotation;
       }
@@ -3031,7 +3388,9 @@
         const block = quadrilateralBoard?.blocks.find((item) => item.name === geometry.block);
         if (block && !block.rotationEnabled) return 0;
       }
-      return rotations[getRegionLayer(regionCode) - 1] || 0;
+      return diskKey
+        ? getCircularDiskRotation(geometry.block, geometry.disco, geometry.layer)
+        : rotations[getRegionLayer(regionCode) - 1] || 0;
     }
 
     function getRegionFocusPoint(regionCode, applyRotation = true) {
@@ -3980,6 +4339,7 @@
           const regionGeometry = {
             shape: String(geometry.shape || region.shape || 'circular'),
             block: String(region.block || block.name || ''),
+            disco: getRegionDiskName(region),
             layer,
             region: regionNumber,
             centerX: boardOffsetX + Number(regionCenter.x) * boardScale,
@@ -4249,30 +4609,33 @@
       const farmTiers = [250, 1000, 4000, 16000, 50000];
       const iconScale = 908 / ((stagePanel.getBoundingClientRect().width || 780) * Math.max(1, stageZoom));
       boardLayerElements.forEach((layerElement, layer) => {
+        if (getCircularBlocks().length) layerElement.style.transform = 'rotate(0deg)';
         layerElement.replaceChildren();
         const regions = Object.entries(regionGeometryByCode)
           .filter(([, geometry]) => geometry.layer === layer)
           .sort((left, right) => (left[1].startAngle || 0) - (right[1].startAngle || 0));
         const circularGroups = new Map();
         const getRegionRenderLayer = (geometry) => {
-          if (currentBoardData?.boardType !== 'mixed' || geometry.shape !== 'circular') {
+          const diskKey = getRegionCircularDiskKey(geometry);
+          if (!diskKey) {
             return layerElement;
           }
-          const key = geometry.block || `${geometry.centerX}:${geometry.centerY}`;
-          if (!circularGroups.has(key)) {
+          if (!circularGroups.has(diskKey)) {
             const group = document.createElementNS(svgNamespace, 'g');
-            const angle = rotations[layer - 1] || 0;
+            const angle = getCircularDiskRotation(geometry.block, geometry.disco, layer);
             group.setAttribute(
               'transform',
               `rotate(${angle} ${geometry.centerX} ${geometry.centerY})`
             );
-            group.dataset.circularRotationGroup = key;
+            group.dataset.circularRotationGroup = diskKey;
+            group.dataset.rotationBlock = geometry.block;
+            group.dataset.disco = geometry.disco;
             group.dataset.centerX = String(geometry.centerX);
             group.dataset.centerY = String(geometry.centerY);
             layerElement.appendChild(group);
-            circularGroups.set(key, group);
+            circularGroups.set(diskKey, group);
           }
-          return circularGroups.get(key);
+          return circularGroups.get(diskKey);
         };
 
         regions.forEach(([code, geometry]) => {
@@ -4420,6 +4783,8 @@
         : null;
       if (nextCampaignBoardConfig?.id !== campaignBoardConfig?.id) campaignCollectedBags = [];
       campaignBoardConfig = nextCampaignBoardConfig;
+      if (!isGameStarted) initializeCircularDiskRotations();
+      renderCircularRotationControls();
       renderBoardLayers();
       allRegionMasks = normalizedMasks;
       regionNeighborCache = {};
@@ -4549,7 +4914,7 @@
         button.type = 'button';
         button.dataset.layer = String(layerNumber);
         button.dataset.direction = direction;
-        button.textContent = `L${layerNumber} ${direction === 'left' ? '→' : '←'}`;
+        button.textContent = `L${layerNumber} ${direction === 'right' ? '→' : '←'}`;
         button.setAttribute('aria-label', `Girar disco L${layerNumber} para a ${direction === 'left' ? 'esquerda' : 'direita'}`);
         button.disabled = getRotationStep(layerNumber) <= 0;
         button.addEventListener('click', () => {
@@ -4716,6 +5081,11 @@
     rotatePickerButton.addEventListener('click', () => {
       controls.classList.add('is-rotation-picker-open');
       app.classList.add('is-rotation-picker-open');
+      const circularBlocks = getRotatableCircularBlocks();
+      selectedCircularRotationBlock = circularBlocks.length === 1
+        ? circularBlocks[0].name
+        : null;
+      updateCircularRotationBlockPicker(circularBlocks);
       campaignGuide.classList.toggle('is-rotation-picker-open',
         ['level2-rotate', 'level2-rotate-again'].includes(campaignGuideStep));
       rotationPickerClose.focus({ preventScroll: true });
@@ -5529,7 +5899,13 @@
         if (suggested?.type === 'rotate') {
           const candidateLayers = suggested.layers || [suggested.layer];
           for (const candidateLayer of candidateLayers) {
-            const candidateButton = document.querySelector(`.layer-button[data-layer="${candidateLayer}"][data-direction="${suggested.direction || 'right'}"]`);
+            const candidateButtons = [...document.querySelectorAll(
+              `.layer-button[data-layer="${candidateLayer}"][data-direction="${suggested.direction || 'right'}"]`
+            )];
+            const candidateButton = candidateButtons.find((button) =>
+              button.dataset.rotationBlock) ||
+              candidateButtons.find((button) =>
+                !button.closest('.is-suppressed-by-circular-picker'));
             if (candidateButton && !candidateButton.disabled) {
               rotationButton = candidateButton;
               break;
@@ -5538,7 +5914,9 @@
         }
         if (!rotationButton || rotationButton.disabled) {
           const availableButtons = [...document.querySelectorAll('.layer-button')]
-            .filter((button) => !button.disabled && Number(button.dataset.layer) >= 2);
+            .filter((button) => !button.disabled && Number(button.dataset.layer) >= 2 &&
+              (button.dataset.rotationBlock ||
+                !button.closest('.is-suppressed-by-circular-picker')));
           rotationButton = availableButtons[Math.floor(Math.random() * availableButtons.length)];
         }
         if (rotationButton) {
@@ -5550,7 +5928,9 @@
           await waitForWarAnimation(3200);
           if (rotationAnimationVersion === rotationBefore) {
             const retryButton = [...document.querySelectorAll('.layer-button')]
-              .find((button) => !button.disabled && Number(button.dataset.layer) >= 2);
+              .find((button) => !button.disabled && Number(button.dataset.layer) >= 2 &&
+                (button.dataset.rotationBlock ||
+                  !button.closest('.is-suppressed-by-circular-picker')));
             if (retryButton) {
               retryButton.click();
               await waitForWarAnimation(3200);
@@ -6586,9 +6966,45 @@
           selectedRegionCode = source;
         } else if (action.type === 'rotate' && Number.isInteger(action.layer)) {
           updateRotationControls();
-          const button = document.querySelector(
-            `.layer-button[data-layer="${action.layer}"][data-direction="${action.direction === 'left' ? 'left' : 'right'}"]`
-          );
+          const direction = action.direction === 'left' ? 'left' : 'right';
+          let button = [...controls.querySelectorAll('.layer-button[data-rotation-block]')]
+            .find((candidate) =>
+              candidate.dataset.rotationBlock === action.block &&
+              candidate.dataset.disco === action.disco &&
+              Number(candidate.dataset.layer) === action.layer &&
+              candidate.dataset.direction === direction);
+          let circularDisksOnLayer = 0;
+          if (!button && !action.block && !action.disco) {
+            const layerDisks = new Map();
+            getRotatableCircularBlocks().forEach((block) => {
+              (block.regions || []).forEach((region) => {
+                const layer = Number(region.layer ||
+                  String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]);
+                if (layer === action.layer) {
+                  layerDisks.set(getCircularDiskKey(block.name, getRegionDiskName(region)), {
+                    block: block.name,
+                    disco: getRegionDiskName(region)
+                  });
+                }
+              });
+            });
+            circularDisksOnLayer = layerDisks.size;
+            if (layerDisks.size === 1) {
+              const [{ block, disco }] = layerDisks.values();
+              button = [...controls.querySelectorAll('.layer-button[data-rotation-block]')]
+                .find((candidate) => candidate.dataset.rotationBlock === block &&
+                  candidate.dataset.disco === disco &&
+                  candidate.dataset.direction === direction);
+            }
+          }
+          if (!button && !action.block && !action.disco && circularDisksOnLayer === 0) {
+            button = [...controls.querySelectorAll('.layer-button:not([data-rotation-block])')]
+              .find((candidate) => Number(candidate.dataset.layer) === action.layer &&
+                candidate.dataset.direction === direction);
+          }
+          if (!button && circularDisksOnLayer > 1) {
+            startMessage.textContent = 'A rotação recebida não identifica qual disco circular deve girar.';
+          }
           if (button) button.click();
         } else {
           startMessage.textContent = 'Ação Bluetooth desconhecida; atualizando o estado recebido.';
