@@ -83,6 +83,7 @@
     const regionLayerBlueForce = document.querySelector('#region-layer-blue-force');
     const regionPieceCounts = document.querySelector('#region-piece-counts');
     const regionSoldierCounts = document.querySelector('#region-soldier-counts');
+    const regionBagCoins = document.querySelector('#region-bag-coins');
     const regionFarm = document.querySelector('#region-farm');
     const regionForce = document.querySelector('#region-force');
     const regionFinalForce = document.querySelector('#region-final-force');
@@ -2790,6 +2791,8 @@
       const dominator = getRegionDominador(regionCode);
       const selectedLayer = getRegionLayer(regionCode);
       const farmProduction = Math.max(0, Number(regionGeometryByCode[regionCode]?.farmProductionPerTurn) || 0);
+      const bagCoins = Math.max(0, Number(regionGeometryByCode[regionCode]?.bagCoins) || 0);
+      const hasUncollectedBag = bagCoins > 0 && !campaignCollectedBags.includes(regionCode);
       const layerFinalForces = { orange: 0, blue: 0 };
       if (selectedLayer) {
         Object.keys(allRegionMasks?.[selectedLayer] || {}).forEach((region) => {
@@ -2826,6 +2829,10 @@
       regionLayerBlueForce.textContent = formatStatisticsNumber(layerFinalForces.blue);
       regionPieceCounts.textContent = `Peças: ${safeCounts.orange + safeCounts.blue}`;
       regionSoldierCounts.textContent = `Soldados: ${soldierTotal}`;
+      regionBagCoins.classList.toggle('is-hidden', !hasUncollectedBag);
+      regionBagCoins.textContent = hasUncollectedBag
+        ? `Saco de moedas: ${formatStatisticsNumber(bagCoins)} moedas`
+        : '';
       regionFarm.classList.toggle('is-hidden', farmProduction <= 0);
       regionFarm.textContent = farmProduction > 0
         ? `Fazenda: ${formatStatisticsNumber(farmProduction)} trigo/turno · ${dominator === 'orange' ? 'laranja' : dominator === 'blue' ? 'azul' : 'sem dono'}`

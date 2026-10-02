@@ -204,7 +204,7 @@
           "shape": "quadrilateral",
           "positions": [[2, 1]],
           "maxPieces": 8,
-          "bagCoins": 6
+          "bagCoins": 8
         },
         {
           "name": "L8-9",
@@ -217,7 +217,8 @@
           "maxPieces": 8,
           "initialPieces": [
             {"team": "blue", "stage": "f"},
-            {"team": "blue", "stage": "f"}
+            {"team": "blue", "stage": "f"},
+            {"team": "blue", "stage": "g"}
           ]
         }
       ]

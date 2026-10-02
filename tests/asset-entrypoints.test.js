@@ -120,6 +120,8 @@ test('Level 3 board preserves its campaign rules and all configured block placem
   assert.match(gameClient, /gameRules\.areAxisAlignedCellsNeighbors\(firstCell, secondCell\)/);
   assert.match(gameClient, /regionBlockName\.textContent = regionBlock \?/);
   assert.match(gameClient, /regionRotationBlockName\.textContent = rotationBlockLabel;/);
+  assert.match(gameClient, /regionBagCoins\.textContent = hasUncollectedBag[\s\S]*?Saco de moedas:/);
+  assert.match(html, /id="region-bag-coins" class="is-hidden"/);
   assert.match(gameClient, /currentBoardData\?\.campaign\?\.id === 'tabuleiro-03'/);
   assert.match(gameClient, /const scale = Number\(currentBoardData\?\.regionFocusScale\) \|\| 1\.8;/);
   assert.match(gameClient, /function getRotatableQuadrilateralBlocks\(\)/);
@@ -227,11 +229,11 @@ test('Level 3 board preserves its campaign rules and all configured block placem
   assert.deepEqual(block('BQ04').rotationArea, { row: 1, column: 1, size: 2 });
   assert.deepEqual(block('BQ05').C_inicial, { x: 1750, y: 675 });
   assert.deepEqual(block('BQ02').regions.find((region) => region.name === 'L8-7').bagCoins, 7);
-  assert.deepEqual(block('BQ04').regions.find((region) => region.name === 'L8-8').bagCoins, 6);
+  assert.deepEqual(block('BQ04').regions.find((region) => region.name === 'L8-8').bagCoins, 8);
   assert.deepEqual(block('BQ03').regions.find((region) => region.name === 'L8-11').initialPieces,
     [{ team: 'blue', stage: 'f' }]);
   assert.deepEqual(block('BQ04').regions.find((region) => region.name === 'L8-9').initialPieces,
-    [{ team: 'blue', stage: 'f' }, { team: 'blue', stage: 'f' }]);
+    [{ team: 'blue', stage: 'f' }, { team: 'blue', stage: 'f' }, { team: 'blue', stage: 'g' }]);
   assert.deepEqual(block('BQ01').regions.find((region) => region.name === 'L8-1').initialPieces,
     [{ team: 'orange', stage: 'g' }]);
 });
