@@ -39669,7 +39669,7 @@
           'await-bag', 'army-tip', 'await-army', 'war',
           'level2-intro', 'await-l84', 'level2-rotate', 'await-circular',
           'level2-pass-turn', 'await-next-rotation', 'level2-rotate-again',
-          'level2-final-attack', 'await-l83',
+          'level2-final-attack', 'await-l83-army', 'level2-final-war', 'await-l83',
           'level2-recycle', 'await-l81', 'complete'
         ].includes(save.campaignGuideStep)
           ? save.campaignGuideStep
@@ -39973,6 +39973,7 @@
       Object.entries(soldierWeights)
         .sort((left, right) => left[1] - right[1])
         .forEach(([stage, cost]) => {
+          if (isCampaignLevelTwo() && stage === 'f') return;
           const recruitCost = getRecruitmentCost(regionCode, stage);
           if (!isLocalPlayersTurn() || !canRecruitPiece(regionCode, stage, currentTeam) ||
               !canAfford(recruitCost)) return;
@@ -40805,11 +40806,12 @@
 
     function findPieceAtPointer(clientX, clientY, sourceCode) {
       const candidates = [...pieces.querySelectorAll('.piece')].reverse();
-      return candidates.find((piece) => {
-        if (piece.dataset.region !== sourceCode || piece.dataset.team !== currentTeam) return false;
+      const hits = candidates.filter((piece) => {
+        if (piece.dataset.team !== currentTeam) return false;
         const rect = piece.getBoundingClientRect();
         return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
-      }) || null;
+      });
+      return hits.find((piece) => piece.dataset.region === sourceCode) || hits[0] || null;
     }
 
     function isPointerOverTrash(clientX, clientY) {
@@ -40868,13 +40870,15 @@
       if (!isLocalPlayersTurn()) return false;
       const piece = findPieceAtPointer(event.clientX, event.clientY, sourceCode);
       if (!piece) return false;
+      sourceCode = piece.dataset.region;
       const pieceStage = piece.dataset.stage;
       const amount = soldierWeights[pieceStage] || 0;
       const availablePieces = getTeamPieceCount(sourceCode, currentTeam);
       const targets = getDragTargets(sourceCode, currentTeam, amount, pieceStage);
       if (!amount || !Object.prototype.hasOwnProperty.call(soldierWeights, pieceStage)) return false;
       const canRecycle = availablePieces >= 2 &&
-        !wasPieceCreatedThisTurn(sourceCode, currentTeam, pieceStage);
+        (isCampaignLevelTwo() ||
+          !wasPieceCreatedThisTurn(sourceCode, currentTeam, pieceStage));
       if (!targets.length && !canRecycle) return false;
       const dragPiece = document.createElement('img');
       dragPiece.className = 'drag-piece';
@@ -41054,7 +41058,7 @@
     function recyclePiece(regionCode, team, pieceStage) {
       if ((!isApplyingBluetoothAction && !isLocalPlayersTurn()) || team !== currentTeam ||
           !Object.prototype.hasOwnProperty.call(soldierWeights, pieceStage)) return false;
-      if (wasPieceCreatedThisTurn(regionCode, team, pieceStage)) {
+      if (!isCampaignLevelTwo() && wasPieceCreatedThisTurn(regionCode, team, pieceStage)) {
         readout.textContent = `${regionCode}: uma peça ${pieceStage.toUpperCase()} recém-promovida não pode ser reciclada neste turno.`;
         return false;
       }
@@ -42225,6 +42229,10 @@
       const selectedRegion = selectedRegionCode || pieceTargets[team].code;
       const regionReference = selectedRegion;
       if (!regionReference || !Object.prototype.hasOwnProperty.call(soldierWeights, stage)) return;
+      if (isCampaignLevelTwo() && stage === 'f') {
+        readout.textContent = 'Neste level, peças F devem ser formadas ao combinar 7 peças G.';
+        return;
+      }
       if (wasPieceRecycledThisTurn(regionReference, team, stage)) {
         readout.textContent = `${regionReference}: não é possível recomprar neste turno uma peça ${stage.toUpperCase()} descartada nesta região.`;
         return;
@@ -42351,7 +42359,7 @@
     function getRegionPieceCenter(regionCode) {
       const geometry = regionGeometryByCode[regionCode];
       if (geometry?.shape === 'circular') {
-        return getRegionFocusPoint(regionCode, currentBoardData?.boardType === 'mixed');
+        return getRegionFocusPoint(regionCode, currentBoardData?.boardType !== 'mixed');
       }
       if (geometry?.shape !== 'quadrilateral' ||
           !Number.isFinite(geometry.centerX) || !Number.isFinite(geometry.centerY)) {
@@ -44164,7 +44172,8 @@
       }
       if (isCampaignLevelTwo() && [
         'level2-intro', 'level2-rotate', 'level2-pass-turn',
-        'level2-rotate-again', 'level2-final-attack', 'level2-recycle'
+        'level2-rotate-again', 'level2-final-attack', 'level2-final-war',
+        'level2-recycle'
       ].includes(campaignGuideStep)) {
         showCampaignGuide(campaignGuideStep);
         return;
@@ -44257,9 +44266,10 @@
         case 'level2-final-attack':
           return [
             getCampaignRegionShape('L8-3'),
-            getCampaignRegionShape('L8-10'),
-            document.querySelector('#war-button')
+            getCampaignRegionShape('L8-10')
           ].filter(Boolean);
+        case 'level2-final-war':
+          return [document.querySelector('#war-button')].filter(Boolean);
         case 'level2-recycle':
           return [
             getCampaignRegionShape('L8-3'),
@@ -44444,9 +44454,14 @@
           dismissible: false
         },
         'level2-final-attack': {
-          title: 'Prepare a conquista de L8-3',
-          message: 'Uma peça F vale 7 unidades G. Reúna pelo menos 8 unidades em L8-10 e declare Guerra para conquistar L8-3.',
+          title: 'Prepare para a conquista',
+          message: 'Seu oponente tem uma peça F! Uma peça F vale 7 unidades G. Para dominar aquela região construa primeiro mais 7 peças na sua região.',
           dismissible: true
+        },
+        'level2-final-war': {
+          title: 'Declare Guerra',
+          message: 'Você já reuniu unidades G suficientes para enfrentar a peça F. Declare Guerra para conquistar L8-3.',
+          dismissible: false
         },
         'level2-recycle': {
           title: 'Recicle peças para avançar',
@@ -44471,7 +44486,8 @@
           : step === 'level2-pass-turn' ? 'Passe o turno para continuar'
             : ['level2-rotate', 'level2-rotate-again'].includes(step)
               ? 'Gire BC03 para continuar'
-              : 'Toque no botão Guerra destacado';
+            : step === 'level2-final-war' ? 'Toque no botão Guerra destacado'
+              : 'Toque na mensagem para continuar';
       campaignGuideCard.removeAttribute('data-position');
       campaignGuide.classList.remove('is-hidden');
       app.classList.add('is-campaign-guiding');
@@ -44490,7 +44506,12 @@
         updateSelectedRegionPanel(selectedRegionCode);
         focusRegion(selectedRegionCode);
       }
-      else if (step === 'level2-final-attack' || step === 'level2-recycle') {
+      else if (step === 'level2-final-attack') {
+        selectedRegionCode = 'L8-10';
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegion(selectedRegionCode);
+      }
+      else if (step === 'level2-recycle') {
         selectedRegionCode = 'L8-3';
         updateSelectedRegionPanel(selectedRegionCode);
         focusRegion('L8-3');
@@ -44554,7 +44575,8 @@
         'level2-intro': 'await-l84',
         'level2-rotate': 'await-circular',
         'level2-rotate-again': 'await-circular',
-        'level2-final-attack': 'await-l83',
+        'level2-final-attack': 'await-l83-army',
+        'level2-final-war': 'await-l83',
         'level2-recycle': 'await-l81'
       }[campaignGuideStep] || 'complete';
       hideCampaignGuide();
@@ -44584,7 +44606,8 @@
         return target.closest?.('.layer-button[data-layer="8"]') != null &&
           (eventType === 'pointerdown' || eventType === 'click');
       }
-      return campaignGuideStep === 'war' && warButton.contains(target) &&
+      return ['war', 'level2-final-war'].includes(campaignGuideStep) &&
+        warButton.contains(target) &&
         (eventType === 'pointerdown' || eventType === 'click');
     }
 
@@ -44616,6 +44639,11 @@
       }
       if (campaignGuideStep === 'await-circular' && orangeOwns('L8-10')) {
         showCampaignGuide('level2-final-attack');
+        return;
+      }
+      if (campaignGuideStep === 'await-l83-army' && orangeOwns('L8-10') &&
+          getTeamSoldierCount('L8-10', 'orange') >= 8) {
+        showCampaignGuide('level2-final-war');
         return;
       }
       if (campaignGuideStep === 'await-l83' && orangeOwns('L8-3')) {
@@ -44900,6 +44928,10 @@
       if (isCampaignGame() && campaignGuideStep === 'war') {
         hideCampaignGuide();
         campaignGuideStep = 'complete';
+        saveGame();
+      } else if (isCampaignLevelTwo() && campaignGuideStep === 'level2-final-war') {
+        hideCampaignGuide();
+        campaignGuideStep = 'await-l83';
         saveGame();
       }
       if (gameMode === 'bluetooth' && bluetoothRole === 'guest') {
