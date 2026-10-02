@@ -41,7 +41,7 @@ continuar pequenas e cobertas por testes.
 | `tests/game-rules.test.js` | Testes de caracterização do módulo de regras, usando `node:test` sem dependências adicionais. | Validar composição, conversões de unidades, custos e reembolsos. |
 | `tests/asset-entrypoints.test.js` | Garante a ordem dos recursos de entrada e sua inclusão nos builds Android e servidor. | Alterar caminhos, módulos web externos ou configurações de empacotamento. |
 | `tabuleiro-01.json`, `tabuleiro-02.json` | Configuração de campanha por nível: regiões, blocos, peças iniciais, moedas, objetivo, rotação e limite de turnos. Regiões de blocos circulares declaram também `disco`. | Criar ou ajustar um nível de campanha e a qual disco cada região pertence. |
-| `regioes-will-of-many-circular.json`, `regioes-will-of-many.json`, `will-of-many-final.json` | Máscaras/regiões usadas para compor o tabuleiro e derivar geometria e vizinhança. O cliente tenta carregá-las nesta ordem. No tabuleiro circular atual, `disco` identifica o anel rotativo de cada região. | Geometria, regiões, dados-base e vizinhança do tabuleiro padrão. |
+| `regioes-will-of-many-circular.json`, `regioes-will-of-many.json`, `will-of-many-final.json` | Máscaras/regiões usadas para compor o tabuleiro e derivar geometria e vizinhança. O tabuleiro circular é a fonte padrão para todos os modos não campanha; os outros JSONs são apenas fallbacks de carregamento inicial. No tabuleiro circular atual, `disco` identifica o anel rotativo de cada região. | Geometria, regiões, dados-base e vizinhança do tabuleiro padrão. |
 | `regioes-will-of-many-l8.json` | Dados auxiliares de regiões L8 usados por ferramentas/edição. Confirme os pontos de leitura antes de tratá-lo como fonte do tabuleiro ativo. | Investigação de geometria e edição de regiões L8. |
 | `editor-regioes.html` | Ferramenta visual de edição/inspeção de regiões e dados auxiliares. | Ajustar ou depurar máscaras e caixas de região. |
 | `peca_*.png`, `l1.png`–`l8.png`, `final*.png`, `tutorial-*.svg` | Imagens de peças, camadas, telas finais e tutorial. | Arte, ícones e recursos empacotados. |
@@ -92,20 +92,27 @@ acessam variáveis e elementos DOM declarados no mesmo script.
 ## Fluxo de dados da partida
 
 1. A página carrega as máscaras de região e aplica os dados com `applyRegionData`.
-2. No modo campanha, `beginConfiguredGame` carrega o JSON do nível antes de
+   Para uma partida nova, qualquer modo fora de campanha deve carregar
+   `regioes-will-of-many-circular.json`; campanha carrega o arquivo indicado por
+   `campaignLevelFiles`. Mantenha essa decisão centralizada em
+   `getNewGameBoardFile` e atualize os testes se a configuração mudar.
+2. Ao selecionar um modo não campanha no fluxo **Jogo novo**, o cliente carrega o
+   tabuleiro circular e volta a confirmá-lo em `beginConfiguredGame`; isso cobre
+   também os caminhos diretos de início por Bluetooth e Online.
+3. No modo campanha, `beginConfiguredGame` carrega o JSON do nível antes de
    preparar peças iniciais, objetivo e estado do guia.
-3. Ações como comprar, mover, promover, descartar, girar ou resolver uma guerra
+4. Ações como comprar, mover, promover, descartar, girar ou resolver uma guerra
    atualizam `regionPiecesByRegion` e estruturas relacionadas.
-4. As ações que alteram a composição/posição atualizam forças, visuais, controles
+5. As ações que alteram a composição/posição atualizam forças, visuais, controles
    e painel da região; muitas também salvam e publicam a ação para Bluetooth ou
    online.
-5. A rotação circular usa a identidade do bloco e o campo `disco` para mover as
+6. A rotação circular usa a identidade do bloco e o campo `disco` para mover as
    regiões do mesmo disco juntas; se houver mais de um bloco circular rotativo,
    o seletor pede primeiro o bloco. Geometria, peças e vizinhança são atualizadas
    em conjunto. Blocos quadriculares continuam usando o caminho por camada.
    Reiniciar um level também reinicia o passo do guia e limpa bloqueios e
    animações de rotação pendentes.
-6. O JSON de nível descreve dados da campanha; o estado vivo da partida e seu save
+7. O JSON de nível descreve dados da campanha; o estado vivo da partida e seu save
    ficam no cliente. O servidor online mantém estado/mensagens da partida online.
 
 Não confunda `regionPiecesByRegion` (composição de peças) com `regionStats`

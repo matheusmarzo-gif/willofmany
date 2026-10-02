@@ -215,6 +215,7 @@
       'tabuleiro-01': 'tabuleiro-01.json',
       'tabuleiro-02': 'tabuleiro-02.json'
     };
+    const defaultNonCampaignBoardFile = 'regioes-will-of-many-circular.json';
     const campaignProgressStorageKey = 'will-of-many-campaign-unlocked-level';
     const boardLayerElements = new Map();
     const probeBoxSize = 30;
@@ -280,6 +281,12 @@
 
     function getCampaignLevelOrder() {
       return Object.keys(campaignLevelFiles);
+    }
+
+    function getNewGameBoardFile() {
+      return gameMode === 'campaign'
+        ? campaignLevelFiles[selectedCampaignLevelId] || campaignLevelFiles['tabuleiro-01']
+        : defaultNonCampaignBoardFile;
     }
 
     function getUnlockedCampaignLevelId() {
@@ -4860,7 +4867,7 @@
     }
 
     async function loadRegionMasks() {
-      const candidates = ['regioes-will-of-many-circular.json', 'will-of-many-final.json', 'regioes-will-of-many.json'];
+      const candidates = [defaultNonCampaignBoardFile, 'will-of-many-final.json', 'regioes-will-of-many.json'];
       if (location.protocol === 'file:' && window.AndroidBluetooth?.readGameAsset) {
         try {
           const regionJson = window.AndroidBluetooth.readGameAsset(candidates[0]);
@@ -7178,7 +7185,7 @@
     };
 
     document.querySelectorAll('#game-mode-options button').forEach((button) => {
-      button.addEventListener('click', () => {
+      button.addEventListener('click', async () => {
         if (button.dataset.mode === 'online' &&
             location.protocol === 'file:' &&
             window.AndroidBluetooth?.openOnlineGame) {
@@ -7204,6 +7211,24 @@
         } else if (lobbyPoll) {
           window.clearInterval(lobbyPoll);
           lobbyPoll = null;
+        }
+        if (gameMode !== 'campaign') {
+          const modeButtons = [...document.querySelectorAll('#game-mode-options button')];
+          modeButtons.forEach((modeButton) => { modeButton.disabled = true; });
+          startGameButton.disabled = true;
+          startMessage.textContent = `Carregando ${defaultNonCampaignBoardFile}...`;
+          try {
+            await loadBoardFile(defaultNonCampaignBoardFile);
+            startMessage.textContent = gameMode === 'bluetooth' && !window.AndroidBluetooth
+              ? 'O modo Bluetooth está disponível somente no aplicativo Android.'
+              : '';
+          } catch (error) {
+            startMessage.textContent = `Não foi possível carregar o tabuleiro padrão: ${error.message}`;
+            console.error('Falha ao carregar o tabuleiro padrão para uma nova partida.', error);
+          } finally {
+            modeButtons.forEach((modeButton) => { modeButton.disabled = false; });
+            updateStartModeSelection();
+          }
         }
       });
     });
@@ -7266,13 +7291,13 @@
     });
 
     async function beginConfiguredGame() {
-      if (gameMode === 'campaign') {
-        try {
-          await loadBoardFile(campaignLevelFiles[selectedCampaignLevelId] || campaignLevelFiles['tabuleiro-01']);
-        } catch (error) {
-          startMessage.textContent = `Não foi possível carregar o level da campanha: ${error.message}`;
-          return;
-        }
+      try {
+        await loadBoardFile(getNewGameBoardFile());
+      } catch (error) {
+        startMessage.textContent = gameMode === 'campaign'
+          ? `Não foi possível carregar o level da campanha: ${error.message}`
+          : `Não foi possível carregar o tabuleiro padrão: ${error.message}`;
+        return;
       }
       if ((gameMode === 'ai' && !selectedStartColor) ||
           (gameMode === 'campaign' && !campaignBoardConfig) ||

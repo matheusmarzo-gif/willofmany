@@ -7,6 +7,7 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const gameClient = fs.readFileSync(path.join(root, 'game-client.js'), 'utf8');
 const circularBoard = JSON.parse(fs.readFileSync(
   path.join(root, 'regioes-will-of-many-circular.json'),
   'utf8'
@@ -42,6 +43,22 @@ test('Android and server builds package all external client resources', () => {
     assert.ok(androidGradle.includes(`include("${resource}")`), `Android includes ${resource}`);
     assert.ok(serverGradle.includes(`include "${resource}"`), `server includes ${resource}`);
   });
+});
+
+test('new non-campaign games select the circular board configuration', () => {
+  assert.match(
+    gameClient,
+    /const defaultNonCampaignBoardFile = 'regioes-will-of-many-circular\.json';/
+  );
+  assert.match(
+    gameClient,
+    /function getNewGameBoardFile\(\) \{\s*return gameMode === 'campaign'\s*\? campaignLevelFiles\[selectedCampaignLevelId\][\s\S]*?: defaultNonCampaignBoardFile;\s*\}/
+  );
+  assert.match(
+    gameClient,
+    /if \(gameMode !== 'campaign'\) \{[\s\S]*?await loadBoardFile\(defaultNonCampaignBoardFile\)/
+  );
+  assert.match(gameClient, /await loadBoardFile\(getNewGameBoardFile\(\)\)/);
 });
 
 test('circular board regions explicitly identify their independently rotating disks', () => {
