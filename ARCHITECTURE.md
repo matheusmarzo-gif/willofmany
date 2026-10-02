@@ -4,6 +4,10 @@ Este documento registra a arquitetura atual do repositório e serve como guia pa
 localizar e alterar mecânicas com menos risco de regressão. É um mapa da situação
 existente, não uma proposta para reescrever o jogo de uma vez.
 
+Antes de iniciar qualquer trabalho neste repositório, leia primeiro
+[`AGENTS.md`](./AGENTS.md), que registra a ordem de leitura, a localização das
+cópias do projeto, as precauções e as validações obrigatórias.
+
 ## Resumo do projeto
 
 O jogo tem três partes que compartilham ou complementam a experiência:
