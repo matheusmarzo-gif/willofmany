@@ -1,0 +1,205 @@
+{
+  "boardType": "mixed",
+  "version": 1,
+  "displayScale": 1.5,
+  "viewOffset": {
+    "x": 500,
+    "y": 0
+  },
+  "coordinateSystem": {
+    "unit": "pixel",
+    "tileColumns": 226,
+    "tileRows": 226,
+    "tileSize": 4,
+    "tileCenterOffset": 2
+  },
+  "campaign": {
+    "id": "tabuleiro-02",
+    "name": "Tabuleiro 02",
+    "initialCoins": 4,
+    "coinsPerTurn": 0,
+    "turnLimit": 5,
+    "aiActionsEnabled": false,
+    "rotationEnabled": true,
+    "objectiveRegions": ["L8-1"],
+    "objective": {
+      "type": "captureInitialBlueRegions"
+    }
+  },
+  "blocks": [
+    {
+      "name": "BQ01",
+      "type": "quadrilateral",
+      "matrixSize": 4,
+      "matrix": [
+        ["L8-1", "L8-2", "L8-3", "L8-10"],
+        [null, null, null, null],
+        [null, null, null, null],
+        [null, null, null, null]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 250,
+        "y": 75
+      },
+      "rotationEnabled": false,
+      "regions": [
+        {
+          "name": "L8-1",
+          "code": "L8-1",
+          "rank": "L8",
+          "layer": 8,
+          "region": 1,
+          "shape": "quadrilateral",
+          "positions": [[1, 1]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "blue", "stage": "g"},
+            {"team": "blue", "stage": "g"}
+          ]
+        },
+        {
+          "name": "L8-2",
+          "code": "L8-2",
+          "rank": "L8",
+          "layer": 8,
+          "region": 2,
+          "shape": "quadrilateral",
+          "positions": [[1, 2]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-3",
+          "code": "L8-3",
+          "rank": "L8",
+          "layer": 8,
+          "region": 3,
+          "shape": "quadrilateral",
+          "positions": [[1, 3]],
+          "maxPieces": 8,
+          "initialPieces": [{"team": "blue", "stage": "f"}]
+        },
+        {
+          "name": "L8-10",
+          "code": "L8-10",
+          "rank": "L8",
+          "layer": 8,
+          "region": 10,
+          "shape": "quadrilateral",
+          "positions": [[1, 4]],
+          "maxPieces": 8
+        }
+      ]
+    },
+    {
+      "name": "BQ02",
+      "type": "quadrilateral",
+      "matrixSize": 2,
+      "matrix": [
+        ["L8-4", "L8-5"],
+        [null, null]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 250,
+        "y": 1175
+      },
+      "rotationEnabled": false,
+      "regions": [
+        {
+          "name": "L8-4",
+          "code": "L8-4",
+          "rank": "L8",
+          "layer": 8,
+          "region": 4,
+          "shape": "quadrilateral",
+          "positions": [[1, 1]],
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-5",
+          "code": "L8-5",
+          "rank": "L8",
+          "layer": 8,
+          "region": 5,
+          "shape": "quadrilateral",
+          "positions": [[1, 2]],
+          "maxPieces": 8,
+          "initialPieces": [{"team": "orange", "stage": "g"}]
+        }
+      ]
+    },
+    {
+      "name": "BC03",
+      "type": "circular",
+      "initialRotation": 90,
+      "rotationStep": 90,
+      "center": {
+        "x": 250,
+        "y": 850
+      },
+      "regions": [
+        {
+          "name": "L8-6",
+          "code": "L8-6",
+          "rank": "L8",
+          "layer": 8,
+          "region": 6,
+          "shape": "circular",
+          "r1": 0,
+          "r2": 250,
+          "g1": 45,
+          "g2": 135,
+          "maxPieces": 8
+        },
+        {
+          "name": "L8-7",
+          "code": "L8-7",
+          "rank": "L8",
+          "layer": 8,
+          "region": 7,
+          "shape": "circular",
+          "r1": 0,
+          "r2": 250,
+          "g1": 135,
+          "g2": 225,
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "blue", "stage": "g"},
+            {"team": "blue", "stage": "g"},
+            {"team": "blue", "stage": "g"}
+          ]
+        },
+        {
+          "name": "L8-8",
+          "code": "L8-8",
+          "rank": "L8",
+          "layer": 8,
+          "region": 8,
+          "shape": "circular",
+          "r1": 0,
+          "r2": 250,
+          "g1": 225,
+          "g2": 315,
+          "maxPieces": 8,
+          "bagCoins": 9
+        },
+        {
+          "name": "L8-9",
+          "code": "L8-9",
+          "rank": "L8",
+          "layer": 8,
+          "region": 9,
+          "shape": "circular",
+          "r1": 0,
+          "r2": 250,
+          "g1": 315,
+          "g2": 405,
+          "maxPieces": 8
+        }
+      ]
+    }
+  ]
+}

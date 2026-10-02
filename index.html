@@ -20,8 +20,6 @@
     .new-game-options h2 { margin:0; font-family:Georgia,"Times New Roman",serif; font-size:28px; font-weight:400; }
     .new-game-options p { margin:12px 0 6px; color:var(--muted); font-size:12px; }
     .choice-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
-    #game-mode-options { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    #game-mode-options [data-mode="campaign"] { grid-column:1/-1; }
     .choice-row button { min-height:38px; }
     .choice-row button.is-active { color:#fffaf4; background:var(--accent); border-color:var(--accent); }
     .start-confirm { margin-top:16px; }
@@ -92,10 +90,15 @@
     .board-focus-outline.is-war-inner { stroke:#fff3a6; stroke-width:4px; }
     .board-focus-outline.is-selected-outer { stroke:#ef4dca; stroke-width:5px; filter:drop-shadow(0 0 5px rgba(239,77,202,.95)); }
     .board-focus-outline.is-selected-inner { stroke:#fff; stroke-width:2px; }
+    .app.is-campaign-guiding .board-focus-outline.is-selected-outer,
+    .app.is-campaign-guiding .board-focus-outline.is-selected-inner { display:none; }
+    .drag-target-outline { fill:rgba(85,190,132,.16); stroke:#75e0a2; stroke-width:5px; stroke-dasharray:10 6; vector-effect:non-scaling-stroke; filter:drop-shadow(0 0 5px rgba(40,160,95,.9)); }
+    .layer [data-circular-rotation-group] { transform-box:view-box; }
     .drag-overlay { position:absolute; inset:0; z-index:15; width:100%; height:100%; pointer-events:none; }
     .stage.is-dragging .drag-overlay { backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); }
     .trash-drop-zone { position:fixed; z-index:80; display:grid; justify-items:center; align-content:center; width:72px; min-height:80px; padding:7px 5px; border:1px solid rgba(103,45,34,.28); border-radius:12px; background:rgba(255,250,244,.96); box-shadow:0 5px 18px rgba(32,33,31,.24); color:#7c3425; pointer-events:none; transform:translateY(-50%) scale(.88); opacity:0; transition:opacity .16s ease,transform .16s ease,background .16s ease; }
     .trash-drop-zone.is-visible { pointer-events:auto; transform:translateY(-50%) scale(1); opacity:1; }
+    .trash-drop-zone.is-guide-visible { display:grid; pointer-events:none; transform:translateY(-50%) scale(1); opacity:1; }
     .trash-drop-zone.is-target { background:#f3d9d2; border-color:#a7482d; transform:translateY(-50%) scale(1.08); }
     .trash-drop-zone:hover, .trash-drop-zone:focus-visible { transform:translateY(-50%) scale(1.08); }
     .trash-drop-icon { width:34px; height:34px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
@@ -127,6 +130,8 @@
     .region-panel.is-hidden { display:none; }
     .region-panel-label { margin:0 0 8px; color:var(--muted); font-size:10px; letter-spacing:.14em; text-transform:uppercase; }
     .region-panel h3 { margin:0 0 6px; font-size:16px; color:var(--ink); }
+    .region-rotation-indicator { display:inline-flex; width:20px; height:20px; margin-left:6px; align-items:center; justify-content:center; border:1px solid currentColor; border-radius:50%; color:#315d77; font-size:17px; line-height:1; vertical-align:middle; }
+    .region-rotation-indicator.is-hidden { display:none; }
     .region-panel p { margin:0; color:var(--muted); font-size:12px; line-height:1.5; }
     .region-layer-forces { display:none; }
     .region-technical { display:none; }
@@ -159,7 +164,7 @@
     .statistics-table th:first-child, .statistics-table td:first-child { text-align:left; }
     .statistics-table tbody tr:nth-child(even) { background:rgba(32,33,31,.035); }
     .game-modal-card h2 { margin:0 0 14px; font-size:18px; }
-    .war-status { position:fixed; top:max(12px,env(safe-area-inset-top)); left:50%; z-index:210; width:min(88%,340px); padding:16px; border:1px solid var(--accent); background:rgba(255,250,244,.97); box-shadow:0 12px 30px rgba(32,33,31,.3); text-align:center; transform:translateX(-50%); }
+    .war-status { position:fixed; top:max(12px,env(safe-area-inset-top)); left:50%; z-index:470; width:min(88%,340px); padding:16px; border:1px solid var(--accent); background:rgba(255,250,244,.97); box-shadow:0 12px 30px rgba(32,33,31,.3); text-align:center; transform:translateX(-50%); }
     .war-status.is-hidden { display:none; }
     .war-status h2 { margin:0 0 8px; font-size:17px; }
     .war-status p { margin:4px 0; color:var(--muted); font-size:12px; line-height:1.4; }
@@ -171,21 +176,24 @@
     .turn-transition-message { display:grid; gap:10px; min-width:min(78vw,360px); margin:0; padding:clamp(22px,5vw,42px); border:1px solid rgba(255,255,255,.26); background:rgba(31,34,34,.88); box-shadow:0 18px 60px rgba(0,0,0,.32); font-family:Georgia,"Palatino Linotype",serif; text-align:center; }
     .turn-transition-player { color:#f2b270; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:clamp(13px,2.5vw,18px); font-weight:750; letter-spacing:.2em; }
     .turn-transition-message[data-team="blue"] .turn-transition-player { color:#8db9ff; }
+    .turn-transition-turn { color:#fffaf4; font-size:clamp(34px,8vw,66px); font-weight:700; letter-spacing:.06em; line-height:1; text-shadow:0 3px 18px rgba(255,255,255,.18); }
+    .turn-transition-round-result { max-width:680px; justify-self:center; color:#fffaf4; font:800 clamp(22px,5vw,38px)/1.15 system-ui,-apple-system,"Segoe UI",sans-serif; text-align:center; text-wrap:balance; }
+    .turn-transition-round-result[data-winner="orange"] { color:#ffc184; }
+    .turn-transition-round-result[data-winner="blue"] { color:#a9caff; }
+    .turn-transition-round-details, .turn-transition-round-score { color:#ddd8ce; font:500 clamp(11px,1.8vw,14px)/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
     .campaign-defeat { position:fixed; inset:0; z-index:450; display:grid; place-items:center; padding:20px; background:rgba(24,24,22,.84); color:#fff; backdrop-filter:blur(5px); animation:campaign-intro-fade .3s ease both; }
-    .campaign-defeat.is-hidden { display:none; }
+    .campaign-defeat.is-hidden, .campaign-intro.is-hidden, .campaign-guide.is-hidden { display:none; }
     .campaign-defeat-card { display:grid; justify-items:center; gap:12px; width:min(440px,100%); padding:clamp(26px,6vw,44px); border:1px solid rgba(255,255,255,.28); background:linear-gradient(145deg,#332e2b,#1f2222); box-shadow:0 24px 90px rgba(0,0,0,.5); text-align:center; animation:campaign-defeat-rise .45s cubic-bezier(.2,.8,.25,1) both; }
     .campaign-defeat-mark { display:grid; place-items:center; width:58px; height:58px; border:1px solid #c77962; border-radius:50%; color:#e49a81; font:400 38px/1 Georgia,"Times New Roman",serif; }
     .campaign-defeat-card strong { color:#f0a188; font:400 clamp(26px,7vw,38px)/1.1 Georgia,"Times New Roman",serif; }
     .campaign-defeat-card span:last-child { color:rgba(255,255,255,.76); font-size:14px; line-height:1.55; }
     .campaign-guide { position:fixed; inset:0; z-index:480; pointer-events:none; }
-    .campaign-guide.is-hidden { display:none; }
     .campaign-guide-shade { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
     .campaign-guide-spotlights { position:absolute; inset:0; pointer-events:none; }
     .campaign-guide-spotlight { position:fixed; border:2px solid #f3c66b; border-radius:8px; box-shadow:0 0 0 2px rgba(26,25,22,.4),0 0 22px 5px rgba(255,218,127,.78); pointer-events:none; }
-    .campaign-guide-region-outline { fill:none; stroke:#ffe08a; stroke-width:4px; vector-effect:non-scaling-stroke; filter:drop-shadow(0 0 5px rgba(255,218,127,.95)); pointer-events:none; }
+    .campaign-guide-region-outline { fill:none; stroke:#ffe08a; stroke-width:1.5px; vector-effect:non-scaling-stroke; filter:drop-shadow(0 0 2px rgba(255,218,127,.7)); pointer-events:none; }
     #turn-points.is-guide-pinned { position:fixed; z-index:481; top:max(8px,env(safe-area-inset-top)); left:50%; width:min(360px,calc(100vw - 28px)); margin:0; padding:8px 12px; border:1px solid rgba(167,72,45,.5); background:rgba(255,250,244,.97); box-shadow:0 4px 18px rgba(0,0,0,.3); text-align:center; transform:translateX(-50%); }
     .campaign-guide-card { position:fixed; left:50%; bottom:max(14px,env(safe-area-inset-bottom)); display:grid; grid-template-columns:48px 1fr; align-items:center; gap:12px; width:min(520px,calc(100vw - 28px)); max-height:min(34vh,240px); overflow:auto; padding:16px 18px; border:1px solid rgba(255,255,255,.32); background:linear-gradient(145deg,#f9f5ec,#e8dfd0); box-shadow:0 18px 55px rgba(0,0,0,.48); color:var(--ink); text-align:left; transform:translateX(-50%); pointer-events:auto; }
-    .campaign-guide-card[data-position="top"] { top:max(14px,env(safe-area-inset-top)); bottom:auto; }
     .campaign-guide-card button { grid-column:1 / -1; display:grid; grid-template-columns:48px 1fr; align-items:center; gap:12px; width:100%; min-height:48px; padding:0; border:0; background:transparent; text-align:left; letter-spacing:normal; }
     .campaign-guide-avatar { display:grid; place-items:center; width:48px; height:48px; border:1px solid rgba(167,72,45,.38); border-radius:50%; color:#fff5e9; background:radial-gradient(circle at 36% 28%,#d99361,#783e32 72%); font:700 20px Georgia,"Times New Roman",serif; }
     .campaign-guide-copy { display:grid; gap:5px; }
@@ -194,20 +202,14 @@
     .campaign-guide-copy span:last-child { color:#55534e; font:12px/1.45 "Trebuchet MS","Gill Sans",sans-serif; }
     .campaign-guide-hint { grid-column:2; padding-top:2px; color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
     .campaign-intro { position:fixed; inset:0; z-index:400; display:grid; place-items:center; padding:20px; background:rgba(17,19,20,.82); backdrop-filter:blur(6px); animation:campaign-intro-fade .3s ease both; }
-    .campaign-intro.is-hidden { display:none; }
-    .campaign-intro-dismiss { display:grid; grid-template-columns:88px 1fr; align-items:center; gap:22px; width:min(560px,100%); padding:clamp(22px,5vw,38px); border:1px solid rgba(255,255,255,.26); background:linear-gradient(145deg,#f9f5ec,#e8dfd0); box-shadow:0 24px 90px rgba(0,0,0,.45); text-align:left; white-space:normal; animation:campaign-intro-rise .42s cubic-bezier(.2,.8,.25,1) both; }
-    .campaign-avatar { display:grid; place-items:center; width:88px; height:88px; border:1px solid rgba(167,72,45,.38); border-radius:50%; color:#fff5e9; background:radial-gradient(circle at 36% 28%,#d99361,#783e32 72%); box-shadow:0 8px 22px rgba(80,44,35,.24); }
+    .campaign-intro-dismiss { display:grid; grid-template-columns:88px 1fr; align-items:center; gap:22px; width:min(560px,100%); padding:clamp(22px,5vw,38px); border:1px solid rgba(255,255,255,.26); background:linear-gradient(145deg,#f9f5ec,#e8dfd0); box-shadow:0 24px 90px rgba(0,0,0,.45); text-align:left; white-space:normal; }
+    .campaign-avatar { display:grid; place-items:center; width:88px; height:88px; border:1px solid rgba(167,72,45,.38); border-radius:50%; color:#fff5e9; background:radial-gradient(circle at 36% 28%,#d99361,#783e32 72%); }
     .campaign-avatar svg { width:60px; height:60px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.7; }
     .campaign-intro-copy { display:grid; gap:9px; }
     .campaign-agent-name { color:var(--accent); font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
     .campaign-intro-copy strong { font:400 clamp(22px,5vw,31px)/1.1 Georgia,"Times New Roman",serif; }
     .campaign-intro-copy span:nth-child(3) { color:#55534e; font:14px/1.65 "Trebuchet MS","Gill Sans",sans-serif; }
     .campaign-intro-hint { padding-top:5px; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
-    .turn-transition-turn { color:#fffaf4; font-size:clamp(34px,8vw,66px); font-weight:700; letter-spacing:.06em; line-height:1; text-shadow:0 3px 18px rgba(255,255,255,.18); }
-    .turn-transition-round-result { max-width:680px; justify-self:center; color:#fffaf4; font:800 clamp(22px,5vw,38px)/1.15 system-ui,-apple-system,"Segoe UI",sans-serif; text-align:center; text-wrap:balance; }
-    .turn-transition-round-result[data-winner="orange"] { color:#ffc184; }
-    .turn-transition-round-result[data-winner="blue"] { color:#a9caff; }
-    .turn-transition-round-details, .turn-transition-round-score { color:#ddd8ce; font:500 clamp(11px,1.8vw,14px)/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
     .victory-score { margin:0 0 12px; padding:12px; border:1px solid var(--line); background:rgba(247,244,237,.75); font-size:14px; font-weight:700; }
     .action-cost-tag { position:absolute; z-index:60; padding:3px 8px; border:1px solid rgba(164,45,45,.2); border-radius:12px; background:rgba(255,255,255,.94); box-shadow:0 2px 8px rgba(0,0,0,.2); color:#b42323; font:700 clamp(12px,2vh,16px)/1.2 system-ui,-apple-system,"Segoe UI",sans-serif; white-space:nowrap; pointer-events:none; transform:translate(-50%,-130%); animation:action-cost-pop 1.8s ease-out forwards; }
     .game-modal-card p { margin:0 0 12px; color:var(--muted); font-size:12px; }
@@ -218,13 +220,12 @@
     .debug-canvas { position:absolute; inset:0; z-index:25; width:100%; height:100%; pointer-events:none; opacity:1; background:rgba(255,255,255,.02); transform:rotate(0deg); transform-origin:center; transition:transform .32s cubic-bezier(.22,.8,.25,1); }
     .debug-canvas.is-hidden { display:none; }
     @keyframes piece-in { from { opacity:0; } to { opacity:1; } }
-    @keyframes region-outline-pulse { from { opacity:.48; } to { opacity:1; } }
     @keyframes war-flash { 0%,100% { opacity:1; filter:none; } 50% { opacity:.25; filter:sepia(1) saturate(4); } }
     @keyframes stage-nudge { 0%,100% { translate:0 0; } 25% { translate:-2px 1px; } 50% { translate:2px -1px; } 75% { translate:-1px 0; } }
     @keyframes action-cost-pop { 0% { opacity:0; translate:0 5px; } 12% { opacity:1; translate:0 0; } 78% { opacity:1; } 100% { opacity:0; translate:0 -8px; } }
     @keyframes campaign-intro-fade { from { opacity:0; } to { opacity:1; } }
-    @keyframes campaign-intro-rise { from { opacity:0; translate:0 18px; scale:.98; } to { opacity:1; translate:0 0; scale:1; } }
     @keyframes campaign-defeat-rise { from { opacity:0; translate:0 18px; scale:.96; } to { opacity:1; translate:0 0; scale:1; } }
+    @keyframes region-outline-pulse { from { opacity:.48; } to { opacity:1; } }
     @media (max-width:760px) { body { overflow-x:hidden; } .app { grid-template-columns:1fr; gap:20px; align-content:start; padding:calc(18px + env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left)); } .intro { text-align:center; } h1,.description { margin-left:auto; margin-right:auto; } h1 { font-size:clamp(38px,12vw,56px); } .description { max-width:340px; } .rule { margin-left:auto; margin-right:auto; } .controls { margin:0 auto; width:min(100%,360px); grid-template-columns:repeat(2,minmax(0,1fr)); } .controls .layer-controls:not(.is-mobile-visible) { display:none; } .turn-panel,.region-panel { width:min(100%,360px); margin-left:auto; margin-right:auto; } .stage-wrap { order:-1; width:100%; } .stage-panel { width:min(100%,calc(100vw - 28px)); } .piece { width:30px; height:30px; } .piece-controls { flex-wrap:wrap; margin-top:16px; } .piece-button { min-width:70px; } .debug-tools { flex-wrap:wrap; } .readout { line-height:1.5; } }
     @media (max-width:760px) { .controls { justify-items:center; } .controls .layer-controls.is-mobile-visible { grid-column:1 / -1; justify-self:center; width:min(100%,180px); } }
     @media (max-width:520px) { .campaign-intro-dismiss { grid-template-columns:1fr; justify-items:center; gap:14px; text-align:center; } .campaign-avatar { width:72px; height:72px; } .campaign-avatar svg { width:50px; height:50px; } }
@@ -284,9 +285,6 @@
       #rotate-picker-button, #pass-turn-button { left:max(5px,env(safe-area-inset-left)); }
       #rotate-picker-button, #pass-turn-button, #statistics-button, #war-button { transform:none; }
       #statistics-button, #war-button { right:max(5px,env(safe-area-inset-right)); }
-      .turn-panel .campaign-actions { position:fixed; z-index:11; bottom:max(46px,calc(env(safe-area-inset-bottom) + 42px)); left:50%; display:flex; width:min(54vw,300px); gap:6px; margin:0; pointer-events:auto; transform:translateX(-50%); }
-      .turn-panel .campaign-actions button { position:static; width:auto; height:34px; min-height:34px; margin:0; padding:5px 8px; border-radius:3px; background:rgba(247,244,237,.96); box-shadow:0 2px 8px rgba(32,33,31,.18); pointer-events:auto; transform:none; }
-      .turn-panel .campaign-actions button:hover, .turn-panel .campaign-actions button:focus-visible { transform:none; }
       #rotate-picker-button { top:max(5px,env(safe-area-inset-top)); }
       #pass-turn-button { top:var(--region-actions-pass-top,calc(50% + 135px)); }
       #statistics-button { top:max(5px,env(safe-area-inset-top)); }
@@ -308,8 +306,7 @@
       .game-modal-card { max-height:96vh; padding:12px; }
       .statistics-table-wrap { max-height:76vh; }
     }
-    @media (max-width:520px) { .campaign-guide-card { grid-template-columns:38px 1fr; gap:9px; padding:12px; } .campaign-guide-card button { grid-template-columns:38px 1fr; gap:9px; } .campaign-guide-avatar { width:38px; height:38px; font-size:17px; } }
-    @media (prefers-reduced-motion:reduce) { .layer,.pieces,.debug-canvas,button { transition:none; } .campaign-intro,.campaign-intro-dismiss,.campaign-defeat,.campaign-defeat-card,.board-focus-outline { animation:none; } }
+    @media (prefers-reduced-motion:reduce) { .layer,.pieces,.debug-canvas,button { transition:none; } .board-focus-outline { animation:none; } }
   </style>
 </head>
 <body>
@@ -326,8 +323,8 @@
         <h2>Novo jogo</h2>
         <p>Modo de jogo</p>
         <div class="choice-row" id="game-mode-options">
-          <button type="button" data-mode="campaign">Campanha</button>
           <button type="button" data-mode="ai">Contra IA</button>
+          <button type="button" data-mode="campaign">Campanha</button>
           <button type="button" data-mode="local">Dois jogadores</button>
           <button type="button" data-mode="bluetooth">Bluetooth</button>
           <button type="button" data-mode="online">Online</button>
@@ -453,6 +450,7 @@
     <section class="stage-wrap" aria-label="Composição dos oito discos">
       <div class="stage-panel" id="stage-panel">
         <button class="stage-panel-close" id="stage-panel-close" type="button" aria-label="Voltar para a visão global">×</button>
+        <div class="war-status is-hidden" id="war-status" aria-live="polite"></div>
         <div class="stage" id="stage">
           <div class="pieces" id="pieces" aria-live="polite"></div>
           <svg class="board-focus-overlay" id="board-focus-overlay" viewBox="0 0 908 908" aria-hidden="true">
@@ -467,11 +465,10 @@
           </svg>
         </div>
       </div>
-      <div class="war-status is-hidden" id="war-status" aria-live="polite"></div>
       <div class="piece-controls" id="piece-controls" aria-label="Comprar peças"></div>
       <aside class="region-panel" id="region-panel" aria-live="polite">
         <p class="region-panel-label">Região selecionada</p>
-        <h3 id="region-name">-</h3>
+        <h3><span id="region-name">-</span><span class="region-rotation-indicator is-hidden" id="region-rotation-indicator" role="img" aria-label="Região de disco rotativo" title="Região de disco rotativo">↻</span></h3>
         <div class="region-layer-forces" aria-label="Força final por equipe neste disco">
           <span class="region-layer-force-team is-orange">
             <img src="peca_laranja.png" alt="Equipe laranja">
@@ -561,8 +558,9 @@
     <div class="game-modal-card final-card">
       <h2 id="final-modal-title">Fim de jogo</h2>
       <div id="final-summary"></div>
-      <button class="modal-close" id="final-menu-button" type="button">Voltar ao menu</button>
+      <button class="modal-close is-hidden" id="campaign-next-level-button" type="button">Continuar para o próximo level</button>
       <button class="modal-close is-hidden" id="final-restart-campaign-button" type="button">Reiniciar level</button>
+      <button class="modal-close" id="final-menu-button" type="button">Voltar ao menu</button>
     </div>
   </div>
   <div class="game-modal is-hidden" id="abandon-match-modal" role="dialog" aria-modal="true" aria-labelledby="abandon-match-title">
@@ -597,7 +595,14 @@
   </section>
   <section class="campaign-guide is-hidden" id="campaign-guide" role="dialog" aria-modal="true" aria-labelledby="campaign-guide-title" aria-describedby="campaign-guide-message" aria-hidden="true">
     <svg class="campaign-guide-shade" id="campaign-guide-shade" aria-hidden="true" preserveAspectRatio="none">
-      <path id="campaign-guide-shade-path" fill="#0c0d0e" fill-opacity=".82" fill-rule="evenodd"></path>
+      <defs>
+        <mask id="campaign-guide-mask" maskUnits="userSpaceOnUse">
+          <rect id="campaign-guide-mask-background" fill="#fff"></rect>
+          <g id="campaign-guide-mask-holes" fill="#000" fill-rule="evenodd"></g>
+        </mask>
+      </defs>
+      <path id="campaign-guide-shade-path" fill="#0c0d0e" fill-opacity=".82" mask="url(#campaign-guide-mask)"></path>
+      <g id="campaign-guide-region-outlines"></g>
     </svg>
     <div class="campaign-guide-spotlights" id="campaign-guide-spotlights" aria-hidden="true"></div>
     <article class="campaign-guide-card" id="campaign-guide-card">
@@ -39284,11 +39289,9 @@
     const onlineCancelButton = document.querySelector('#online-cancel-button');
     const finalModal = document.querySelector('#final-modal');
     const finalSummary = document.querySelector('#final-summary');
+    const campaignNextLevelButton = document.querySelector('#campaign-next-level-button');
     const finalMenuButton = document.querySelector('#final-menu-button');
     const finalRestartCampaignButton = document.querySelector('#final-restart-campaign-button');
-    const abandonMatchButton = document.querySelector('#abandon-match-button');
-    const abandonMatchModal = document.querySelector('#abandon-match-modal');
-    const confirmAbandonMatchButton = document.querySelector('#confirm-abandon-match-button');
     const campaignActions = document.querySelector('#campaign-actions');
     const campaignMenuButton = document.querySelector('#campaign-menu-button');
     const campaignRestartButton = document.querySelector('#campaign-restart-button');
@@ -39299,17 +39302,20 @@
     const campaignGuide = document.querySelector('#campaign-guide');
     const campaignGuideShade = document.querySelector('#campaign-guide-shade');
     const campaignGuideShadePath = document.querySelector('#campaign-guide-shade-path');
+    const campaignGuideMask = document.querySelector('#campaign-guide-mask');
+    const campaignGuideMaskBackground = document.querySelector('#campaign-guide-mask-background');
+    const campaignGuideMaskHoles = document.querySelector('#campaign-guide-mask-holes');
+    const campaignGuideRegionOutlines = document.querySelector('#campaign-guide-region-outlines');
     const campaignGuideSpotlights = document.querySelector('#campaign-guide-spotlights');
     const campaignGuideCard = document.querySelector('#campaign-guide-card');
     const campaignGuideContinue = document.querySelector('#campaign-guide-continue');
     const campaignGuideTitle = document.querySelector('#campaign-guide-title');
     const campaignGuideMessage = document.querySelector('#campaign-guide-message');
     const campaignGuideHint = document.querySelector('#campaign-guide-hint');
+    const abandonMatchButton = document.querySelector('#abandon-match-button');
+    const abandonMatchModal = document.querySelector('#abandon-match-modal');
+    const confirmAbandonMatchButton = document.querySelector('#confirm-abandon-match-button');
     const stagePanel = document.querySelector('#stage-panel');
-    const boardFocusOverlay = document.querySelector('#board-focus-overlay');
-    const boardFocusMaskHoles = document.querySelector('#board-focus-mask-holes');
-    const boardFocusDim = document.querySelector('#board-focus-dim');
-    const boardFocusOutlines = document.querySelector('#board-focus-outlines');
     const trashDropZone = document.querySelector('#trash-drop-zone');
     const trashDropRefund = document.querySelector('#trash-drop-refund');
     const stagePanelClose = document.querySelector('#stage-panel-close');
@@ -39325,6 +39331,7 @@
     const regionsFile = document.querySelector('#regions-file');
     const regionPanel = document.querySelector('#region-panel');
     const regionName = document.querySelector('#region-name');
+    const regionRotationIndicator = document.querySelector('#region-rotation-indicator');
     const regionLayerOrangeForce = document.querySelector('#region-layer-orange-force');
     const regionLayerBlueForce = document.querySelector('#region-layer-blue-force');
     const regionPieceCounts = document.querySelector('#region-piece-counts');
@@ -39341,6 +39348,10 @@
     const turnPlayer = document.querySelector('#turn-player');
     const warButton = document.querySelector('#war-button');
     const warStatus = document.querySelector('#war-status');
+    const boardFocusOverlay = document.querySelector('#board-focus-overlay');
+    const boardFocusMaskHoles = document.querySelector('#board-focus-mask-holes');
+    const boardFocusDim = document.querySelector('#board-focus-dim');
+    const boardFocusOutlines = document.querySelector('#board-focus-outlines');
     const regionDominator = document.querySelector('#region-dominator');
     const regionNeighbors = document.querySelector('#region-neighbors');
     const regionMoveControls = document.querySelector('#region-move-controls');
@@ -39377,13 +39388,40 @@
     debugCanvas.addEventListener('pointerup', endDebugProbeDrag);
     debugCanvas.addEventListener('pointerleave', endDebugProbeDrag);
     stage.appendChild(debugCanvas);
-    const dragOverlay = document.createElement('canvas');
-    const dragOverlayContext = dragOverlay.getContext('2d');
-    dragOverlay.className = 'drag-overlay';
-    dragOverlay.width = 908;
-    dragOverlay.height = 908;
+    const dragOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    dragOverlay.classList.add('drag-overlay');
+    dragOverlay.setAttribute('viewBox', '0 0 908 908');
+    dragOverlay.setAttribute('aria-hidden', 'true');
+    dragOverlay.style.display = 'none';
+    const dragOverlayDefs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const dragOverlayMask = document.createElementNS('http://www.w3.org/2000/svg', 'mask');
+    dragOverlayMask.id = 'drag-overlay-mask';
+    dragOverlayMask.setAttribute('maskUnits', 'userSpaceOnUse');
+    dragOverlayMask.setAttribute('x', '0');
+    dragOverlayMask.setAttribute('y', '0');
+    dragOverlayMask.setAttribute('width', '908');
+    dragOverlayMask.setAttribute('height', '908');
+    const dragOverlayMaskBackground = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    dragOverlayMaskBackground.setAttribute('width', '908');
+    dragOverlayMaskBackground.setAttribute('height', '908');
+    dragOverlayMaskBackground.setAttribute('fill', '#fff');
+    const dragOverlayMaskHoles = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    dragOverlayMaskHoles.setAttribute('fill', '#000');
+    dragOverlayMaskHoles.setAttribute('fill-rule', 'evenodd');
+    dragOverlayMask.append(dragOverlayMaskBackground, dragOverlayMaskHoles);
+    dragOverlayDefs.appendChild(dragOverlayMask);
+    const dragOverlayDim = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    dragOverlayDim.setAttribute('width', '908');
+    dragOverlayDim.setAttribute('height', '908');
+    dragOverlayDim.setAttribute('fill', '#000');
+    dragOverlayDim.setAttribute('fill-opacity', '.74');
+    dragOverlayDim.setAttribute('mask', 'url(#drag-overlay-mask)');
+    const dragOverlayTargets = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    dragOverlayTargets.classList.add('drag-target-outlines');
+    dragOverlay.append(dragOverlayDefs, dragOverlayDim, dragOverlayTargets);
     stage.appendChild(dragOverlay);
     const rotations = Array(8).fill(0);
+    const mixedCircularRotationAngles = new Map();
     const pieceCounts = { blue:0, orange:0 };
     const pieceTargets = { blue:{code:'L8-4',region:4,label:'região L8-4',slots:[]}, orange:{code:'L8-1',region:1,label:'região L8-1',slots:[]} };
     const maxPieces = 16;
@@ -39414,16 +39452,20 @@
     let campaignBoardConfig = null;
     let activeCampaignLevel = null;
     let campaignCollectedBags = [];
-    let campaignGuideStep = 'complete';
-    let campaignGuideDismissible = false;
-    let actionFeedbackQueue = [];
-    let activeActionFeedback = null;
-    let actionFeedbackTimer = 0;
     let campaignObjectiveRegions = [];
     let campaignResetPending = false;
+    let selectedCampaignLevelId = 'tabuleiro-01';
+    let campaignNextLevelId = null;
+    let campaignGuideStep = 'complete';
+    let campaignGuideDismissible = false;
     let campaignIntroPending = false;
+    let campaignLevel2SeenSectors = [];
     let gameSessionVersion = 0;
-    let gameLaunchRequestVersion = 0;
+    const campaignLevelFiles = {
+      'tabuleiro-01': 'tabuleiro-01.json',
+      'tabuleiro-02': 'tabuleiro-02.json'
+    };
+    const campaignProgressStorageKey = 'will-of-many-campaign-unlocked-level';
     const boardLayerElements = new Map();
     const probeBoxSize = 30;
     let debugZoom = 1;
@@ -39479,11 +39521,41 @@
     let lastWheatTurnReport = null;
     const pontosDoTurn = { orange: 8, blue: 8 };
     const turnPointSchedule = [8, 10, 12, 16, 20, 24, 32, 40, 80, 100, 120, 160, 200, 240, 320, 400, 800, 1000, 1200, 1600, 2000, 2400, 3200, 4000];
-    const moveCostByLayer = { 8: 1, 7: 4, 6: 16, 5: 64, 4: 256, 3: 1024, 2: 4096 };
     const promotionCostBySourceLayer = { 8: 3, 7: 9, 6: 27, 5: 81, 4: 243, 3: 729, 2: 2197 };
 
     function getTurnPointIncome(turnNumber) {
       return turnPointSchedule[Math.min(Math.max(1, turnNumber), turnPointSchedule.length) - 1] * gameSpeed;
+    }
+
+    function getCampaignLevelOrder() {
+      return Object.keys(campaignLevelFiles);
+    }
+
+    function getUnlockedCampaignLevelId() {
+      const progress = localStorage.getItem(campaignProgressStorageKey);
+      return campaignLevelFiles[progress] ? progress : 'tabuleiro-01';
+    }
+
+    function getNextCampaignLevelId(levelId) {
+      const levels = getCampaignLevelOrder();
+      const nextIndex = levels.indexOf(levelId) + 1;
+      return nextIndex > 0 ? levels[nextIndex] || null : null;
+    }
+
+    function unlockNextCampaignLevel(levelId) {
+      const nextLevelId = getNextCampaignLevelId(levelId);
+      if (!nextLevelId) return null;
+      const currentUnlockedIndex = getCampaignLevelOrder().indexOf(getUnlockedCampaignLevelId());
+      const nextUnlockedIndex = getCampaignLevelOrder().indexOf(nextLevelId);
+      if (nextUnlockedIndex > currentUnlockedIndex) {
+        localStorage.setItem(campaignProgressStorageKey, nextLevelId);
+      }
+      return nextLevelId;
+    }
+
+    function getCampaignCoinsPerTurn(level) {
+      const coinsPerTurn = Number(level?.coinsPerTurn);
+      return Number.isFinite(coinsPerTurn) ? Math.max(0, coinsPerTurn) : 4;
     }
 
     function resetGameState() {
@@ -39495,6 +39567,16 @@
       pieceCounts.orange = 0;
       pieceCounts.blue = 0;
       rotations.fill(0);
+      if (currentBoardData?.boardType === 'mixed') {
+        currentBoardData.blocks.forEach((block) => {
+          if (block.type !== 'circular') return;
+          const initialRotation = Number(block.initialRotation) || 0;
+          (block.regions || []).forEach((region) => {
+            const layer = Number(region.layer || String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]);
+            if (layer >= 1 && layer <= rotations.length) rotations[layer - 1] = initialRotation;
+          });
+        });
+      }
       currentTurn = 1;
       currentTeam = 'orange';
       hasRotatedThisTurn = false;
@@ -39512,6 +39594,7 @@
       isGameStarted = true;
       isAiTurnRunning = false;
       isWarRunning = false;
+      warStatus.classList.add('is-hidden');
       turnMoveHistory = [];
       turnRecycledPieces = [];
       turnCreatedPieces = [];
@@ -39520,15 +39603,12 @@
       wheatBalances = { orange: 0, blue: 0 };
       lastWheatTurnReport = null;
       campaignCollectedBags = [];
-      campaignGuideStep = 'complete';
-      campaignGuideDismissible = false;
-      actionFeedbackQueue = [];
-      if (actionFeedbackTimer) window.clearTimeout(actionFeedbackTimer);
-      activeActionFeedback?.tag?.remove();
-      activeActionFeedback = null;
-      actionFeedbackTimer = 0;
+      campaignLevel2SeenSectors = [];
       campaignObjectiveRegions = [];
       campaignResetPending = false;
+      campaignNextLevelId = null;
+      campaignGuideStep = 'complete';
+      campaignGuideDismissible = false;
       campaignIntroPending = false;
       campaignIntro.classList.add('is-hidden');
       campaignIntro.setAttribute('aria-hidden', 'true');
@@ -39536,10 +39616,12 @@
       campaignGuide.setAttribute('aria-hidden', 'true');
       campaignGuideSpotlights.replaceChildren();
       turnPoints.classList.remove('is-guide-pinned');
+      updateBoardFocusOverlay();
       campaignDefeat.classList.add('is-hidden');
       campaignDefeat.setAttribute('aria-hidden', 'true');
+      campaignActions.classList.add('is-hidden');
       trashDropZone.classList.add('is-hidden');
-      trashDropZone.classList.remove('is-visible', 'is-target');
+      trashDropZone.classList.remove('is-visible', 'is-target', 'is-guide-visible');
     }
 
     function saveGame() {
@@ -39547,8 +39629,10 @@
       const save = {
         gameMode, humanTeam, aiTeam, gameSpeed, currentTeam, currentTurn,
         campaignLevelId: activeCampaignLevel?.id || null,
+        boardRotationConfigVersion: 3,
         campaignCollectedBags: [...campaignCollectedBags],
         campaignGuideStep,
+        campaignLevel2SeenSectors: [...campaignLevel2SeenSectors],
         hasRotatedThisTurn, lastRotatedLayer, lastRotatedBy, rotationLockTurn,
         rotations: [...rotations], pontosDoTurn: { ...pontosDoTurn },
         turnMoveHistory: JSON.parse(JSON.stringify(turnMoveHistory)),
@@ -39575,16 +39659,20 @@
         campaignCollectedBags = Array.isArray(save.campaignCollectedBags)
           ? save.campaignCollectedBags.filter((code) => typeof code === 'string')
           : [];
+        campaignObjectiveRegions = gameMode === 'campaign'
+          ? (activeCampaignLevel?.objectiveRegions || [])
+          : [];
         campaignGuideStep = [
           'intro', 'coins', 'purchase', 'move', 'await-move', 'bag-tip',
-          'await-bag', 'army-tip', 'await-army', 'war', 'complete'
+          'await-bag', 'army-tip', 'await-army', 'war',
+          'level2-intro', 'await-l84', 'level2-rotate', 'await-circular',
+          'level2-pass-turn', 'await-next-rotation', 'level2-rotate-again',
+          'level2-final-attack', 'await-l83',
+          'level2-recycle', 'await-l81', 'complete'
         ].includes(save.campaignGuideStep)
           ? save.campaignGuideStep
           : 'complete';
         campaignIntroPending = gameMode === 'campaign' && campaignGuideStep === 'intro';
-        campaignObjectiveRegions = gameMode === 'campaign'
-          ? (activeCampaignLevel?.objectiveRegions || [])
-          : [];
         gameSpeed = Math.max(1, Math.min(3, Number(save.gameSpeed) || 1));
         currentTeam = save.currentTeam === 'blue' ? 'blue' : 'orange';
         currentTurn = Math.max(1, Number(save.currentTurn) || 1);
@@ -39593,6 +39681,19 @@
         lastRotatedBy = save.lastRotatedBy || null;
         rotationLockTurn = save.rotationLockTurn || null;
         (save.rotations || []).forEach((value, index) => { rotations[index] = Number(value) || 0; });
+        campaignLevel2SeenSectors = Array.isArray(save.campaignLevel2SeenSectors)
+          ? save.campaignLevel2SeenSectors.filter((code) => /^L8-[6-9]$/.test(code))
+          : [];
+        if (save.boardRotationConfigVersion !== 3 && currentBoardData?.boardType === 'mixed') {
+          currentBoardData.blocks.forEach((block) => {
+            if (block.type !== 'circular') return;
+            const initialRotation = Number(block.initialRotation) || 0;
+            (block.regions || []).forEach((region) => {
+              const layer = Number(region.layer || String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]);
+              if (layer >= 1 && layer <= rotations.length) rotations[layer - 1] = initialRotation;
+            });
+          });
+        }
         const savedOrangePoints = Number(save.pontosDoTurn?.orange);
         const savedBluePoints = Number(save.pontosDoTurn?.blue);
         pontosDoTurn.orange = Number.isFinite(savedOrangePoints) ? savedOrangePoints : getTurnPointIncome(currentTurn);
@@ -39657,6 +39758,19 @@
 
     function isCampaignGame() {
       return gameMode === 'campaign' && !!activeCampaignLevel;
+    }
+
+    function isCampaignLevelTwo() {
+      return isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-02';
+    }
+
+    function isRegionInRotatableBlock(regionCode) {
+      const geometry = regionGeometryByCode[regionCode];
+      if (!geometry || geometry.shape !== 'circular' ||
+          currentBoardData?.boardType !== 'mixed' ||
+          currentBoardData.campaign?.rotationEnabled === false) return false;
+      const block = currentBoardData.blocks.find((item) => item.name === geometry.block);
+      return block?.type === 'circular' && block.rotationEnabled !== false;
     }
 
     function updateWarAvailability() {
@@ -39739,7 +39853,11 @@
     }
 
     function getMoveCost(regionCode, amount) {
-      return (moveCostByLayer[getRegionLayer(regionCode)] || 0) * amount;
+      const stage = Object.entries(soldierWeights)
+        .find(([, soldierAmount]) => soldierAmount === amount)?.[0];
+      if (!stage) return Infinity;
+      if (stage === 'g' && getRegionLayer(regionCode) === 8) return 1;
+      return Math.floor(getRecruitmentCost(regionCode, stage) / 2);
     }
 
     function getMaxMovableSoldiers(team, sourceCode, targetCode) {
@@ -39768,6 +39886,12 @@
 
     function getRotationStep(layerNumber) {
       if (isCampaignGame() && activeCampaignLevel.rotationEnabled === false) return 0;
+      if (currentBoardData?.boardType === 'mixed') {
+        const circularBlock = currentBoardData.blocks.find((block) =>
+          block.type === 'circular' && (block.regions || []).some((region) =>
+            Number(region.layer || String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]) === layerNumber));
+        if (circularBlock) return Number(circularBlock.rotationStep) || rotationStepByLayer[layerNumber] || 0;
+      }
       return rotationStepByLayer[layerNumber] || 0;
     }
 
@@ -39825,8 +39949,10 @@
       if (isCampaignGame()) {
         campaignObjective.textContent = `Campanha · ${activeCampaignLevel.name}: conquiste ${campaignObjectiveRegions.join(', ') || 'as regiões azuis'}`;
       }
-      const wheatProduction = getWheatTotals(currentTeam).production;
-      turnWheatValue.textContent = `Trigo: ${formatStatisticsNumber(wheatBalances[currentTeam])} · +${formatStatisticsNumber(wheatProduction)}/turno`;
+      const wheatTotals = getWheatTotals(currentTeam);
+      const netWheatProduction = wheatTotals.production - wheatTotals.consumption;
+      const netWheatSign = netWheatProduction >= 0 ? '+' : '';
+      turnWheatValue.textContent = `Trigo: ${formatStatisticsNumber(wheatBalances[currentTeam])} · ${netWheatSign}${formatStatisticsNumber(netWheatProduction)}/turno`;
       const shortageReport = lastWheatTurnReport?.team === currentTeam &&
         lastWheatTurnReport.turn === currentTurn &&
         lastWheatTurnReport.shortage > 0
@@ -40406,8 +40532,8 @@
       blocks.reverse();
       for (const block of blocks) {
         warSpotlightRegionCodes = [...new Set([...block.alliedRegions, ...block.enemyRegions])];
-        focusRegion(block.regionCode);
         updateBoardFocusOverlay();
+        focusRegion(block.regionCode);
         const alliedForce = block.alliedRegions.reduce((sum, code) => sum + getRegionFinalForceValue(code), 0);
         const enemyForce = block.enemyRegions.reduce((sum, code) => sum + getRegionFinalForceValue(code), 0);
         renderWarForces(block.attacker, alliedForce, enemyForce);
@@ -40453,6 +40579,7 @@
       updateSelectedRegionPanel(selectedRegionCode);
       readout.textContent = `Guerra concluída: ${blocks.length} bloco(s) de confronto.`;
       saveGame();
+      maybeAdvanceLevel2Guide();
       const centerWinner = getCenterConqueror();
       if (centerWinner && (!isOnlineGame() || onlineTeam === 'orange')) {
         finishGame(centerWinner, 'center');
@@ -40542,6 +40669,31 @@
     function getNeighborRegionCode(regionCode, direction) {
       if (!regionCode) return null;
       const geometry = regionGeometryByCode[regionCode];
+      if (currentBoardData?.boardType === 'mixed' && geometry?.shape === 'circular') {
+        const candidates = (getRegionNeighborSummary(regionCode).sameRank || [])
+          .filter((candidate) => {
+            const candidateGeometry = regionGeometryByCode[candidate];
+            return candidateGeometry?.shape === 'circular' &&
+              candidateGeometry.block === geometry.block;
+          });
+        const sourceBoundary = direction === 'left' ? geometry.startAngle : geometry.endAngle;
+        const boundaryError = (first, second) => {
+          const difference = ((first - second) % 360 + 360) % 360;
+          return Math.min(difference, 360 - difference);
+        };
+        return candidates
+          .map((candidate) => ({
+            code: candidate,
+            error: boundaryError(
+              direction === 'left'
+                ? regionGeometryByCode[candidate].endAngle
+                : regionGeometryByCode[candidate].startAngle,
+              sourceBoundary
+            )
+          }))
+          .filter((candidate) => candidate.error < 0.01)
+          .sort((first, second) => first.code.localeCompare(second.code))[0]?.code || null;
+      }
       if (geometry?.shape === 'quadrilateral') {
         const neighbors = getRegionNeighborSummary(regionCode).sameRank || [];
         const candidates = neighbors.filter((candidate) => getRegionLayer(candidate) === geometry.layer);
@@ -40583,7 +40735,8 @@
       if (sourceFinalPieces > sourceLimit) return [];
 
       const targets = [];
-      const candidateTargets = regionGeometryByCode[sourceCode]?.shape === 'quadrilateral'
+      const candidateTargets = currentBoardData?.boardType === 'mixed' ||
+        regionGeometryByCode[sourceCode]?.shape === 'quadrilateral'
         ? (regionNeighborCache[sourceCode]?.sameRank || [])
         : ['left', 'right'].map((direction) => getNeighborRegionCode(sourceCode, direction)).filter(Boolean);
       for (const targetCode of candidateTargets) {
@@ -40624,36 +40777,28 @@
     }
 
     function drawDragOverlay(targetCodes = []) {
-      if (!dragOverlayContext) return;
-      dragOverlayContext.clearRect(0, 0, 908, 908);
+      dragOverlayMaskHoles.replaceChildren();
+      dragOverlayTargets.replaceChildren();
+      dragOverlay.style.display = targetCodes.length ? '' : 'none';
       if (!targetCodes.length) return;
-      dragOverlayContext.fillStyle = 'rgba(0, 0, 0, .74)';
-      dragOverlayContext.fillRect(0, 0, 908, 908);
-      dragOverlayContext.globalCompositeOperation = 'destination-out';
+      const svgNamespace = 'http://www.w3.org/2000/svg';
       targetCodes.forEach((regionCode) => {
-        const match = String(regionCode).match(/^L(\d+)-(\d+)$/);
-        if (!match) return;
-        const layer = Number(match[1]);
-        const tiles = allRegionMasks?.[layer]?.[match[2]] || [];
-        const angle = ((rotations[layer - 1] || 0) * Math.PI) / 180;
-        const sin = Math.sin(angle);
-        const cos = Math.cos(angle);
-        tiles.forEach((key) => {
-          const [column, row] = key.split(',').map(Number);
-          const rawX = column * 4 + 2;
-          const rawY = row * 4 + 2;
-          const dx = rawX - 454;
-          const dy = rawY - 454;
-          const x = 454 + (dx * cos - dy * sin);
-          const y = 454 + (dx * sin + dy * cos);
-          dragOverlayContext.save();
-          dragOverlayContext.translate(x, y);
-          dragOverlayContext.rotate(angle);
-          dragOverlayContext.fillRect(-2, -2, 4, 4);
-          dragOverlayContext.restore();
-        });
+        const geometry = regionGeometryByCode[regionCode];
+        if (!geometry) return;
+        const pathData = getRegionFocusPathData(geometry);
+        const center = getRegionRotationCenter(regionCode);
+        const transform = `rotate(${getRegionVisualRotation(regionCode)} ${center.x} ${center.y})`;
+        const hole = document.createElementNS(svgNamespace, 'path');
+        hole.setAttribute('d', pathData);
+        hole.setAttribute('transform', transform);
+        dragOverlayMaskHoles.appendChild(hole);
+
+        const outline = document.createElementNS(svgNamespace, 'path');
+        outline.setAttribute('d', pathData);
+        outline.setAttribute('transform', transform);
+        outline.classList.add('drag-target-outline');
+        dragOverlayTargets.appendChild(outline);
       });
-      dragOverlayContext.globalCompositeOperation = 'source-over';
     }
 
     function findPieceAtPointer(clientX, clientY, sourceCode) {
@@ -40679,7 +40824,7 @@
       trashDropZone.classList.add('is-hidden');
       trashDropZone.classList.remove('is-visible', 'is-target');
       pieceDragState = null;
-      dragOverlayContext?.clearRect(0, 0, 908, 908);
+      drawDragOverlay();
     }
 
     function finishPieceDrag(clientX, clientY) {
@@ -40948,6 +41093,7 @@
       renderPiecePurchaseButtons();
       passTurnButton.disabled = !isLocalPlayersTurn() || isWarRunning || isGameOver || isAiTurnRunning;
       updateTurnPointsDisplay();
+      maybeAdvanceLevel2Guide();
     }
 
     function getRegionProbeBoxesForLayer(layerNumber, regionNumber) {
@@ -41099,6 +41245,66 @@
       return Math.sqrt(minimumSquaredDistance);
     }
 
+    function isPointInCircularRegion(geometry, x, y) {
+      const dx = x - geometry.centerX;
+      const dy = geometry.centerY - y;
+      const radius = Math.hypot(dx, dy);
+      if (radius < geometry.innerRadius - 3 || radius > geometry.outerRadius + 3) return false;
+      const span = geometry.endAngle - geometry.startAngle;
+      if (span >= 360) return true;
+      const rotation = getRegionVisualRotation(`L${geometry.layer}-${geometry.region}`) || 0;
+      const startAngle = ((geometry.startAngle - rotation) % 360 + 360) % 360;
+      const angle = ((Math.atan2(dy, dx) * 180 / Math.PI) % 360 + 360) % 360;
+      const relativeAngle = (angle - startAngle + 360) % 360;
+      return relativeAngle < span - 0.01;
+    }
+
+    function areCircularAndQuadrilateralRegionsNeighbors(circular, quadrilateral) {
+      if (circular?.shape !== 'circular' || quadrilateral?.shape !== 'quadrilateral') return null;
+      const pointInCell = (x, y, cell, tolerance = 2) =>
+        x >= cell.x - cell.width / 2 - tolerance &&
+        x <= cell.x + cell.width / 2 + tolerance &&
+        y >= cell.y - cell.height / 2 - tolerance &&
+        y <= cell.y + cell.height / 2 + tolerance;
+
+      for (const cell of quadrilateral.cells) {
+        const left = cell.x - cell.width / 2;
+        const right = cell.x + cell.width / 2;
+        const top = cell.y - cell.height / 2;
+        const bottom = cell.y + cell.height / 2;
+        for (let y = top; y <= bottom; y += 4) {
+          for (let x = left; x <= right; x += 4) {
+            if (isPointInCircularRegion(circular, x, y)) return true;
+          }
+          if (isPointInCircularRegion(circular, left, y) ||
+              isPointInCircularRegion(circular, right, y)) return true;
+        }
+        for (let x = left; x <= right; x += 4) {
+          if (isPointInCircularRegion(circular, x, top) ||
+              isPointInCircularRegion(circular, x, bottom)) return true;
+        }
+
+        const span = circular.endAngle - circular.startAngle;
+        const rotation = getRegionVisualRotation(`L${circular.layer}-${circular.region}`) || 0;
+        const startAngle = circular.startAngle - rotation;
+        const radialStep = 4;
+        const angleStep = 2;
+        const radialCount = Math.max(1, Math.ceil((circular.outerRadius - circular.innerRadius) / radialStep));
+        const angleCount = Math.max(1, Math.ceil(span / angleStep));
+        for (let radialIndex = 0; radialIndex <= radialCount; radialIndex += 1) {
+          const radius = circular.innerRadius +
+            (circular.outerRadius - circular.innerRadius) * radialIndex / radialCount;
+          for (let angleIndex = 0; angleIndex <= angleCount; angleIndex += 1) {
+            const angle = (startAngle + span * angleIndex / angleCount) * Math.PI / 180;
+            const x = circular.centerX + radius * Math.cos(angle);
+            const y = circular.centerY - radius * Math.sin(angle);
+            if (pointInCell(x, y, cell)) return true;
+          }
+        }
+      }
+      return false;
+    }
+
     function areQuadrilateralRegionsNeighbors(first, second) {
       const firstGeometry = regionGeometryByCode[first];
       const secondGeometry = regionGeometryByCode[second];
@@ -41114,6 +41320,11 @@
     function areRegionsNeighbors(first, second) {
       const quadrilateralResult = areQuadrilateralRegionsNeighbors(first, second);
       if (quadrilateralResult !== null) return quadrilateralResult;
+      const firstGeometry = regionGeometryByCode[first];
+      const secondGeometry = regionGeometryByCode[second];
+      const mixedBlockNeighbor = areCircularAndQuadrilateralRegionsNeighbors(firstGeometry, secondGeometry) ??
+        areCircularAndQuadrilateralRegionsNeighbors(secondGeometry, firstGeometry);
+      if (mixedBlockNeighbor !== null) return mixedBlockNeighbor;
       const distance = getCircularRegionDistance(first, second);
       if (distance !== null) return distance < 5;
 
@@ -41301,27 +41512,24 @@
 
     function getMoveAmountOptions(target) {
       const geometry = regionGeometryByCode[selectedRegionCode];
-      const neighbor = geometry?.shape === 'quadrilateral'
+      const usesDirectRegionTargets = currentBoardData?.boardType === 'mixed' ||
+        geometry?.shape === 'quadrilateral';
+      const neighbor = usesDirectRegionTargets
         ? target
         : getNeighborRegionCode(selectedRegionCode, target);
       if (!neighbor || !isRegionAvailableForTeam(neighbor, currentTeam)) return [];
-      if (geometry?.shape === 'quadrilateral' &&
+      if (usesDirectRegionTargets &&
           !(regionNeighborCache[selectedRegionCode]?.sameRank || []).includes(neighbor)) return [];
-      const available = getTeamSoldierCount(selectedRegionCode, currentTeam);
-      const layer = getRegionLayer(selectedRegionCode);
-      const costPerUnit = moveCostByLayer[layer] || 0;
-      const maxByPoints = costPerUnit ? Math.floor(pontosDoTurn[currentTeam] / costPerUnit) : 0;
-      const maxAmount = Math.min(
-        getMaxMovableSoldiers(currentTeam, selectedRegionCode, neighbor),
-        maxByPoints
-      );
+      const maxAmount = getMaxMovableSoldiers(currentTeam, selectedRegionCode, neighbor);
       return Object.entries(soldierWeights)
-        .filter(([, amount]) => amount <= maxAmount)
+        .filter(([, amount]) =>
+          amount <= maxAmount && canAfford(getMoveCost(selectedRegionCode, amount)))
         .sort((left, right) => left[1] - right[1]);
     }
 
     function openMoveModal() {
-      if (regionGeometryByCode[selectedRegionCode]?.shape === 'quadrilateral') {
+      if (currentBoardData?.boardType === 'mixed' ||
+          regionGeometryByCode[selectedRegionCode]?.shape === 'quadrilateral') {
         moveDirectionOptions.replaceChildren();
         (regionNeighborCache[selectedRegionCode]?.sameRank || [])
           .filter((code) => getRegionLayer(code) === getRegionLayer(selectedRegionCode))
@@ -41348,7 +41556,8 @@
 
     function renderMoveAmountOptions(target) {
       const options = getMoveAmountOptions(target);
-      const targetCode = regionGeometryByCode[selectedRegionCode]?.shape === 'quadrilateral'
+      const targetCode = currentBoardData?.boardType === 'mixed' ||
+        regionGeometryByCode[selectedRegionCode]?.shape === 'quadrilateral'
         ? target
         : getNeighborRegionCode(selectedRegionCode, target);
       moveDirectionOptions.classList.add('is-hidden');
@@ -41357,7 +41566,8 @@
       options.forEach(([stage, amount]) => {
         const button = document.createElement('button');
         button.type = 'button';
-        button.innerHTML = `<img src="${currentTeam === 'orange' ? 'peca_laranja' : 'peca_azul'}_${stage}.png" alt=""> ${stage.toUpperCase()} · ${amount}`;
+        const cost = getMoveCost(selectedRegionCode, amount);
+        button.innerHTML = `<img src="${currentTeam === 'orange' ? 'peca_laranja' : 'peca_azul'}_${stage}.png" alt=""> ${stage.toUpperCase()} · ${amount} · ${cost} moedas`;
         button.addEventListener('click', () => {
           closeModal(moveModal);
           performMoveTo(targetCode, amount);
@@ -41448,6 +41658,7 @@
     }
 
     function updateSelectedRegionPanel(regionCode = selectedRegionCode) {
+      updateBoardFocusOverlay();
       regionPanel.classList.remove('is-hidden');
       const code = regionCode || '-';
       const counts = regionCode ? (regionStats[regionCode] || { orange: 0, blue: 0 }) : { orange: 0, blue: 0 };
@@ -41477,6 +41688,9 @@
       const inferiorText = neighborSummary.inferior.length ? neighborSummary.inferior.join(', ') : 'nenhuma';
       const sameRankText = neighborSummary.sameRank.length ? neighborSummary.sameRank.join(', ') : 'nenhuma';
       regionName.textContent = code;
+      const rotationAvailable = isRegionInRotatableBlock(regionCode);
+      regionRotationIndicator.classList.toggle('is-hidden', !rotationAvailable);
+      regionRotationIndicator.setAttribute('aria-hidden', String(!rotationAvailable));
       regionLayerOrangeForce.textContent = formatStatisticsNumber(layerFinalForces.orange);
       regionLayerBlueForce.textContent = formatStatisticsNumber(layerFinalForces.blue);
       regionPieceCounts.textContent = `Peças: ${safeCounts.orange + safeCounts.blue}`;
@@ -41593,30 +41807,8 @@
       tag.setAttribute('aria-hidden', 'true');
       tag.style.left = `${point.x}%`;
       tag.style.top = `${point.y}%`;
-      if (actionFeedbackQueue.length + Number(!!activeActionFeedback) >= 3) {
-        if (activeActionFeedback) {
-          window.clearTimeout(actionFeedbackTimer);
-          activeActionFeedback.tag.remove();
-          activeActionFeedback = null;
-          actionFeedbackTimer = 0;
-        } else {
-          actionFeedbackQueue.shift();
-        }
-      }
-      actionFeedbackQueue.push({ tag });
-      showNextActionFeedback();
-    }
-
-    function showNextActionFeedback() {
-      if (activeActionFeedback || !actionFeedbackQueue.length) return;
-      activeActionFeedback = actionFeedbackQueue.shift();
-      stage.appendChild(activeActionFeedback.tag);
-      actionFeedbackTimer = window.setTimeout(() => {
-        activeActionFeedback?.tag.remove();
-        activeActionFeedback = null;
-        actionFeedbackTimer = 0;
-        showNextActionFeedback();
-      }, 1800);
+      stage.appendChild(tag);
+      window.setTimeout(() => tag.remove(), 1800);
     }
 
     function updateActiveRegions() {
@@ -41818,9 +42010,10 @@
           .reduce((total, quantity) => total + Number(quantity || 0), 0);
         const slots = getBalancedRegionSlots(regionCode, availableSlots, totalPieces);
         const layerNumber = getRegionLayer(regionCode);
-        const rotation = ((rotations[layerNumber - 1] || 0) * Math.PI) / 180;
+        const rotation = (getRegionVisualRotation(regionCode) * Math.PI) / 180;
         const sin = Math.sin(rotation);
         const cos = Math.cos(rotation);
+        const rotationCenter = getRegionRotationCenter(regionCode);
         let slotIndex = 0;
         const teamOrder = ['orange', 'blue'];
         const stageOrder = ['g', 'f', 'e', 'd', 'c', 'b', 'a'];
@@ -41831,10 +42024,10 @@
             for (let i = 0; i < quantity; i += 1) {
               const slot = slots[slotIndex] || slots[0];
               if (!slot) return;
-              const localX = (slot.x / 100) * 908 - 454;
-              const localY = (slot.y / 100) * 908 - 454;
-              const rotatedX = 454 + (localX * cos - localY * sin);
-              const rotatedY = 454 + (localX * sin + localY * cos);
+              const localX = (slot.x / 100) * 908 - rotationCenter.x;
+              const localY = (slot.y / 100) * 908 - rotationCenter.y;
+              const rotatedX = rotationCenter.x + (localX * cos - localY * sin);
+              const rotatedY = rotationCenter.y + (localX * sin + localY * cos);
               const pieceKey = `${regionCode}:${team}:${stage}:${i}`;
               let piece = existingPieces.get(pieceKey);
               if (!piece) {
@@ -41855,7 +42048,8 @@
               piece.alt = `Peça ${team === 'blue' ? 'azul' : 'laranja'} de nível ${stage.toUpperCase()} na região ${regionCode}`;
               piece.style.left = `${(rotatedX / 908) * 100}%`;
               piece.style.top = `${(rotatedY / 908) * 100}%`;
-              piece.style.transform = `translate(-50%,-50%) rotate(${rotations[layerNumber - 1] || 0}deg)`;
+              const visualRotation = getRegionVisualRotation(regionCode);
+              piece.style.transform = `translate(-50%,-50%) rotate(${visualRotation}deg)`;
               pieces.appendChild(piece);
               slotIndex += 1;
             }
@@ -41865,169 +42059,6 @@
       existingPieces.forEach((piece, key) => {
         if (!activeKeys.has(key)) piece.remove();
       });
-    }
-
-    function getBalancedRegionSlots(regionCode, slots, pieceCount) {
-      if (pieceCount <= 0 || !slots.length) return slots;
-      const center = getRegionPieceCenter(regionCode);
-      if (pieceCount === 1 && center) return [center];
-      if ((pieceCount !== 2 && pieceCount !== 3) || !center) {
-        return slots;
-      }
-
-      const layerNumber = getRegionLayer(regionCode);
-      const angle = ((rotations[layerNumber - 1] || 0) * Math.PI) / 180;
-      const sin = Math.sin(angle);
-      const cos = Math.cos(angle);
-      const match = String(regionCode).match(/^L\d+-(\d+)$/);
-      const tiles = match ? allRegionMasks?.[layerNumber]?.[match[1]] : null;
-      if (Array.isArray(tiles) && tiles.length) {
-        const points = tiles.map((key) => {
-          const [column, row] = key.split(',').map(Number);
-          const rawX = column * 4 + 2;
-          const rawY = row * 4 + 2;
-          const dx = rawX - 454;
-          const dy = rawY - 454;
-          return {
-            rawX,
-            rawY,
-            x: 454 + dx * cos - dy * sin,
-            y: 454 + dx * sin + dy * cos
-          };
-        });
-        const regionSet = new Set(points.map((point) =>
-          `${Math.round(point.x)},${Math.round(point.y)}`
-        ));
-        const panelWidth = stagePanel.getBoundingClientRect().width || 780;
-        const radius = Math.max(2, Math.min(3, Math.ceil((30 / panelWidth * 908 / 4 / 2))));
-        const rows = new Map();
-        points.forEach((point) => {
-          for (let y = Math.floor(point.y / 4) - radius; y <= Math.floor(point.y / 4) + radius; y += 1) {
-            for (let x = Math.floor(point.x / 4) - radius; x <= Math.floor(point.x / 4) + radius; x += 1) {
-              if (!regionSet.has(`${Math.round(x * 4 + 2)},${Math.round(y * 4 + 2)}`)) {
-                return;
-              }
-            }
-          }
-          const rowKey = Math.floor(point.y / 4);
-          if (!rows.has(rowKey)) rows.set(rowKey, []);
-          rows.get(rowKey).push(point);
-        });
-
-        const baseGap = (30 / panelWidth) * 100 * 1.2;
-        let bestRow = null;
-        let bestRowScore = Infinity;
-        rows.forEach((row) => {
-          if (row.length < pieceCount) return;
-          row.sort((first, second) => first.x - second.x);
-          const minX = row[0].x / 908 * 100;
-          const maxX = row[row.length - 1].x / 908 * 100;
-          const availableGap = (maxX - minX) / (pieceCount - 1);
-          const gap = Math.min(baseGap, availableGap * 0.8);
-          const occupiedWidth = gap * (pieceCount - 1);
-          const startX = Math.max(minX, Math.min(center.x - occupiedWidth / 2, maxX - occupiedWidth));
-          const targetXs = Array.from({ length: pieceCount }, (_, index) => startX + gap * index);
-          const selected = [];
-          targetXs.forEach((targetX) => {
-            const previous = selected[selected.length - 1];
-            const candidate = row.reduce((closest, point) => {
-              const pointX = point.x / 908 * 100;
-              if (previous && pointX <= previous.x / 908 * 100 + gap * 0.75) return closest;
-              if (!closest || Math.abs(pointX - targetX) < Math.abs(closest.x / 908 * 100 - targetX)) {
-                return point;
-              }
-              return closest;
-            }, null);
-            if (candidate) selected.push(candidate);
-          });
-          if (selected.length !== pieceCount) return;
-          const averageX = selected.reduce((total, point) => total + point.x / 908 * 100, 0) / pieceCount;
-          const averageY = selected.reduce((total, point) => total + point.y / 908 * 100, 0) / pieceCount;
-          const rowScore = ((averageY - center.y) ** 2) * 3 + ((averageX - center.x) ** 2) * 2
-            + ((baseGap - gap) ** 2);
-          if (rowScore < bestRowScore) {
-            bestRowScore = rowScore;
-            bestRow = selected.map((point) => ({
-              x: point.rawX / 908 * 100,
-              y: point.rawY / 908 * 100
-            }));
-          }
-        });
-        if (bestRow) return bestRow;
-      }
-      if (slots.length < pieceCount) return slots;
-
-      const positionedSlots = slots.map((slot) => {
-        const dx = (slot.x / 100) * 908 - 454;
-        const dy = (slot.y / 100) * 908 - 454;
-        return {
-          slot,
-          x: (454 + dx * cos - dy * sin) / 908 * 100,
-          y: (454 + dx * sin + dy * cos) / 908 * 100
-        };
-      });
-      const horizontalSpan = Math.max(...positionedSlots.map((point) => point.x))
-        - Math.min(...positionedSlots.map((point) => point.x));
-      const panelWidth = stagePanel.getBoundingClientRect().width || 780;
-      const desiredGap = Math.min(
-        (30 / panelWidth) * 100 * 1.2,
-        horizontalSpan / (pieceCount - 1) * 0.8
-      );
-      const minimumGap = desiredGap * 0.45;
-      let bestArrangement = positionedSlots.slice(0, pieceCount);
-      let bestScore = Infinity;
-      const evaluate = (arrangement) => {
-        const horizontalOrder = [...arrangement].sort((first, second) => first.x - second.x);
-        const average = horizontalOrder.reduce((sum, point) => ({
-          x: sum.x + point.x / horizontalOrder.length,
-          y: sum.y + point.y / horizontalOrder.length
-        }), { x: 0, y: 0 });
-        const gaps = horizontalOrder.slice(1).map((point, index) => point.x - horizontalOrder[index].x);
-        const verticalDeviation = horizontalOrder.reduce(
-          (total, point) => total + ((point.y - center.y) ** 2),
-          0
-        ) / horizontalOrder.length;
-        const centerDeviation = ((average.x - center.x) ** 2) + ((average.y - center.y) ** 2);
-        const spacingDeviation = gaps.reduce((total, gap) => total + ((gap - desiredGap) ** 2), 0);
-        const overlapPenalty = gaps.reduce(
-          (total, gap) => total + (Math.max(0, minimumGap - gap) ** 2) * 4,
-          0
-        );
-        const score = verticalDeviation * 3 + centerDeviation * 2
-          + spacingDeviation * 2 + overlapPenalty;
-        if (score < bestScore) {
-          bestScore = score;
-          bestArrangement = horizontalOrder;
-        }
-      };
-
-      for (let first = 0; first < positionedSlots.length; first += 1) {
-        for (let second = first + 1; second < positionedSlots.length; second += 1) {
-          if (pieceCount === 2) {
-            evaluate([positionedSlots[first], positionedSlots[second]]);
-            continue;
-          }
-          for (let third = second + 1; third < positionedSlots.length; third += 1) {
-            evaluate([positionedSlots[first], positionedSlots[second], positionedSlots[third]]);
-          }
-        }
-      }
-      return bestArrangement.map((point) => point.slot);
-    }
-
-    function getRegionPieceCenter(regionCode) {
-      const geometry = regionGeometryByCode[regionCode];
-      if (geometry?.shape !== 'quadrilateral' ||
-          !Number.isFinite(geometry.centerX) || !Number.isFinite(geometry.centerY)) {
-        return getRegionFocusPoint(regionCode);
-      }
-      const angle = ((rotations[getRegionLayer(regionCode) - 1] || 0) * Math.PI) / 180;
-      const dx = geometry.centerX - 454;
-      const dy = geometry.centerY - 454;
-      return {
-        x: (454 + dx * Math.cos(angle) - dy * Math.sin(angle)) / 908 * 100,
-        y: (454 + dx * Math.sin(angle) + dy * Math.cos(angle)) / 908 * 100
-      };
     }
 
     function rotationEasing(progress) {
@@ -42096,6 +42127,93 @@
           delete piece.dataset.rotationTargetTop;
           delete piece.dataset.rotationTargetTransform;
         });
+      };
+      window.requestAnimationFrame(animate);
+    }
+
+    function captureMixedCircularPiecePositions(layerNumber) {
+      return new Map(
+        [...pieces.querySelectorAll(`.piece[data-layer="${layerNumber}"]`)]
+          .filter((piece) => regionGeometryByCode[piece.dataset.region]?.shape === 'circular')
+          .map((piece) => [piece, {
+            x: parseFloat(piece.style.left) / 100 * 908,
+            y: parseFloat(piece.style.top) / 100 * 908,
+            transform: piece.style.transform
+          }])
+      );
+    }
+
+    function animateMixedCircularBlocks(layerNumber, startRotation, targetRotation, animationVersion, startPositions) {
+      const groups = [...(boardLayerElements.get(layerNumber)?.querySelectorAll('[data-circular-rotation-group]') || [])];
+      if (!groups.length) return;
+      mixedCircularRotationAngles.set(layerNumber, startRotation);
+      const startedAt = performance.now();
+      const duration = 3000;
+      const centers = groups.map((group) => ({
+        group,
+        x: Number(group.dataset.centerX),
+        y: Number(group.dataset.centerY),
+        block: group.dataset.circularRotationGroup
+      }));
+      const animatedPieces = [...pieces.querySelectorAll(`.piece[data-layer="${layerNumber}"]`)]
+        .filter((piece) => centers.some(({ block }) =>
+          regionGeometryByCode[piece.dataset.region]?.block === block && startPositions.has(piece)));
+      const piecePaths = animatedPieces.map((piece) => {
+        const geometry = regionGeometryByCode[piece.dataset.region];
+        const start = startPositions.get(piece);
+        return {
+          piece,
+          center: centers.find((item) => item.block === geometry.block),
+          startX: start.x,
+          startY: start.y,
+          targetLeft: piece.style.left,
+          targetTop: piece.style.top,
+          targetTransform: piece.style.transform
+        };
+      });
+      centers.forEach(({ group, x, y }) =>
+        group.setAttribute('transform', `rotate(${startRotation} ${x} ${y})`));
+      piecePaths.forEach(({ piece }) => {
+        const start = startPositions.get(piece);
+        piece.style.left = `${start.x / 908 * 100}%`;
+        piece.style.top = `${start.y / 908 * 100}%`;
+        piece.style.transform = start.transform ||
+          `translate(-50%,-50%) rotate(${startRotation}deg)`;
+      });
+      const animate = (now) => {
+        if (animationVersion !== rotationAnimationVersion) return;
+        const progress = Math.min(1, (now - startedAt) / duration);
+        const angle = startRotation + (targetRotation - startRotation) * rotationEasing(progress);
+        mixedCircularRotationAngles.set(layerNumber, angle);
+        centers.forEach(({ group, x, y }) => {
+          group.setAttribute('transform', `rotate(${angle} ${x} ${y})`);
+        });
+        const delta = (angle - startRotation) * Math.PI / 180;
+        const cosine = Math.cos(delta);
+        const sine = Math.sin(delta);
+        piecePaths.forEach(({ piece, center, startX, startY, targetLeft, targetTop, targetTransform }) => {
+          if (progress >= 1) {
+            piece.style.left = targetLeft;
+            piece.style.top = targetTop;
+            piece.style.transform = targetTransform;
+            return;
+          }
+          const dx = startX - center.x;
+          const dy = startY - center.y;
+          const x = center.x + dx * cosine - dy * sine;
+          const y = center.y + dx * sine + dy * cosine;
+          piece.style.left = `${x / 908 * 100}%`;
+          piece.style.top = `${y / 908 * 100}%`;
+          piece.style.transform =
+            `translate(-50%,-50%) rotate(${angle}deg)`;
+        });
+        updateBoardFocusOverlayTransforms(layerNumber);
+        if (progress < 1) {
+          window.requestAnimationFrame(animate);
+        } else {
+          mixedCircularRotationAngles.delete(layerNumber);
+          updateBoardFocusOverlay();
+        }
       };
       window.requestAnimationFrame(animate);
     }
@@ -42176,31 +42294,240 @@
       }
     }
 
-    function getRegionFocusPoint(regionCode) {
+    function getRegionRotationCenter(regionCode) {
+      const geometry = regionGeometryByCode[regionCode];
+      if (currentBoardData?.boardType === 'mixed' && geometry?.shape === 'circular') {
+        return { x: geometry.centerX, y: geometry.centerY };
+      }
+      return { x: 454, y: 454 };
+    }
+
+    function getRegionVisualRotation(regionCode) {
+      const geometry = regionGeometryByCode[regionCode];
+      if (!geometry) return 0;
+      const animatedRotation = mixedCircularRotationAngles.get(geometry.layer);
+      if (geometry.shape === 'circular' && Number.isFinite(animatedRotation)) {
+        return animatedRotation;
+      }
+      if (currentBoardData?.boardType === 'mixed' && geometry.shape === 'quadrilateral') {
+        const block = quadrilateralBoard?.blocks.find((item) => item.name === geometry.block);
+        if (block && !block.rotationEnabled) return 0;
+      }
+      return rotations[getRegionLayer(regionCode) - 1] || 0;
+    }
+
+    function getRegionFocusPoint(regionCode, applyRotation = true) {
       const match = String(regionCode || '').match(/^L(\d+)-(\d+)$/);
       if (!match || !allRegionMasks) return null;
       const layer = Number(match[1]);
       const region = match[2];
       const tiles = allRegionMasks[layer]?.[region];
       if (!Array.isArray(tiles) || !tiles.length) return null;
-      const center = 454;
-      const rotation = ((rotations[layer - 1] || 0) * Math.PI) / 180;
+      const rotation = applyRotation ? (getRegionVisualRotation(regionCode) * Math.PI) / 180 : 0;
       const sin = Math.sin(rotation);
       const cos = Math.cos(rotation);
+      const geometry = regionGeometryByCode[regionCode];
+      const rotationCenter = currentBoardData?.boardType === 'mixed' && geometry?.shape === 'circular'
+        ? { x: geometry.centerX, y: geometry.centerY }
+        : { x: 454, y: 454 };
       const point = tiles.reduce((sum, key) => {
         const [column, row] = key.split(',').map(Number);
         const rawX = column * 4 + 2;
         const rawY = row * 4 + 2;
-        const dx = rawX - center;
-        const dy = rawY - center;
-        sum.x += center + (dx * cos - dy * sin);
-        sum.y += center + (dx * sin + dy * cos);
+        const dx = rawX - rotationCenter.x;
+        const dy = rawY - rotationCenter.y;
+        sum.x += rotationCenter.x + (dx * cos - dy * sin);
+        sum.y += rotationCenter.y + (dx * sin + dy * cos);
         return sum;
       }, { x: 0, y: 0 });
       return {
         x: (point.x / tiles.length / 908) * 100,
         y: (point.y / tiles.length / 908) * 100
       };
+    }
+
+    function getRegionPieceCenter(regionCode) {
+      const geometry = regionGeometryByCode[regionCode];
+      if (geometry?.shape === 'circular') {
+        return getRegionFocusPoint(regionCode, currentBoardData?.boardType === 'mixed');
+      }
+      if (geometry?.shape !== 'quadrilateral' ||
+          !Number.isFinite(geometry.centerX) || !Number.isFinite(geometry.centerY)) {
+        return getRegionFocusPoint(regionCode);
+      }
+      const rotation = getRegionVisualRotation(regionCode);
+      const angle = (rotation * Math.PI) / 180;
+      const center = getRegionRotationCenter(regionCode);
+      const dx = geometry.centerX - center.x;
+      const dy = geometry.centerY - center.y;
+      return {
+        x: (center.x + dx * Math.cos(angle) - dy * Math.sin(angle)) / 908 * 100,
+        y: (center.y + dx * Math.sin(angle) + dy * Math.cos(angle)) / 908 * 100
+      };
+    }
+
+    function getBalancedRegionSlots(regionCode, slots, pieceCount) {
+      if (pieceCount <= 0 || !slots.length) return slots;
+      const slotCenter = getRegionPieceCenter(regionCode);
+      if (pieceCount === 1 && slotCenter) return [slotCenter];
+      if ((pieceCount !== 2 && pieceCount !== 3) || !slotCenter) return slots;
+
+      const geometry = regionGeometryByCode[regionCode];
+      if (pieceCount === 3 && currentBoardData?.boardType === 'mixed' &&
+          geometry?.shape === 'circular') {
+        const angle = (geometry.startAngle + geometry.endAngle) / 2 * Math.PI / 180;
+        const radialSpan = Math.max(0, geometry.outerRadius - geometry.innerRadius);
+        const innerRadius = geometry.innerRadius + radialSpan * 0.18;
+        const outerRadius = geometry.innerRadius + radialSpan * 0.62;
+        const angleOffset = Math.min(24, (geometry.endAngle - geometry.startAngle) * 0.28) * Math.PI / 180;
+        const positions = [
+          { radius: innerRadius, angle },
+          { radius: outerRadius, angle: angle - angleOffset },
+          { radius: outerRadius, angle: angle + angleOffset }
+        ];
+        return positions.map(({ radius, angle: pieceAngle }) => ({
+          x: (geometry.centerX + radius * Math.cos(pieceAngle)) / 908 * 100,
+          y: (geometry.centerY - radius * Math.sin(pieceAngle)) / 908 * 100
+        }));
+      }
+
+      const layerNumber = getRegionLayer(regionCode);
+      const isMixedCircular = currentBoardData?.boardType === 'mixed' &&
+        regionGeometryByCode[regionCode]?.shape === 'circular';
+      const angle = (isMixedCircular ? 0 : getRegionVisualRotation(regionCode)) * Math.PI / 180;
+      const sin = Math.sin(angle);
+      const cos = Math.cos(angle);
+      const match = String(regionCode).match(/^L\d+-(\d+)$/);
+      const tiles = match ? allRegionMasks?.[layerNumber]?.[match[1]] : null;
+      const center = regionGeometryByCode[regionCode]?.shape === 'circular'
+        && !isMixedCircular ? {
+          x: (454 + (slotCenter.x * 908 - 454) * cos - (slotCenter.y * 908 - 454) * sin) / 908,
+          y: (454 + (slotCenter.x * 908 - 454) * sin + (slotCenter.y * 908 - 454) * cos) / 908
+        }
+        : slotCenter;
+
+      if (regionGeometryByCode[regionCode]?.shape !== 'circular' &&
+          Array.isArray(tiles) && tiles.length) {
+        const points = tiles.map((key) => {
+          const [column, row] = key.split(',').map(Number);
+          const rawX = column * 4 + 2;
+          const rawY = row * 4 + 2;
+          const dx = rawX - 454;
+          const dy = rawY - 454;
+          return {
+            rawX,
+            rawY,
+            x: 454 + dx * cos - dy * sin,
+            y: 454 + dx * sin + dy * cos
+          };
+        });
+        const regionSet = new Set(points.map((point) => `${Math.round(point.x)},${Math.round(point.y)}`));
+        const panelWidth = stagePanel.getBoundingClientRect().width || 780;
+        const radius = Math.max(2, Math.min(3, Math.ceil(30 / panelWidth * 908 / 4 / 2)));
+        const rows = new Map();
+        points.forEach((point) => {
+          for (let y = Math.floor(point.y / 4) - radius; y <= Math.floor(point.y / 4) + radius; y += 1) {
+            for (let x = Math.floor(point.x / 4) - radius; x <= Math.floor(point.x / 4) + radius; x += 1) {
+              if (!regionSet.has(`${Math.round(x * 4 + 2)},${Math.round(y * 4 + 2)}`)) return;
+            }
+          }
+          const rowKey = Math.floor(point.y / 4);
+          if (!rows.has(rowKey)) rows.set(rowKey, []);
+          rows.get(rowKey).push(point);
+        });
+
+        const baseGap = 30 / panelWidth * 100 * 1.2;
+        let bestRow = null;
+        let bestRowScore = Number.POSITIVE_INFINITY;
+        rows.forEach((row) => {
+          if (row.length < pieceCount) return;
+          row.sort((first, second) => first.x - second.x);
+          const minX = row[0].x / 908 * 100;
+          const maxX = row[row.length - 1].x / 908 * 100;
+          const availableGap = (maxX - minX) / (pieceCount - 1);
+          const gap = Math.min(baseGap, availableGap * 0.8);
+          const occupiedWidth = gap * (pieceCount - 1);
+          const startX = Math.max(minX, Math.min(center.x - occupiedWidth / 2, maxX - occupiedWidth));
+          const targetXs = Array.from({ length: pieceCount }, (_, index) => startX + gap * index);
+          const selected = [];
+          targetXs.forEach((targetX) => {
+            const previous = selected[selected.length - 1];
+            const candidate = row.reduce((closest, point) => {
+              const pointX = point.x / 908 * 100;
+              if (previous && pointX <= previous.x / 908 * 100 + gap * 0.75) return closest;
+              if (!closest || Math.abs(pointX - targetX) < Math.abs(closest.x / 908 * 100 - targetX)) {
+                return point;
+              }
+              return closest;
+            }, null);
+            if (candidate) selected.push(candidate);
+          });
+          if (selected.length !== pieceCount) return;
+          const averageX = selected.reduce((total, point) => total + point.x / 908 * 100, 0) / pieceCount;
+          const averageY = selected.reduce((total, point) => total + point.y / 908 * 100, 0) / pieceCount;
+          const rowScore = (averageY - center.y) ** 2 * 3
+            + (averageX - center.x) ** 2 * 2 + (baseGap - gap) ** 2;
+          if (rowScore < bestRowScore) {
+            bestRowScore = rowScore;
+            bestRow = selected.map((point) => ({
+              x: point.rawX / 908 * 100,
+              y: point.rawY / 908 * 100
+            }));
+          }
+        });
+        if (bestRow) return bestRow;
+      }
+
+      if (slots.length < pieceCount) return slots;
+      const positionedSlots = slots.map((slot) => {
+        const dx = slot.x / 100 * 908 - 454;
+        const dy = slot.y / 100 * 908 - 454;
+        return {
+          slot,
+          x: (454 + dx * cos - dy * sin) / 908 * 100,
+          y: (454 + dx * sin + dy * cos) / 908 * 100
+        };
+      });
+      const horizontalSpan = Math.max(...positionedSlots.map((point) => point.x))
+        - Math.min(...positionedSlots.map((point) => point.x));
+      const panelWidth = stagePanel.getBoundingClientRect().width || 780;
+      const desiredGap = Math.min(30 / panelWidth * 100 * 1.2,
+        horizontalSpan / (pieceCount - 1) * 0.8);
+      const minimumGap = desiredGap * 0.45;
+      let bestArrangement = positionedSlots.slice(0, pieceCount);
+      let bestScore = Number.POSITIVE_INFINITY;
+      const evaluate = (arrangement) => {
+        const ordered = [...arrangement].sort((first, second) => first.x - second.x);
+        const average = ordered.reduce((sum, point) => ({
+          x: sum.x + point.x / ordered.length,
+          y: sum.y + point.y / ordered.length
+        }), { x: 0, y: 0 });
+        const gaps = ordered.slice(1).map((point, index) => point.x - ordered[index].x);
+        const verticalDeviation = ordered.reduce((total, point) =>
+          total + (point.y - center.y) ** 2, 0) / ordered.length;
+        const centerDeviation = (average.x - center.x) ** 2 + (average.y - center.y) ** 2;
+        const spacingDeviation = gaps.reduce((total, gap) => total + (gap - desiredGap) ** 2, 0);
+        const overlapPenalty = gaps.reduce((total, gap) =>
+          total + Math.max(0, minimumGap - gap) ** 2 * 4, 0);
+        const score = verticalDeviation * 3 + centerDeviation * 2
+          + spacingDeviation * 2 + overlapPenalty;
+        if (score < bestScore) {
+          bestScore = score;
+          bestArrangement = ordered;
+        }
+      };
+      for (let first = 0; first < positionedSlots.length; first += 1) {
+        for (let second = first + 1; second < positionedSlots.length; second += 1) {
+          if (pieceCount === 2) {
+            evaluate([positionedSlots[first], positionedSlots[second]]);
+            continue;
+          }
+          for (let third = second + 1; third < positionedSlots.length; third += 1) {
+            evaluate([positionedSlots[first], positionedSlots[second], positionedSlots[third]]);
+          }
+        }
+      }
+      return bestArrangement.map((point) => point.slot);
     }
 
     function updateStageZoom() {
@@ -42230,11 +42557,22 @@
     }
 
     function focusRegion(regionCode) {
+      updateBoardFocusOverlay();
       const point = getRegionFocusPoint(regionCode);
       if (!point) return;
       const layer = getRegionLayer(regionCode);
       const rect = stagePanel.getBoundingClientRect();
       const scale = 1.8;
+      if (currentBoardData?.boardType === 'mixed') {
+        stageZoom = scale;
+        stageZoomOffset = {
+          x: ((50 - point.x) / 100) * rect.width * scale,
+          y: ((50 - point.y) / 100) * rect.height * scale
+        };
+        focusedRegionCode = regionCode;
+        updateStageZoom();
+        return;
+      }
       const outerLayerFocus = { 5: 0.06, 6: 0.12, 7: 0.18, 8: 0.24 };
       const outwardBias = outerLayerFocus[layer] || 0;
       const radialX = point.x - 50;
@@ -42269,6 +42607,40 @@
       const layerOrder = Object.keys(allRegionMasks)
         .map(Number)
         .sort((a, b) => b - a);
+
+      if (currentBoardData?.boardType === 'mixed') {
+        const viewX = ((unzoomedX + rect.width / 2) / rect.width) * 908;
+        const viewY = ((unzoomedY + rect.height / 2) / rect.height) * 908;
+        for (const layer of layerOrder) {
+          const layerData = allRegionMasks[layer];
+          if (!layerData) continue;
+          const match = Object.keys(layerData).find((region) => {
+            const regionCode = `L${layer}-${region}`;
+            const geometry = regionGeometryByCode[regionCode];
+            if (!geometry) return false;
+            let pointX = viewX;
+            let pointY = viewY;
+            if (geometry.shape === 'circular') {
+              const angle = -getRegionVisualRotation(regionCode) * Math.PI / 180;
+              const dx = viewX - geometry.centerX;
+              const dy = viewY - geometry.centerY;
+              pointX = geometry.centerX + dx * Math.cos(angle) - dy * Math.sin(angle);
+              pointY = geometry.centerY + dx * Math.sin(angle) + dy * Math.cos(angle);
+            }
+            const tile = `${Math.floor(pointX / 4)},${Math.floor(pointY / 4)}`;
+            return (layerData[region] || []).includes(tile);
+          });
+          if (match) {
+            currentDebugLayer = layer;
+            regionMasks = layerData;
+            if (!debugCanvas.classList.contains('is-hidden')) drawRegionDebug();
+            document.querySelectorAll('.layer-button').forEach((button) =>
+              button.classList.toggle('is-active', Number(button.dataset.layer) === layer));
+            return `L${layer}-${match}`;
+          }
+        }
+        return null;
+      }
 
       for (const layer of layerOrder) {
         const rotation = ((rotations[layer - 1] || 0) * Math.PI) / 180;
@@ -42494,7 +42866,7 @@
     }
 
     function prepareQuadrilateralBoard(data) {
-      if (data?.boardType !== 'quadrilateral') return null;
+      if (!['quadrilateral', 'mixed'].includes(data?.boardType)) return null;
       if (!Array.isArray(data.blocks) || !data.blocks.length) {
         throw new Error('o tabuleiro quadricular não contém blocos');
       }
@@ -42507,6 +42879,23 @@
       let bottom = Number.NEGATIVE_INFINITY;
 
       data.blocks.forEach((block) => {
+        if (!block || block.type !== 'circular') return;
+        const center = block.center || {};
+        const radius = Math.max(0, ...(block.regions || []).map((region) =>
+          Number(region.geometry?.r2 ?? region.geometry?.outerRadius ?? region.r2 ?? region.outerRadius) || 0));
+        const centerX = Number(center.x);
+        const centerY = Number(center.y);
+        if (!Number.isFinite(centerX) || !Number.isFinite(centerY) || !radius) {
+          throw new Error(`geometria circular inválida no bloco ${block.name || ''}`);
+        }
+        left = Math.min(left, centerX - radius);
+        top = Math.min(top, centerY - radius);
+        right = Math.max(right, centerX + radius);
+        bottom = Math.max(bottom, centerY + radius);
+      });
+
+      data.blocks.forEach((block) => {
+        if (block?.type === 'circular') return;
         if (!block || block.type !== 'quadrilateral' || !Array.isArray(block.matrix)) {
           throw new Error('bloco quadricular inválido');
         }
@@ -42616,8 +43005,10 @@
         ? Math.min(2, Math.max(1, Number(data.displayScale)))
         : 1;
       const scale = Math.min(908 / (right - left), 908 / (bottom - top)) * displayScale;
-      const offsetX = (908 - (right - left) * scale) / 2 - left * scale;
-      const offsetY = (908 - (bottom - top) * scale) / 2 - top * scale;
+      const viewOffsetX = Number(data.viewOffset?.x) || 0;
+      const viewOffsetY = Number(data.viewOffset?.y) || 0;
+      const offsetX = (908 - (right - left) * scale) / 2 - left * scale + viewOffsetX;
+      const offsetY = (908 - (bottom - top) * scale) / 2 - top * scale + viewOffsetY;
       const matrices = {};
       const cellsByRegion = {};
       const cellOwners = {};
@@ -42683,16 +43074,34 @@
         };
       });
 
-      return { blocks, matrices, cellsByRegion, cellOwners, masks, geometry, campaign: data.campaign || null };
+      return {
+        blocks,
+        matrices,
+        cellsByRegion,
+        cellOwners,
+        masks,
+        geometry,
+        campaign: data.campaign || null,
+        scale,
+        offsetX,
+        offsetY,
+        tileColumns,
+        tileRows,
+        tileSize,
+        tileOffset
+      };
     }
 
     function normalizeImportedRegionMasks(data) {
       quadrilateralBoard = null;
-      if (data?.boardType === 'quadrilateral') {
+      if (['quadrilateral', 'mixed'].includes(data?.boardType)) {
         quadrilateralBoard = prepareQuadrilateralBoard(data);
-        return quadrilateralBoard.masks;
+        if (data.boardType === 'quadrilateral') return quadrilateralBoard.masks;
       }
-      const normalized = {};
+      const normalized = data?.boardType === 'mixed'
+        ? Object.fromEntries(Object.entries(quadrilateralBoard?.masks || {})
+          .map(([layer, regions]) => [layer, { ...regions }]))
+        : {};
       const addRegion = (layerKey, regionKey, regionValue) => {
         const layerName = String(layerKey);
         if (!normalized[layerName]) normalized[layerName] = {};
@@ -42747,8 +43156,8 @@
         const rasterizeCircularRegion = (region, block) => {
           const geometry = region.geometry || region;
           const center = geometry.center || region.center || block.center;
-          const innerRadius = Number(geometry.r1 ?? geometry.innerRadius);
-          const outerRadius = Number(geometry.r2 ?? geometry.outerRadius);
+          const innerRadius = Number(geometry.r1 ?? geometry.innerRadius) * (quadrilateralBoard?.scale || 1);
+          const outerRadius = Number(geometry.r2 ?? geometry.outerRadius) * (quadrilateralBoard?.scale || 1);
           const startAngle = Number(geometry.g1 ?? geometry.startAngle);
           const endAngle = Number(geometry.g2 ?? geometry.endAngle);
           const span = endAngle - startAngle;
@@ -42760,8 +43169,8 @@
             throw new Error(`geometria circular inválida para ${region.code || 'região'}`);
           }
 
-          const centerX = Number(center.x);
-          const centerY = Number(center.y);
+          const centerX = (quadrilateralBoard?.offsetX || 0) + Number(center.x) * (quadrilateralBoard?.scale || 1);
+          const centerY = (quadrilateralBoard?.offsetY || 0) + Number(center.y) * (quadrilateralBoard?.scale || 1);
           const tiles = [];
           for (let row = 0; row < tileRows; row += 1) {
             const y = row * tileSize + tileOffset;
@@ -42785,6 +43194,7 @@
 
         data.blocks.forEach((block) => {
           if (!block || typeof block !== 'object' || !Array.isArray(block.regions)) return;
+          if (block.type === 'quadrilateral' && quadrilateralBoard) return;
           block.regions.forEach((region) => {
             if (!region || typeof region !== 'object') return;
             const layerKey = region.layer ?? region.rank ?? (typeof region.code === 'string' ? region.code.match(/^L(\d+)/)?.[1] : null);
@@ -42828,11 +43238,14 @@
 
     function normalizeImportedRegionGeometry(data) {
       if (data?.boardType === 'quadrilateral') return quadrilateralBoard?.geometry || {};
-      const normalized = {};
+      const normalized = data?.boardType === 'mixed'
+        ? { ...(quadrilateralBoard?.geometry || {}) }
+        : {};
       if (!data || !Array.isArray(data.blocks)) return normalized;
 
       data.blocks.forEach((block) => {
         if (!block || typeof block !== 'object' || !Array.isArray(block.regions)) return;
+        if (block.type === 'quadrilateral' && data.boardType === 'mixed') return;
         const center = block.center || {};
         block.regions.forEach((region) => {
           if (!region || typeof region !== 'object') return;
@@ -42843,13 +43256,18 @@
           const code = region.code || region.name || `L${layer}-${regionNumber}`;
           const geometry = region.geometry || region;
           const regionCenter = geometry.center || region.center || center;
+          const boardScale = data.boardType === 'mixed' ? quadrilateralBoard?.scale || 1 : 1;
+          const boardOffsetX = data.boardType === 'mixed' ? quadrilateralBoard?.offsetX || 0 : 0;
+          const boardOffsetY = data.boardType === 'mixed' ? quadrilateralBoard?.offsetY || 0 : 0;
           const regionGeometry = {
+            shape: String(geometry.shape || region.shape || 'circular'),
             block: String(region.block || block.name || ''),
             layer,
-            centerX: Number(regionCenter.x),
-            centerY: Number(regionCenter.y),
-            innerRadius: Number(geometry.r1 ?? geometry.innerRadius),
-            outerRadius: Number(geometry.r2 ?? geometry.outerRadius),
+            region: regionNumber,
+            centerX: boardOffsetX + Number(regionCenter.x) * boardScale,
+            centerY: boardOffsetY + Number(regionCenter.y) * boardScale,
+            innerRadius: Number(geometry.r1 ?? geometry.innerRadius) * boardScale,
+            outerRadius: Number(geometry.r2 ?? geometry.outerRadius) * boardScale,
             startAngle: Number(geometry.g1 ?? geometry.startAngle),
             endAngle: Number(geometry.g2 ?? geometry.endAngle),
             maxPieces: Number(region.maxPieces)
@@ -42870,6 +43288,7 @@
           normalized[code] = {
             ...regionGeometry,
             farmProductionPerTurn: Number(region.farmProductionPerTurn) || 0,
+            bagCoins: Math.max(0, Number(region.bagCoins) || 0),
             initialPieces: Array.isArray(region.initialPieces) ? region.initialPieces.map((piece) => {
               if (!piece || !['orange', 'blue'].includes(piece.team) ||
                   !Object.prototype.hasOwnProperty.call(soldierWeights, piece.stage)) {
@@ -42983,39 +43402,6 @@
       }).join(' ');
     }
 
-    function appendCampaignBagIcon(layerElement, code, geometry, svgNamespace, iconScale) {
-      if (!geometry.bagCoins || campaignCollectedBags.includes(code)) return;
-      const icon = document.createElementNS(svgNamespace, 'g');
-      icon.setAttribute('transform', `translate(${geometry.centerX} ${geometry.centerY}) scale(${iconScale})`);
-      icon.setAttribute('pointer-events', 'none');
-      icon.dataset.region = code;
-      icon.setAttribute('aria-label', `Saco com ${geometry.bagCoins} moedas`);
-      const sack = document.createElementNS(svgNamespace, 'path');
-      sack.setAttribute('d', 'M-7 -11 Q0 -7 7 -11 L5 -5 Q12 1 10 9 Q8 15 0 15 Q-8 15 -10 9 Q-12 1 -5 -5 Z');
-      sack.setAttribute('fill', '#a56b31');
-      sack.setAttribute('stroke', '#54351f');
-      sack.setAttribute('stroke-width', '1.5');
-      icon.appendChild(sack);
-      const tie = document.createElementNS(svgNamespace, 'path');
-      tie.setAttribute('d', 'M-5 -6 Q0 -3 5 -6 M-3 -10 Q0 -7 3 -10');
-      tie.setAttribute('fill', 'none');
-      tie.setAttribute('stroke', '#f2d18a');
-      tie.setAttribute('stroke-width', '1.5');
-      icon.appendChild(tie);
-      const coin = document.createElementNS(svgNamespace, 'circle');
-      coin.setAttribute('cx', '0');
-      coin.setAttribute('cy', '5');
-      coin.setAttribute('r', '4');
-      coin.setAttribute('fill', '#f6d65b');
-      coin.setAttribute('stroke', '#805b1d');
-      coin.setAttribute('stroke-width', '1');
-      icon.appendChild(coin);
-      const title = document.createElementNS(svgNamespace, 'title');
-      title.textContent = `Saco em ${code}: ${geometry.bagCoins} moedas`;
-      icon.appendChild(title);
-      layerElement.appendChild(icon);
-    }
-
     function getRegionFocusPathData(geometry) {
       if (geometry.shape === 'quadrilateral') return getQuadrilateralRegionPath(geometry);
       const path = getCircularRegionPath(geometry);
@@ -43047,7 +43433,12 @@
         const geometry = regionGeometryByCode[regionCode];
         const path = document.createElementNS(svgNamespace, 'path');
         path.setAttribute('d', getRegionFocusPathData(geometry));
-        path.setAttribute('transform', `rotate(${rotations[geometry.layer - 1] || 0} 454 454)`);
+        path.dataset.regionCode = regionCode;
+        const rotationCenter = getRegionRotationCenter(regionCode);
+        path.setAttribute(
+          'transform',
+          `rotate(${getRegionVisualRotation(regionCode)} ${rotationCenter.x} ${rotationCenter.y})`
+        );
         boardFocusMaskHoles.appendChild(path);
       });
 
@@ -43055,9 +43446,11 @@
         const geometry = regionGeometryByCode[regionCode];
         const isWarRegion = warRegions.includes(regionCode);
         const pathData = getRegionFocusPathData(geometry);
-        const transform = `rotate(${rotations[geometry.layer - 1] || 0} 454 454)`;
+        const rotationCenter = getRegionRotationCenter(regionCode);
+        const transform = `rotate(${getRegionVisualRotation(regionCode)} ${rotationCenter.x} ${rotationCenter.y})`;
         const outerOutline = document.createElementNS(svgNamespace, 'path');
         outerOutline.setAttribute('d', pathData);
+        outerOutline.dataset.regionCode = regionCode;
         outerOutline.setAttribute('transform', transform);
         outerOutline.setAttribute(
           'class',
@@ -43067,6 +43460,7 @@
 
         const innerOutline = document.createElementNS(svgNamespace, 'path');
         innerOutline.setAttribute('d', pathData);
+        innerOutline.dataset.regionCode = regionCode;
         innerOutline.setAttribute('transform', transform);
         innerOutline.setAttribute(
           'class',
@@ -43074,6 +43468,62 @@
         );
         boardFocusOutlines.appendChild(innerOutline);
       });
+    }
+
+    function updateBoardFocusOverlayTransforms(layerNumber) {
+      [boardFocusMaskHoles, boardFocusOutlines].forEach((container) => {
+        [...container.children].forEach((path) => {
+          const regionCode = path.dataset.regionCode;
+          const geometry = regionGeometryByCode[regionCode];
+          if (!geometry || geometry.layer !== layerNumber) return;
+          const rotationCenter = getRegionRotationCenter(regionCode);
+          path.setAttribute(
+            'transform',
+            `rotate(${getRegionVisualRotation(regionCode)} ${rotationCenter.x} ${rotationCenter.y})`
+          );
+        });
+      });
+    }
+
+    function appendCampaignBagIcon(layerElement, code, geometry, svgNamespace, iconScale) {
+      if (!geometry.bagCoins || campaignCollectedBags.includes(code)) return;
+      const icon = document.createElementNS(svgNamespace, 'g');
+      const angle = ((geometry.startAngle + geometry.endAngle) / 2) * Math.PI / 180;
+      const radius = (geometry.innerRadius + geometry.outerRadius) / 2;
+      const centerX = geometry.shape === 'circular'
+        ? geometry.centerX + radius * Math.cos(angle)
+        : geometry.centerX;
+      const centerY = geometry.shape === 'circular'
+        ? geometry.centerY - radius * Math.sin(angle)
+        : geometry.centerY;
+      icon.setAttribute('transform', `translate(${centerX} ${centerY}) scale(${iconScale})`);
+      icon.setAttribute('pointer-events', 'none');
+      icon.dataset.region = code;
+      icon.setAttribute('aria-label', `Saco com ${geometry.bagCoins} moedas`);
+      const sack = document.createElementNS(svgNamespace, 'path');
+      sack.setAttribute('d', 'M-7 -11 Q0 -7 7 -11 L5 -5 Q12 1 10 9 Q8 15 0 15 Q-8 15 -10 9 Q-12 1 -5 -5 Z');
+      sack.setAttribute('fill', '#a56b31');
+      sack.setAttribute('stroke', '#54351f');
+      sack.setAttribute('stroke-width', '1.5');
+      icon.appendChild(sack);
+      const tie = document.createElementNS(svgNamespace, 'path');
+      tie.setAttribute('d', 'M-5 -6 Q0 -3 5 -6 M-3 -10 Q0 -7 3 -10');
+      tie.setAttribute('fill', 'none');
+      tie.setAttribute('stroke', '#f2d18a');
+      tie.setAttribute('stroke-width', '1.5');
+      icon.appendChild(tie);
+      const coin = document.createElementNS(svgNamespace, 'circle');
+      coin.setAttribute('cx', '0');
+      coin.setAttribute('cy', '5');
+      coin.setAttribute('r', '4');
+      coin.setAttribute('fill', '#f6d65b');
+      coin.setAttribute('stroke', '#805b1d');
+      coin.setAttribute('stroke-width', '1');
+      icon.appendChild(coin);
+      const title = document.createElementNS(svgNamespace, 'title');
+      title.textContent = `Saco em ${code}: ${geometry.bagCoins} moedas`;
+      icon.appendChild(title);
+      layerElement.appendChild(icon);
     }
 
     function renderBoardLayers() {
@@ -43085,6 +43535,27 @@
         const regions = Object.entries(regionGeometryByCode)
           .filter(([, geometry]) => geometry.layer === layer)
           .sort((left, right) => (left[1].startAngle || 0) - (right[1].startAngle || 0));
+        const circularGroups = new Map();
+        const getRegionRenderLayer = (geometry) => {
+          if (currentBoardData?.boardType !== 'mixed' || geometry.shape !== 'circular') {
+            return layerElement;
+          }
+          const key = geometry.block || `${geometry.centerX}:${geometry.centerY}`;
+          if (!circularGroups.has(key)) {
+            const group = document.createElementNS(svgNamespace, 'g');
+            const angle = rotations[layer - 1] || 0;
+            group.setAttribute(
+              'transform',
+              `rotate(${angle} ${geometry.centerX} ${geometry.centerY})`
+            );
+            group.dataset.circularRotationGroup = key;
+            group.dataset.centerX = String(geometry.centerX);
+            group.dataset.centerY = String(geometry.centerY);
+            layerElement.appendChild(group);
+            circularGroups.set(key, group);
+          }
+          return circularGroups.get(key);
+        };
 
         regions.forEach(([code, geometry]) => {
           const pathData = geometry.shape === 'quadrilateral'
@@ -43103,17 +43574,18 @@
           shape.setAttribute('stroke-width', '2');
           shape.setAttribute('vector-effect', 'non-scaling-stroke');
           shape.dataset.region = code;
-          layerElement.appendChild(shape);
+          getRegionRenderLayer(geometry).appendChild(shape);
         });
 
         regions.forEach(([code, geometry]) => {
+          const renderLayer = getRegionRenderLayer(geometry);
           if (geometry.shape === 'quadrilateral') {
-            appendCampaignBagIcon(layerElement, code, geometry, svgNamespace, iconScale);
+            appendCampaignBagIcon(renderLayer, code, geometry, svgNamespace, iconScale);
             return;
           }
           const production = Math.max(0, Number(geometry.farmProductionPerTurn) || 0);
           if (!production) {
-            appendCampaignBagIcon(layerElement, code, geometry, svgNamespace, iconScale);
+            appendCampaignBagIcon(renderLayer, code, geometry, svgNamespace, iconScale);
             return;
           }
           const tier = Math.max(1, Math.min(5, farmTiers.findIndex((value) => production <= value) + 1));
@@ -43166,8 +43638,8 @@
           const title = document.createElementNS(svgNamespace, 'title');
           title.textContent = `Fazenda em ${code}: ${formatStatisticsNumber(production)} trigo por turno`;
           icon.appendChild(title);
-          layerElement.appendChild(icon);
-          appendCampaignBagIcon(layerElement, code, geometry, svgNamespace, iconScale);
+          renderLayer.appendChild(icon);
+          appendCampaignBagIcon(renderLayer, code, geometry, svgNamespace, iconScale);
         });
       });
       updateBoardFocusOverlay();
@@ -43220,9 +43692,12 @@
       const nextCampaignBoardConfig = data?.campaign && typeof data.campaign === 'object'
         ? {
           ...data.campaign,
-          objectiveRegions: Object.entries(regionGeometryByCode)
-            .filter(([, geometry]) => geometry.initialPieces.some((piece) => piece.team === 'blue'))
-            .map(([code]) => code)
+          objectiveRegions: Array.isArray(data.campaign.objectiveRegions)
+            ? data.campaign.objectiveRegions.filter((code) =>
+              Object.prototype.hasOwnProperty.call(regionGeometryByCode, code))
+            : Object.entries(regionGeometryByCode)
+              .filter(([, geometry]) => geometry.initialPieces.some((piece) => piece.team === 'blue'))
+              .map(([code]) => code)
         }
         : null;
       if (nextCampaignBoardConfig?.id !== campaignBoardConfig?.id) campaignCollectedBags = [];
@@ -43405,6 +43880,50 @@
             finishIfCenterConquered();
             return;
           }
+          if (currentBoardData?.boardType === 'mixed' &&
+              Object.values(regionGeometryByCode).some((geometry) =>
+                geometry.layer === layerNumber && geometry.shape === 'circular')) {
+            resetStageZoom();
+            stagePanel.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            playRotationSound();
+            const rotationDelta = direction === 'left' ? -step : step;
+            const previousRotation = rotations[index];
+            const startingPiecePositions = captureMixedCircularPiecePositions(layerNumber);
+            rotations[index] += rotationDelta;
+            rotationAnimationVersion += 1;
+            hasRotatedThisTurn = true;
+            lastRotatedLayer = layerNumber;
+            lastRotatedBy = currentTeam;
+            rotationLockTurn = currentTurn + 1;
+            if (isCampaignLevelTwo() &&
+                ['level2-rotate', 'level2-rotate-again'].includes(campaignGuideStep)) {
+              hideCampaignGuide();
+              campaignGuideStep = 'await-circular';
+            }
+            updateRotationControls();
+            recomputeNeighborCacheForLayer(layerNumber);
+            recalculateRegionForces();
+            refreshRegionVisuals();
+            animateMixedCircularBlocks(
+              layerNumber,
+              previousRotation,
+              rotations[index],
+              rotationAnimationVersion,
+              startingPiecePositions
+            );
+            updateBoardFocusOverlay();
+            updateSelectedRegionPanel(selectedRegionCode);
+            updateReadout();
+            saveGame();
+            publishBluetoothAction({
+              type: 'rotate',
+              team: currentTeam,
+              layer: layerNumber,
+              direction
+            });
+            finishIfCenterConquered();
+            return;
+          }
           resetStageZoom();
           stagePanel.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
           playRotationSound();
@@ -43557,7 +44076,6 @@
       isGameOver = true;
       isGameStarted = false;
       abandonMatchButton.classList.add('is-hidden');
-      finalRestartCampaignButton.classList.toggle('is-hidden', !isCampaignGame());
       onlineSurrenderPending = false;
       confirmAbandonMatchButton.disabled = false;
       if (notifyOpponent && gameMode === 'bluetooth' && bluetoothConnected) {
@@ -43580,6 +44098,14 @@
       updateWarAvailability();
       passTurnButton.disabled = true;
       renderFinalSummary(winner, reason);
+      const nextLevelNumber = campaignNextLevelId
+        ? getCampaignLevelOrder().indexOf(campaignNextLevelId) + 1
+        : 0;
+      campaignNextLevelButton.classList.toggle('is-hidden', reason !== 'campaign' || !campaignNextLevelId);
+      finalRestartCampaignButton.classList.toggle('is-hidden', reason !== 'campaign');
+      if (campaignNextLevelId) {
+        campaignNextLevelButton.textContent = `Continuar para o Level ${nextLevelNumber}`;
+      }
       finalModal.classList.remove('is-hidden');
     }
 
@@ -43596,19 +44122,23 @@
           !campaignObjectiveRegions.every((regionCode) => getRegionDominador(regionCode) === 'orange')) {
         return false;
       }
+      campaignNextLevelId = unlockNextCampaignLevel(activeCampaignLevel.id);
       finishGame('orange', 'campaign');
       return true;
     }
 
-    async function failCampaignLevel(message = 'Você perdeu: era necessário concluir o level em seu único turno. O level será reiniciado.') {
+    async function failCampaignLevel() {
       if (!isCampaignGame() || campaignResetPending || isGameOver) return;
       campaignResetPending = true;
       const sessionVersion = gameSessionVersion;
-      isAiTurnRunning = false;
       isGameOver = true;
       isGameStarted = false;
+      isAiTurnRunning = false;
       localStorage.removeItem('will-of-many-save');
       passTurnButton.disabled = true;
+      const turnLimit = Math.max(1, Number(activeCampaignLevel?.turnLimit) || 1);
+      const turnWord = turnLimit === 1 ? 'turno' : 'turnos';
+      const message = `Você perdeu: tinha apenas ${turnLimit} ${turnWord} para concluir este level.`;
       readout.textContent = `${message} ${activeCampaignLevel.name} será reiniciado...`;
       campaignDefeatMessage.textContent = `${message} ${activeCampaignLevel.name} será reiniciado...`;
       campaignDefeat.classList.remove('is-hidden');
@@ -43617,7 +44147,8 @@
       if (sessionVersion === gameSessionVersion && isCampaignGame()) {
         campaignDefeat.classList.add('is-hidden');
         campaignDefeat.setAttribute('aria-hidden', 'true');
-        await restartCampaignLevel();
+        campaignResetPending = false;
+        await beginConfiguredGame();
       }
     }
 
@@ -43629,11 +44160,16 @@
         campaignIntroDismiss.focus({ preventScroll: true });
         return;
       }
-      if (isCampaignGame() && [
-        'coins', 'purchase', 'move', 'bag-tip', 'army-tip', 'war'
+      if (isCampaignLevelTwo() && [
+        'level2-intro', 'level2-rotate', 'level2-pass-turn',
+        'level2-rotate-again', 'level2-final-attack', 'level2-recycle'
       ].includes(campaignGuideStep)) {
         showCampaignGuide(campaignGuideStep);
+        return;
       }
+      if (isCampaignGame() && [
+        'coins', 'purchase', 'move', 'bag-tip', 'army-tip', 'war'
+      ].includes(campaignGuideStep)) showCampaignGuide(campaignGuideStep);
     }
 
     function dismissCampaignIntro() {
@@ -43642,9 +44178,7 @@
       campaignIntro.classList.add('is-hidden');
       campaignIntro.setAttribute('aria-hidden', 'true');
       campaignIntroDismiss.blur();
-      if (shouldContinueGuide) {
-        showCampaignGuide('coins');
-      }
+      if (shouldContinueGuide) showCampaignGuide('coins');
     }
 
     function getCampaignApproachRegion() {
@@ -43659,8 +44193,7 @@
             const path = queue.shift();
             const current = path[path.length - 1];
             if (current === target) return path.length > 1 ? path[path.length - 2] : null;
-            const neighbors = [...(regionNeighborCache[current]?.sameRank || [])].sort();
-            neighbors.forEach((neighbor) => {
+            [...(regionNeighborCache[current]?.sameRank || [])].sort().forEach((neighbor) => {
               if (visited.has(neighbor)) return;
               visited.add(neighbor);
               queue.push([...path, neighbor]);
@@ -43689,9 +44222,9 @@
       const approachRegion = getCampaignApproachRegion();
       const piecesInRegion = (regionCode) => [...pieces.querySelectorAll('.piece')]
         .filter((piece) => piece.dataset.region === regionCode && piece.dataset.team === 'orange');
+      const rotatableLayerButtons = [...document.querySelectorAll('.layer-button[data-layer="8"]')];
       switch (step) {
-        case 'coins':
-          return [turnPoints];
+        case 'coins': return [turnPoints];
         case 'purchase':
           return [
             document.querySelector('#piece-controls .piece-button[data-stage="g"]'),
@@ -43701,34 +44234,96 @@
           return [...piecesInRegion('L8-5'), getCampaignRegionShape('L8-4')].filter(Boolean);
         case 'bag-tip':
           return [turnPoints, getCampaignBagIcon('L8-3')].filter(Boolean);
-        case 'army-tip':
-          return [getCampaignRegionShape(approachRegion)].filter(Boolean);
+        case 'army-tip': return [getCampaignRegionShape(approachRegion)].filter(Boolean);
         case 'war':
           return [
             document.querySelector('#war-button'),
             getCampaignRegionShape(approachRegion),
             ...campaignObjectiveRegions.map(getCampaignRegionShape)
           ].filter(Boolean);
-        default:
-          return [];
+        case 'level2-rotate':
+          return [
+            ...['L8-6', 'L8-7', 'L8-8', 'L8-9'].map(getCampaignRegionShape),
+            regionName,
+            regionRotationIndicator,
+            ...rotatableLayerButtons
+          ].filter(Boolean);
+        case 'level2-pass-turn':
+          return [passTurnButton];
+        case 'level2-rotate-again':
+          return rotatableLayerButtons;
+        case 'level2-final-attack':
+          return [
+            getCampaignRegionShape('L8-3'),
+            getCampaignRegionShape('L8-10'),
+            document.querySelector('#war-button')
+          ].filter(Boolean);
+        case 'level2-recycle':
+          return [
+            getCampaignRegionShape('L8-3'),
+            getCampaignRegionShape('L8-10'),
+            trashDropZone
+          ].filter(Boolean);
+        default: return [];
       }
     }
 
     function updateCampaignGuideSpotlights() {
       if (campaignGuide.classList.contains('is-hidden')) return;
-      const targets = getCampaignGuideTargetElements(campaignGuideStep)
-        .filter((target) => {
-          if (!target || !target.getClientRects().length) return false;
-          const rect = target.getBoundingClientRect();
-          return rect.bottom > 0 && rect.top < window.innerHeight &&
-            rect.right > 0 && rect.left < window.innerWidth;
-        });
+      const targets = getCampaignGuideTargetElements(campaignGuideStep).filter((target) => {
+        if (!target || !target.getClientRects().length) return false;
+        const rect = target.getBoundingClientRect();
+        return rect.bottom > 0 && rect.top < window.innerHeight &&
+          rect.right > 0 && rect.left < window.innerWidth;
+      });
       campaignGuideSpotlights.replaceChildren();
       const width = campaignGuideShade.clientWidth;
       const height = campaignGuideShade.clientHeight;
       campaignGuideShade.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      campaignGuideShade.querySelector('.campaign-guide-region-outline')?.remove();
-      const holes = targets.map((target) => {
+      campaignGuideMask.setAttribute('x', '0');
+      campaignGuideMask.setAttribute('y', '0');
+      campaignGuideMask.setAttribute('width', String(width));
+      campaignGuideMask.setAttribute('height', String(height));
+      campaignGuideMaskBackground.setAttribute('width', String(width));
+      campaignGuideMaskBackground.setAttribute('height', String(height));
+      campaignGuideMaskHoles.replaceChildren();
+      campaignGuideRegionOutlines.replaceChildren();
+      const svgNamespace = 'http://www.w3.org/2000/svg';
+      const circularGuideTargets = new Map();
+      targets.forEach((target) => {
+        if (target.namespaceURI !== svgNamespace || target.tagName.toLowerCase() !== 'path') return;
+        const geometry = regionGeometryByCode[target.dataset.region];
+        if (geometry?.shape !== 'circular') return;
+        if (!circularGuideTargets.has(geometry.block)) circularGuideTargets.set(geometry.block, []);
+        circularGuideTargets.get(geometry.block).push({ target, geometry });
+      });
+      const fullCircularGuideBlocks = new Set();
+      circularGuideTargets.forEach((entries, blockName) => {
+        const block = currentBoardData?.blocks.find((item) => item.name === blockName);
+        if (block?.regions?.length && entries.length >= block.regions.length) {
+          fullCircularGuideBlocks.add(blockName);
+        }
+      });
+      targets.forEach((target) => {
+        if (target.namespaceURI === svgNamespace && target.tagName.toLowerCase() === 'path') {
+          const matrix = target.getScreenCTM();
+          const pathData = target.getAttribute('d');
+          if (!matrix || !pathData) return;
+          const transform = `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})`;
+          const hole = document.createElementNS(svgNamespace, 'path');
+          hole.setAttribute('d', pathData);
+          hole.setAttribute('transform', transform);
+          campaignGuideMaskHoles.appendChild(hole);
+          const geometry = regionGeometryByCode[target.dataset.region];
+          if (!geometry || !fullCircularGuideBlocks.has(geometry.block)) {
+            const outline = document.createElementNS(svgNamespace, 'path');
+            outline.setAttribute('d', pathData);
+            outline.setAttribute('transform', transform);
+            outline.classList.add('campaign-guide-region-outline');
+            campaignGuideRegionOutlines.appendChild(outline);
+          }
+          return;
+        }
         const rect = target.getBoundingClientRect();
         const padding = target === turnPoints || target.id === 'war-button' ? 8 : 6;
         const left = Math.max(0, rect.left - padding);
@@ -43742,12 +44337,35 @@
         outline.style.width = `${Math.max(1, right - left)}px`;
         outline.style.height = `${Math.max(1, bottom - top)}px`;
         campaignGuideSpotlights.appendChild(outline);
-        return `M${left} ${top}H${right}V${bottom}H${left}Z`;
+        const hole = document.createElementNS(svgNamespace, 'rect');
+        hole.setAttribute('x', String(left));
+        hole.setAttribute('y', String(top));
+        hole.setAttribute('width', String(Math.max(1, right - left)));
+        hole.setAttribute('height', String(Math.max(1, bottom - top)));
+        campaignGuideMaskHoles.appendChild(hole);
       });
-      campaignGuideShadePath.setAttribute(
-        'd',
-        [`M0 0H${width}V${height}H0Z`, ...holes].join('')
-      );
+      fullCircularGuideBlocks.forEach((blockName) => {
+        const entry = circularGuideTargets.get(blockName)?.[0];
+        if (!entry) return;
+        const { target, geometry } = entry;
+        const matrix = target.getScreenCTM();
+        if (!matrix) return;
+        const radius = geometry.outerRadius;
+        const path = [
+          `M ${geometry.centerX + radius} ${geometry.centerY}`,
+          `A ${radius} ${radius} 0 1 0 ${geometry.centerX - radius} ${geometry.centerY}`,
+          `A ${radius} ${radius} 0 1 0 ${geometry.centerX + radius} ${geometry.centerY}`
+        ].join(' ');
+        const outline = document.createElementNS(svgNamespace, 'path');
+        outline.setAttribute('d', path);
+        outline.setAttribute(
+          'transform',
+          `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})`
+        );
+        outline.classList.add('campaign-guide-region-outline');
+        campaignGuideRegionOutlines.appendChild(outline);
+      });
+      campaignGuideShadePath.setAttribute('d', `M0 0H${width}V${height}H0Z`);
       if (campaignGuideStep === 'bag-tip') {
         const regionShape = getCampaignRegionShape('L8-3');
         const matrix = regionShape?.getScreenCTM();
@@ -43757,17 +44375,16 @@
           outline.classList.add('campaign-guide-region-outline');
           outline.setAttribute('d', pathData);
           outline.setAttribute('transform', `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})`);
-          campaignGuideShade.appendChild(outline);
+          campaignGuideRegionOutlines.appendChild(outline);
         }
       }
       const targetRects = targets.map((target) => target.getBoundingClientRect());
-      const topCardBottom = campaignGuideCard.getBoundingClientRect().height + 28;
-      const bottomCardTop = height - topCardBottom;
-      const overlap = (top, bottom) => targetRects.reduce((total, rect) =>
-        total + Math.max(0, Math.min(rect.bottom, bottom) - Math.max(rect.top, top)), 0);
-      campaignGuideCard.dataset.position = overlap(12, topCardBottom) <= overlap(bottomCardTop, height - 12)
-        ? 'top'
-        : 'bottom';
+      const guideTop = campaignGuideCard.dataset.position === 'top';
+      if (!guideTop && targetRects.some((rect) => rect.bottom > height * 0.67)) {
+        campaignGuideCard.dataset.position = 'top';
+      } else if (guideTop && targetRects.every((rect) => rect.bottom < height * 0.6)) {
+        campaignGuideCard.removeAttribute('data-position');
+      }
     }
 
     function showCampaignGuide(step) {
@@ -43777,61 +44394,113 @@
         coins: {
           title: 'Suas moedas neste turno',
           message: `Você tem ${Number(pontosDoTurn.orange).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} moedas disponíveis para comprar unidades ou movê-las. As moedas não acumulam de um turno para o outro.`,
-          dismissible: true,
-          focus: null
+          dismissible: true
         },
         purchase: {
           title: 'Compre sua primeira unidade',
           message: 'Você controla L8-5. Toque no ícone da peça G para comprar uma unidade; ela custa 1 moeda.',
-          dismissible: false,
-          focus: 'L8-5'
+          dismissible: false
         },
         move: {
           title: 'Avance pelo tabuleiro',
           message: 'Toque nesta mensagem para voltar ao jogo. Depois, arraste a peça G de L8-5 para a região vizinha L8-4.',
-          dismissible: true,
-          focus: 'L8-5'
+          dismissible: true
         },
         'bag-tip': {
           title: 'Encontre mais moedas',
           message: 'Suas moedas estão acabando. Compre uma unidade G em L8-4 (1 moeda) e avance com uma das duas até L8-3 para pegar o saco com 3 moedas.',
-          dismissible: true,
-          focus: 'L8-3'
+          dismissible: true
         },
         'army-tip': {
           title: 'Prepare o avanço final',
           message: `Parabéns! Você encontrou as moedas. Faltam apenas duas regiões: reúna o máximo possível de soldados em ${approachRegion || 'L8-2'}, ao lado do inimigo.`,
-          dismissible: true,
-          focus: approachRegion
+          dismissible: true
         },
         war: {
           title: 'Declare Guerra',
           message: `Você tem pelo menos dois soldados em ${approachRegion || 'L8-2'}. Toque em Guerra para atacar os territórios inimigos vizinhos; vença com mais força para conquistá-los.`,
-          dismissible: false,
-          focus: null
+          dismissible: false
+        },
+        'level2-intro': {
+          title: 'Level 2: alcance L8-1',
+          message: 'Seu objetivo é conquistar a região L8-1. Você tem 5 turnos para alcançar esse objetivo. Toque nesta mensagem para voltar ao tabuleiro.',
+          dismissible: true
+        },
+        'level2-rotate': {
+          title: 'Atravesse o disco BC03',
+          message: 'O disco BC03 gira. O ícone ↻ ao lado do nome da região indica que ela faz parte de um disco rotativo. Use os controles para girar à direita ou à esquerda e encontrar um caminho até o outro lado sem enfrentar os inimigos.',
+          dismissible: false
+        },
+        'level2-pass-turn': {
+          title: 'Gire novamente no próximo turno',
+          message: 'Você já conquistou uma região do disco. Passe o turno para liberar outra rotação e continuar abrindo caminho.',
+          dismissible: false
+        },
+        'level2-rotate-again': {
+          title: 'Continue pelo disco',
+          message: 'Agora você pode girar o BC03 novamente. Escolha girar para a direita ou para a esquerda para alinhar o caminho com a próxima região.',
+          dismissible: false
+        },
+        'level2-final-attack': {
+          title: 'Prepare a conquista de L8-3',
+          message: 'Uma peça F vale 7 unidades G. Reúna pelo menos 8 unidades em L8-10 e declare Guerra para conquistar L8-3.',
+          dismissible: true
+        },
+        'level2-recycle': {
+          title: 'Recicle peças para avançar',
+          message: 'Ao arrastar uma peça para a lixeira, você recebe de volta metade do custo dela. Use essa estratégia entre L8-3 e L8-10 para reunir recursos e conquistar a região principal L8-1.',
+          dismissible: true
         }
       }[step];
       if (!guideContent) return;
       campaignGuideStep = step;
       campaignGuideDismissible = guideContent.dismissible;
+      if (step === 'level2-recycle') {
+        trashDropZone.classList.remove('is-hidden');
+        trashDropZone.classList.add('is-guide-visible');
+      }
       turnPoints.classList.toggle('is-guide-pinned', step === 'bag-tip');
       campaignGuideTitle.textContent = guideContent.title;
       campaignGuideMessage.textContent = guideContent.message;
       campaignGuideContinue.disabled = !guideContent.dismissible;
       campaignGuideHint.textContent = guideContent.dismissible
         ? 'Toque na mensagem para continuar'
-        : step === 'purchase' ? 'Compre a unidade destacada para continuar' : 'Toque no botão Guerra destacado';
+        : step === 'purchase' ? 'Compre a unidade destacada para continuar'
+          : step === 'level2-pass-turn' ? 'Passe o turno para continuar'
+            : ['level2-rotate', 'level2-rotate-again'].includes(step)
+              ? 'Gire BC03 para continuar'
+              : 'Toque no botão Guerra destacado';
+      campaignGuideCard.removeAttribute('data-position');
       campaignGuide.classList.remove('is-hidden');
+      app.classList.add('is-campaign-guiding');
       campaignGuide.setAttribute('aria-hidden', 'false');
-      if (guideContent.focus) focusRegion(guideContent.focus);
+      if (step === 'purchase') focusRegion('L8-5');
+      else if (step === 'coins') focusRegion('L8-5');
+      else if (step === 'bag-tip') focusRegion('L8-3');
+      else if (step === 'army-tip' && approachRegion) focusRegion(approachRegion);
+      else if (step === 'level2-rotate') {
+        selectedRegionCode = 'L8-7';
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegion('L8-7');
+      }
+      else if (step === 'level2-rotate-again') {
+        selectedRegionCode = campaignLevel2SeenSectors[campaignLevel2SeenSectors.length - 1] || 'L8-7';
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegion(selectedRegionCode);
+      }
+      else if (step === 'level2-final-attack' || step === 'level2-recycle') {
+        selectedRegionCode = 'L8-3';
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegion('L8-3');
+      }
       const primaryTarget = step === 'purchase'
         ? document.querySelector('#piece-controls .piece-button[data-stage="g"]')
         : step === 'coins' ? turnPoints
           : step === 'bag-tip' ? getCampaignBagIcon('L8-3')
-          : step === 'war' ? document.querySelector('#war-button')
-            : getCampaignGuideTargetElements(step)[0];
-      const guideTargets = getCampaignGuideTargetElements(step).filter((target) =>
-        target && target.getClientRects().length);
+            : step === 'war' ? document.querySelector('#war-button')
+              : getCampaignGuideTargetElements(step)[0];
+      const guideTargets = getCampaignGuideTargetElements(step)
+        .filter((target) => target && target.getClientRects().length);
       if (guideTargets.length) {
         const rects = guideTargets.map((target) => target.getBoundingClientRect());
         const bounds = {
@@ -43843,26 +44512,31 @@
           const center = (bounds.top + bounds.bottom) / 2;
           window.scrollTo(0, Math.max(0, Math.min(maxScroll,
             window.scrollY + center - window.innerHeight / 2)));
-        } else if (primaryTarget) {
-          primaryTarget.scrollIntoView({ block: 'center', inline: 'nearest' });
-        }
+        } else if (primaryTarget) primaryTarget.scrollIntoView({ block: 'center', inline: 'nearest' });
       }
       window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
         updateCampaignGuideSpotlights();
         const focusTarget = guideContent.dismissible ? campaignGuideContinue : primaryTarget;
         focusTarget?.focus?.({ preventScroll: true });
       }));
-      if (isGameStarted && !isGameOver) saveGame();
+      saveGame();
     }
 
     function hideCampaignGuide() {
+      const wasRecycleGuide = campaignGuideStep === 'level2-recycle';
       campaignGuide.classList.add('is-hidden');
+      app.classList.remove('is-campaign-guiding');
       campaignGuide.setAttribute('aria-hidden', 'true');
       turnPoints.classList.remove('is-guide-pinned');
       campaignGuideSpotlights.replaceChildren();
       campaignGuideContinue.blur();
       campaignGuideShadePath.setAttribute('d', '');
-      campaignGuideShade.querySelector('.campaign-guide-region-outline')?.remove();
+      campaignGuideMaskHoles.replaceChildren();
+      campaignGuideRegionOutlines.replaceChildren();
+      if (wasRecycleGuide) {
+        trashDropZone.classList.remove('is-guide-visible');
+        trashDropZone.classList.add('is-hidden');
+      }
     }
 
     function continueCampaignGuide() {
@@ -43874,19 +44548,39 @@
       const nextStep = {
         move: 'await-move',
         'bag-tip': 'await-bag',
-        'army-tip': 'await-army'
+        'army-tip': 'await-army',
+        'level2-intro': 'await-l84',
+        'level2-rotate': 'await-circular',
+        'level2-rotate-again': 'await-circular',
+        'level2-final-attack': 'await-l83',
+        'level2-recycle': 'await-l81'
       }[campaignGuideStep] || 'complete';
       hideCampaignGuide();
       campaignGuideStep = nextStep;
+      if (campaignGuideStep === 'await-l84') {
+        resetStageZoom();
+        focusStrongestRegionForTeam('orange');
+      }
       saveGame();
       if (nextStep === 'await-army') maybeShowCampaignWarGuide();
+      if (isCampaignLevelTwo()) maybeAdvanceLevel2Guide();
     }
 
     function isCampaignGuideActionAllowed(target, eventType) {
+      if ((campaignMenuButton.contains(target) || campaignRestartButton.contains(target)) &&
+          (eventType === 'pointerdown' || eventType === 'click')) return true;
       if (campaignGuideDismissible) return campaignGuideContinue.contains(target);
       if (campaignGuideStep === 'purchase') {
         const purchaseButton = document.querySelector('#piece-controls .piece-button[data-stage="g"]');
         return !!purchaseButton && purchaseButton.contains(target);
+      }
+      if (campaignGuideStep === 'level2-pass-turn') {
+        return passTurnButton.contains(target) &&
+          (eventType === 'pointerdown' || eventType === 'click');
+      }
+      if (['level2-rotate', 'level2-rotate-again'].includes(campaignGuideStep)) {
+        return target.closest?.('.layer-button[data-layer="8"]') != null &&
+          (eventType === 'pointerdown' || eventType === 'click');
       }
       return campaignGuideStep === 'war' && warButton.contains(target) &&
         (eventType === 'pointerdown' || eventType === 'click');
@@ -43900,14 +44594,43 @@
       showCampaignGuide('war');
     }
 
+    function maybeAdvanceLevel2Guide() {
+      if (!isCampaignLevelTwo() || isGameOver) return;
+      const orangeOwns = (code) => getRegionDominador(code) === 'orange';
+      if (campaignGuideStep === 'await-l84' && orangeOwns('L8-4')) {
+        showCampaignGuide('level2-rotate');
+        return;
+      }
+      if (campaignGuideStep === 'await-circular') {
+        const newlyConqueredSector = Object.entries(regionGeometryByCode)
+          .filter(([, geometry]) => geometry.shape === 'circular')
+          .map(([code]) => code)
+          .filter((code) => orangeOwns(code) && !campaignLevel2SeenSectors.includes(code));
+        if (newlyConqueredSector.length) {
+          campaignLevel2SeenSectors.push(...newlyConqueredSector);
+          showCampaignGuide('level2-pass-turn');
+          return;
+        }
+      }
+      if (campaignGuideStep === 'await-circular' && orangeOwns('L8-10')) {
+        showCampaignGuide('level2-final-attack');
+        return;
+      }
+      if (campaignGuideStep === 'await-l83' && orangeOwns('L8-3')) {
+        showCampaignGuide('level2-recycle');
+      }
+    }
+
     function returnCampaignToMenu() {
       if (!isCampaignGame()) return;
       gameSessionVersion += 1;
-      gameLaunchRequestVersion += 1;
       isGameStarted = false;
       isGameOver = true;
       isAiTurnRunning = false;
       isWarRunning = false;
+      warStatus.classList.add('is-hidden');
+      warSpotlightRegionCodes = [];
+      updateBoardFocusOverlay();
       campaignResetPending = false;
       campaignIntroPending = false;
       localStorage.removeItem('will-of-many-save');
@@ -43930,13 +44653,13 @@
     async function restartCampaignLevel() {
       if (!isCampaignGame()) return;
       gameSessionVersion += 1;
-      gameLaunchRequestVersion += 1;
       isGameStarted = false;
       isGameOver = true;
       isAiTurnRunning = false;
       isWarRunning = false;
       campaignResetPending = false;
       dismissCampaignIntro();
+      hideCampaignGuide();
       campaignDefeat.classList.add('is-hidden');
       campaignDefeat.setAttribute('aria-hidden', 'true');
       finalModal.classList.add('is-hidden');
@@ -43955,10 +44678,10 @@
       app.classList.remove('is-hidden');
       renderBoardLayers();
       abandonMatchButton.classList.toggle('is-hidden', !isOnlineGame() || !isGameStarted || isGameOver);
-      campaignActions.classList.toggle('is-hidden', !isCampaignGame() || !isGameStarted);
-      finalRestartCampaignButton.classList.add('is-hidden');
       updateWarAvailability();
       updateTurnPointsDisplay();
+      campaignActions.classList.toggle('is-hidden', !isCampaignGame() || !isGameStarted);
+      finalRestartCampaignButton.classList.add('is-hidden');
       focusStrongestRegionForTeam(currentTeam);
       updateSelectedRegionPanel(selectedRegionCode);
       updateTurnState();
@@ -44007,20 +44730,22 @@
     async function scheduleAiTurn() {
       if ((gameMode !== 'ai' && !isCampaignGame()) || !isGameStarted ||
           isGameOver || currentTeam !== aiTeam || isAiTurnRunning) return;
-      const sessionVersion = gameSessionVersion;
-      const isCurrentGame = () => sessionVersion === gameSessionVersion && isGameStarted && !isGameOver;
       isAiTurnRunning = true;
       passTurnButton.disabled = true;
+      if (isCampaignGame() && activeCampaignLevel.aiActionsEnabled === false) {
+        turnPlayer.textContent = 'Vez: azul · IA inativa';
+        isAiTurnRunning = false;
+        await passTurnToNextPlayer();
+        return;
+      }
       turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA pensando`;
       await waitForWarAnimation(650);
-      if (!isCurrentGame()) return;
       focusStrongestRegionForTeam(aiTeam);
       await waitForWarAnimation(700);
-      if (!isCurrentGame()) return;
 
       let actionCount = 0;
       let pendingAiFollowUp = null;
-      while (actionCount < 32 && pontosDoTurn[aiTeam] > 0 && isCurrentGame()) {
+      while (actionCount < 32 && pontosDoTurn[aiTeam] > 0 && !isGameOver) {
         const pointsBefore = pontosDoTurn[aiTeam];
         const snapshot = getGameSnapshot();
         snapshot.pendingAiFollowUp = pendingAiFollowUp;
@@ -44032,7 +44757,6 @@
         focusActionRegion(action.source, action.target);
         turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA: ${action.type}`;
         await waitForWarAnimation(500);
-        if (!isCurrentGame()) return;
         if (action.type === 'buy' && action.source) {
           pendingAiFollowUp = action.followUp || null;
           selectedRegionCode = action.source;
@@ -44056,11 +44780,10 @@
         }
         actionCount += 1;
         await waitForWarAnimation(850);
-        if (!isCurrentGame()) return;
         if (pontosDoTurn[aiTeam] >= pointsBefore && !recycleSucceeded) break;
       }
 
-      if (isCurrentGame() && !hasRotatedThisTurn) {
+      if (!isGameOver && !hasRotatedThisTurn) {
         let rotationButton = null;
         const suggested = window.WillOfManyAI?.chooseAction(getGameSnapshot());
         if (suggested?.type === 'rotate') {
@@ -44081,42 +44804,46 @@
         if (rotationButton) {
           focusActionRegion(selectedRegionCode);
           await waitForWarAnimation(500);
-          if (!isCurrentGame()) return;
           const rotationBefore = rotationAnimationVersion;
           turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA girando disco`;
           rotationButton.click();
           await waitForWarAnimation(3200);
-          if (!isCurrentGame()) return;
           if (rotationAnimationVersion === rotationBefore) {
             const retryButton = [...document.querySelectorAll('.layer-button')]
               .find((button) => !button.disabled && Number(button.dataset.layer) >= 2);
             if (retryButton) {
               retryButton.click();
               await waitForWarAnimation(3200);
-              if (!isCurrentGame()) return;
             }
           }
         }
       }
-      if (!isCurrentGame()) return;
       isAiTurnRunning = false;
-      await passTurnToNextPlayer();
+      if (!isGameOver) await passTurnToNextPlayer();
     }
 
     async function passTurnToNextPlayer() {
       if (isWarRunning || isGameOver || isAiTurnRunning || !isLocalPlayersTurn()) return;
-      passTurnButton.disabled = true;
-      if (isCampaignGame() && currentTeam === humanTeam) {
-        await failCampaignLevel('Você perdeu: tinha apenas 1 turno para concluir este level.');
-        return;
+      if (isCampaignLevelTwo() && campaignGuideStep === 'level2-pass-turn' &&
+          !campaignGuide.classList.contains('is-hidden')) {
+        hideCampaignGuide();
+        campaignGuideStep = 'await-next-rotation';
+        saveGame();
       }
+      passTurnButton.disabled = true;
       const roundResult = scoreCurrentRound();
       if (finishIfCenterConquered()) return;
+      const campaignTurnLimit = Number(activeCampaignLevel?.turnLimit);
+      if (isCampaignGame() && currentTeam === humanTeam &&
+          Number.isFinite(campaignTurnLimit) && campaignTurnLimit > 0 &&
+          currentTurn >= campaignTurnLimit * 2 - 1) {
+        await failCampaignLevel();
+        return;
+      }
       if (isCampaignGame() && currentTeam === aiTeam &&
-          currentTurn >= Number(activeCampaignLevel.turnLimit || 1) * 2) {
-        if (!finishCampaignIfObjectiveMet()) {
-          await failCampaignLevel('Você perdeu: tinha apenas 1 turno para concluir este level.');
-        }
+          Number.isFinite(campaignTurnLimit) && campaignTurnLimit > 0 &&
+          currentTurn >= campaignTurnLimit * 2) {
+        if (!finishCampaignIfObjectiveMet()) await failCampaignLevel();
         return;
       }
       currentTeam = currentTeam === 'orange' ? 'blue' : 'orange';
@@ -44127,7 +44854,7 @@
       hasRotatedThisTurn = false;
       updateRotationControls();
       pontosDoTurn[currentTeam] = isCampaignGame()
-        ? Number(activeCampaignLevel.coinsPerTurn) || 4
+        ? getCampaignCoinsPerTurn(activeCampaignLevel)
         : getTurnPointIncome(currentTurn);
       const wheatReport = isCampaignGame() ? null : applyWheatForTurn(currentTeam);
       renderPiecePurchaseButtons();
@@ -44158,6 +44885,10 @@
         return;
       }
       if ((gameMode === 'ai' || isCampaignGame()) && currentTeam === aiTeam) scheduleAiTurn();
+      if (isCampaignLevelTwo() && currentTeam === humanTeam &&
+          campaignGuideStep === 'await-next-rotation') {
+        showCampaignGuide('level2-rotate-again');
+      }
     }
 
     passTurnButton.addEventListener('click', passTurnToNextPlayer);
@@ -44360,6 +45091,7 @@
         amount
       });
       finishIfCenterConquered();
+      maybeAdvanceLevel2Guide();
       if (isCampaignGame() && currentTeam === 'orange' &&
           campaignGuideStep === 'await-move' && sourceCode === 'L8-5' && neighbor === 'L8-4') {
         showCampaignGuide('bag-tip');
@@ -44403,7 +45135,7 @@
     });
     debugExportButton.addEventListener('click', exportGameDebugLog);
     stage.addEventListener('pointerdown', (event) => {
-      if (isDebugModeActive() || isWarRunning) {
+      if (isDebugModeActive()) {
         event.stopPropagation();
         return;
       }
@@ -44411,14 +45143,12 @@
       const regionCode = resolveRegionFromPointer(event.clientX, event.clientY);
       if (!regionCode) {
         selectedRegionCode = null;
-        updateBoardFocusOverlay();
         updateSelectedRegionPanel();
         updateMobileRotationControls();
         return;
       }
       if (beginPieceDrag(event, regionCode)) return;
       selectedRegionCode = regionCode;
-      updateBoardFocusOverlay();
       updateSelectedRegionPanel(selectedRegionCode);
       updateMobileRotationControls();
       focusRegion(regionCode);
@@ -44487,7 +45217,6 @@
     }
 
     function isLocalPlayersTurn() {
-      if (isCampaignGame()) return isGameStarted && !campaignResetPending;
       if (isOnlineGame()) {
         return !!onlineSocket && onlineSocket.readyState === WebSocket.OPEN &&
           currentTeam === onlineTeam;
@@ -45290,7 +46019,10 @@
         }
         gameMode = button.dataset.mode;
         if (gameMode === 'online' || gameMode === 'campaign') selectedStartSpeed = '1';
-        if (gameMode === 'campaign') selectedStartColor = 'orange';
+        if (gameMode === 'campaign') {
+          selectedStartColor = 'orange';
+          selectedCampaignLevelId = getUnlockedCampaignLevelId();
+        }
         updateStartModeSelection();
         startMessage.textContent = gameMode === 'bluetooth' && !window.AndroidBluetooth
           ? 'O modo Bluetooth está disponível somente no aplicativo Android.'
@@ -45309,36 +46041,6 @@
 
     onlineMatchButton.addEventListener('click', enterOnlineQueue);
     onlineCancelButton.addEventListener('click', leaveOnlineQueue);
-    campaignMenuButton.addEventListener('click', returnCampaignToMenu);
-    campaignRestartButton.addEventListener('click', restartCampaignLevel);
-    finalRestartCampaignButton.addEventListener('click', restartCampaignLevel);
-    campaignIntroDismiss.addEventListener('click', dismissCampaignIntro);
-    campaignGuideContinue.addEventListener('click', continueCampaignGuide);
-    ['pointerdown', 'click'].forEach((eventType) => {
-      document.addEventListener(eventType, (event) => {
-        if (!isCampaignGame() || campaignGuide.classList.contains('is-hidden') ||
-            isCampaignGuideActionAllowed(event.target, eventType)) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }, true);
-    });
-    window.addEventListener('resize', updateCampaignGuideSpotlights);
-    window.addEventListener('scroll', () => {
-      if (!campaignGuide.classList.contains('is-hidden')) {
-        window.requestAnimationFrame(updateCampaignGuideSpotlights);
-      }
-    }, true);
-    stage.addEventListener('transitionend', (event) => {
-      if (event.target === stage && event.propertyName === 'transform' &&
-          !campaignGuide.classList.contains('is-hidden')) {
-        updateCampaignGuideSpotlights();
-      }
-    });
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && !campaignIntro.classList.contains('is-hidden')) {
-        dismissCampaignIntro();
-      }
-    });
     abandonMatchButton.addEventListener('click', () => {
       if (!isOnlineGame() || !isGameStarted || isGameOver || onlineSurrenderPending) return;
       abandonMatchModal.classList.remove('is-hidden');
@@ -45395,23 +46097,14 @@
     });
 
     async function beginConfiguredGame() {
-      const launchVersion = ++gameLaunchRequestVersion;
       if (gameMode === 'campaign') {
         try {
-          await loadBoardFile('tabuleiro-01.json');
+          await loadBoardFile(campaignLevelFiles[selectedCampaignLevelId] || campaignLevelFiles['tabuleiro-01']);
         } catch (error) {
           startMessage.textContent = `Não foi possível carregar o level da campanha: ${error.message}`;
           return;
         }
-      } else {
-        try {
-          await loadBoardFile('regioes-will-of-many-circular.json');
-        } catch (error) {
-          startMessage.textContent = `Não foi possível carregar o tabuleiro principal: ${error.message}`;
-          return;
-        }
       }
-      if (launchVersion !== gameLaunchRequestVersion) return;
       if ((gameMode === 'ai' && !selectedStartColor) ||
           (gameMode === 'campaign' && !campaignBoardConfig) ||
           (!selectedStartSpeed && !isOnlineGame()) || !allRegionMasks) {
@@ -45430,15 +46123,24 @@
       placeBoardInitialPieces();
       if (isCampaignGame()) {
         campaignObjectiveRegions = [...(activeCampaignLevel.objectiveRegions || [])];
-        campaignIntroPending = true;
-        campaignGuideStep = 'intro';
+        campaignIntroPending = activeCampaignLevel.id === 'tabuleiro-01';
+        campaignGuideStep = campaignIntroPending
+          ? 'intro'
+          : activeCampaignLevel.id === 'tabuleiro-02' ? 'level2-intro' : 'complete';
+        campaignLevel2SeenSectors = [];
         if (!campaignObjectiveRegions.length) {
           startMessage.textContent = 'O level da campanha não define regiões iniciais azuis para conquistar.';
           isGameStarted = false;
           return;
         }
-        pontosDoTurn.orange = Number(activeCampaignLevel.coinsPerTurn) || 4;
-        pontosDoTurn.blue = Number(activeCampaignLevel.coinsPerTurn) || 4;
+        const startingCoins = Number(activeCampaignLevel.initialCoins);
+        const campaignStartingBalance = Number.isFinite(startingCoins)
+          ? Math.max(0, startingCoins)
+          : getCampaignCoinsPerTurn(activeCampaignLevel);
+        pontosDoTurn.orange = campaignStartingBalance;
+        pontosDoTurn.blue = activeCampaignLevel.aiActionsEnabled === false
+          ? 0
+          : campaignStartingBalance;
       }
       renderBoardLayers();
       for (let layer = 1; layer <= 8; layer += 1) {
@@ -45497,8 +46199,11 @@
         return;
       }
       if (saved?.gameMode === 'campaign') {
+        selectedCampaignLevelId = campaignLevelFiles[saved.campaignLevelId]
+          ? saved.campaignLevelId
+          : getUnlockedCampaignLevelId();
         try {
-          await loadBoardFile('tabuleiro-01.json');
+          await loadBoardFile(campaignLevelFiles[selectedCampaignLevelId]);
         } catch (error) {
           startMessage.textContent = `Não foi possível carregar o level salvo: ${error.message}`;
           return;
@@ -45593,6 +46298,44 @@
       });
     });
     startGameButton.addEventListener('click', beginConfiguredGame);
+    campaignMenuButton.addEventListener('click', returnCampaignToMenu);
+    campaignRestartButton.addEventListener('click', restartCampaignLevel);
+    finalRestartCampaignButton.addEventListener('click', restartCampaignLevel);
+    campaignIntroDismiss.addEventListener('click', dismissCampaignIntro);
+    campaignGuideContinue.addEventListener('click', continueCampaignGuide);
+    ['pointerdown', 'click'].forEach((eventType) => {
+      document.addEventListener(eventType, (event) => {
+        if (!isCampaignGame() || campaignGuide.classList.contains('is-hidden') ||
+            isCampaignGuideActionAllowed(event.target, eventType)) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }, true);
+    });
+    window.addEventListener('resize', updateCampaignGuideSpotlights);
+    window.addEventListener('scroll', () => {
+      if (!campaignGuide.classList.contains('is-hidden')) {
+        window.requestAnimationFrame(updateCampaignGuideSpotlights);
+      }
+    }, true);
+    stage.addEventListener('transitionend', (event) => {
+      if (event.target === stage && event.propertyName === 'transform' &&
+          !campaignGuide.classList.contains('is-hidden')) {
+        updateCampaignGuideSpotlights();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !campaignIntro.classList.contains('is-hidden')) {
+        dismissCampaignIntro();
+      }
+    });
+    campaignNextLevelButton.addEventListener('click', async () => {
+      if (!campaignNextLevelId) return;
+      selectedCampaignLevelId = campaignNextLevelId;
+      gameMode = 'campaign';
+      finalModal.classList.add('is-hidden');
+      campaignNextLevelId = null;
+      await beginConfiguredGame();
+    });
     startBackButton.addEventListener('click', () => {
       if (window.AndroidBluetooth && bluetoothRole && !isGameStarted) {
         window.AndroidBluetooth.disconnect();
@@ -45604,11 +46347,10 @@
       startMessage.textContent = '';
     });
     finalMenuButton.addEventListener('click', () => {
-      gameSessionVersion += 1;
-      isGameStarted = false;
-      isGameOver = true;
-      isAiTurnRunning = false;
-      isWarRunning = false;
+      if (isCampaignGame()) {
+        returnCampaignToMenu();
+        return;
+      }
       if (window.AndroidBluetooth && bluetoothConnected) {
         window.AndroidBluetooth.disconnect();
       }
