@@ -35,6 +35,9 @@ dependencies {
 tasks.register("prepareWebAssets", Sync) {
     from(projectDir.parentFile.parentFile) {
         include("index.html")
+        include("game.css")
+        include("game-client.js")
+        include("game-rules.js")
         include("will-of-many-ai.js")
         include("*.png")
         include("*.json")

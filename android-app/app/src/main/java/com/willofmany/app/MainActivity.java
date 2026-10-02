@@ -175,7 +175,8 @@ public final class MainActivity extends Activity {
         @JavascriptInterface
         public String readGameAsset(String fileName) {
             if (!"regioes-will-of-many-circular.json".equals(fileName) &&
-                !"tabuleiro-01.json".equals(fileName)) {
+                !"tabuleiro-01.json".equals(fileName) &&
+                !"tabuleiro-02.json".equals(fileName)) {
                 Log.w(TAG, "Rejeitando arquivo de tabuleiro não permitido: " + fileName);
                 return "";
             }

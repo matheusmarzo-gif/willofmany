@@ -33,6 +33,9 @@ tasks.named("test") {
 tasks.named("processResources") {
     from(rootProject.projectDir.parentFile) {
         include "index.html"
+        include "game.css"
+        include "game-client.js"
+        include "game-rules.js"
         include "will-of-many-ai.js"
         include "*.png"
         include "*.svg"
