@@ -165,12 +165,7 @@
           "r2": 250,
           "g1": 135,
           "g2": 225,
-          "maxPieces": 8,
-          "initialPieces": [
-            {"team": "blue", "stage": "g"},
-            {"team": "blue", "stage": "g"},
-            {"team": "blue", "stage": "g"}
-          ]
+          "maxPieces": 8
         },
         {
           "name": "L8-8",
@@ -197,7 +192,12 @@
           "r2": 250,
           "g1": 315,
           "g2": 405,
-          "maxPieces": 8
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "blue", "stage": "g"},
+            {"team": "blue", "stage": "g"},
+            {"team": "blue", "stage": "g"}
+          ]
         }
       ]
     }

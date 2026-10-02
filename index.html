@@ -39393,6 +39393,8 @@
     dragOverlay.setAttribute('viewBox', '0 0 908 908');
     dragOverlay.setAttribute('aria-hidden', 'true');
     dragOverlay.style.display = 'none';
+    dragOverlay.style.overflow = 'visible';
+    const dragOverlayHeight = 1250;
     const dragOverlayDefs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
     const dragOverlayMask = document.createElementNS('http://www.w3.org/2000/svg', 'mask');
     dragOverlayMask.id = 'drag-overlay-mask';
@@ -39400,10 +39402,10 @@
     dragOverlayMask.setAttribute('x', '0');
     dragOverlayMask.setAttribute('y', '0');
     dragOverlayMask.setAttribute('width', '908');
-    dragOverlayMask.setAttribute('height', '908');
+    dragOverlayMask.setAttribute('height', String(dragOverlayHeight));
     const dragOverlayMaskBackground = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     dragOverlayMaskBackground.setAttribute('width', '908');
-    dragOverlayMaskBackground.setAttribute('height', '908');
+    dragOverlayMaskBackground.setAttribute('height', String(dragOverlayHeight));
     dragOverlayMaskBackground.setAttribute('fill', '#fff');
     const dragOverlayMaskHoles = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     dragOverlayMaskHoles.setAttribute('fill', '#000');
@@ -39412,7 +39414,7 @@
     dragOverlayDefs.appendChild(dragOverlayMask);
     const dragOverlayDim = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     dragOverlayDim.setAttribute('width', '908');
-    dragOverlayDim.setAttribute('height', '908');
+    dragOverlayDim.setAttribute('height', String(dragOverlayHeight));
     dragOverlayDim.setAttribute('fill', '#000');
     dragOverlayDim.setAttribute('fill-opacity', '.74');
     dragOverlayDim.setAttribute('mask', 'url(#drag-overlay-mask)');
@@ -44853,9 +44855,11 @@
       turnCreatedPieces = turnCreatedPieces.filter((piece) => piece.team !== currentTeam);
       hasRotatedThisTurn = false;
       updateRotationControls();
-      pontosDoTurn[currentTeam] = isCampaignGame()
-        ? getCampaignCoinsPerTurn(activeCampaignLevel)
-        : getTurnPointIncome(currentTurn);
+      if (!isCampaignLevelTwo()) {
+        pontosDoTurn[currentTeam] = isCampaignGame()
+          ? getCampaignCoinsPerTurn(activeCampaignLevel)
+          : getTurnPointIncome(currentTurn);
+      }
       const wheatReport = isCampaignGame() ? null : applyWheatForTurn(currentTeam);
       renderPiecePurchaseButtons();
       recalculateRegionForces();
