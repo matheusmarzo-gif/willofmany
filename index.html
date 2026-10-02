@@ -131,6 +131,7 @@
           <span class="turn-button-label">Abandonar partida</span>
         </button>
         <div class="campaign-actions is-hidden" id="campaign-actions">
+          <button id="campaign-undo-button" type="button" title="Desfazer o último movimento" disabled>Desfazer</button>
           <button id="campaign-menu-button" type="button">Retornar ao menu</button>
           <button id="campaign-restart-button" type="button">Reiniciar level</button>
         </div>
@@ -152,6 +153,9 @@
           <div class="pieces" id="pieces" aria-live="polite"></div>
           <svg class="board-focus-overlay" id="board-focus-overlay" viewBox="0 0 908 908" aria-hidden="true">
             <defs>
+              <marker id="quadrilateral-rotation-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M0 0 10 5 0 10Z" fill="#ffe49a"></path>
+              </marker>
               <mask id="board-focus-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="908" height="908">
                 <rect width="908" height="908" fill="#fff"></rect>
                 <g id="board-focus-mask-holes" fill="#000" fill-rule="evenodd"></g>
@@ -190,6 +194,8 @@
         <p class="region-technical" id="region-free-units">Unidades livres temporárias: 0</p>
         <p class="region-technical" id="region-dominator">Dominador: livre</p>
         <p id="region-neighbors">Vizinhos: —</p>
+        <button class="is-hidden" id="rotate-quadrilateral-block-button" type="button">GIRAR BLOCO</button>
+        <p class="region-rotation-help is-hidden" id="region-rotation-help" aria-live="polite"></p>
         <div class="region-move is-hidden" id="region-move-controls">
           <button type="button" id="open-move-button">Mover unidades</button>
         </div>

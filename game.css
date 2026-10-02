@@ -98,6 +98,22 @@
     .board-focus-outline.is-war-inner { stroke:#fff3a6; stroke-width:1.5px; }
     .board-focus-outline.is-selected-outer { stroke:#ef4dca; stroke-width:3px; filter:drop-shadow(0 0 3px rgba(239,77,202,.95)); }
     .board-focus-outline.is-selected-inner { stroke:#fff; stroke-width:1.5px; }
+    .region-rotation-overlay { pointer-events:none; }
+    .quadrilateral-rotation-cell { vector-effect:non-scaling-stroke; }
+    .quadrilateral-rotation-cell.is-occupied { fill:rgba(255,255,255,.24); stroke:#ffe49a; stroke-width:3px; filter:drop-shadow(0 0 5px rgba(255,228,154,.95)); }
+    .quadrilateral-rotation-cell.is-vacant { fill:rgba(255,255,255,.76); stroke:#a6a6a6; stroke-width:2px; stroke-dasharray:6 4; }
+    .quadrilateral-rotation-arrow { fill:none; stroke:#ffe49a; stroke-width:2.5px; stroke-linecap:round; stroke-dasharray:18 10; vector-effect:non-scaling-stroke; filter:drop-shadow(0 0 3px rgba(255,204,81,.9)); }
+    .quadrilateral-rotation-arrow.is-clockwise { animation:quadrilateral-rotation-cue-clockwise 2.2s linear infinite; }
+    .quadrilateral-rotation-arrow.is-anticlockwise { animation:quadrilateral-rotation-cue-anticlockwise 2.2s linear infinite; }
+    .region-rotation-overlay.is-rotating-clockwise .quadrilateral-rotation-arrow,
+    .region-rotation-overlay.is-rotating-anticlockwise .quadrilateral-rotation-arrow { animation:none; }
+    .region-rotation-overlay.is-rotating-clockwise .quadrilateral-rotation-arrow.is-clockwise { animation:quadrilateral-rotation-draw 0.75s ease-out both; }
+    .region-rotation-overlay.is-rotating-clockwise .quadrilateral-rotation-arrow.is-anticlockwise { opacity:0; }
+    .region-rotation-overlay.is-rotating-anticlockwise .quadrilateral-rotation-arrow.is-clockwise { opacity:0; }
+    .region-rotation-overlay.is-rotating-anticlockwise .quadrilateral-rotation-arrow.is-anticlockwise { animation:quadrilateral-rotation-draw 0.75s ease-out both; }
+    @keyframes quadrilateral-rotation-cue-clockwise { 0%,45% { opacity:1; stroke-dashoffset:0; } 50%,100% { opacity:0; stroke-dashoffset:-28; } }
+    @keyframes quadrilateral-rotation-cue-anticlockwise { 0%,45% { opacity:0; stroke-dashoffset:28; } 50%,100% { opacity:1; stroke-dashoffset:0; } }
+    @keyframes quadrilateral-rotation-draw { from { opacity:.35; stroke-dashoffset:64; } to { opacity:1; stroke-dashoffset:0; } }
     .app.is-campaign-guiding .board-focus-outline.is-selected-outer,
     .app.is-campaign-guiding .board-focus-outline.is-selected-inner { display:none; }
     .drag-target-outline { fill:rgba(85,190,132,.16); stroke:#75e0a2; stroke-width:5px; stroke-dasharray:10 6; vector-effect:non-scaling-stroke; filter:drop-shadow(0 0 5px rgba(40,160,95,.9)); }
@@ -143,6 +159,9 @@
     .region-rotation-indicator { display:inline-flex; width:20px; height:20px; margin-left:6px; align-items:center; justify-content:center; border:1px solid currentColor; border-radius:50%; color:#315d77; font-size:17px; line-height:1; vertical-align:middle; }
     .region-rotation-indicator.is-hidden { display:none; }
     .region-panel p { margin:0; color:var(--muted); font-size:12px; line-height:1.5; }
+    .region-panel #rotate-quadrilateral-block-button { width:100%; min-height:38px; margin-top:8px; padding:8px; color:#fffaf4; border-color:#315d77; background:#315d77; font-size:11px; font-weight:800; letter-spacing:.06em; }
+    .region-panel #rotate-quadrilateral-block-button:disabled { cursor:not-allowed; opacity:.48; }
+    .region-rotation-help { margin-top:5px !important; color:#315d77 !important; font-size:11px !important; font-weight:700; }
     .region-layer-forces { display:none; }
     .region-technical { display:none; }
     .turn-panel { width:min(100%, 280px); margin-top:22px; padding:12px 0; }
@@ -268,6 +287,8 @@
       .stage-panel { position:absolute; top:50%; left:50%; width:min(100vh,50vw); height:min(100vh,50vw); aspect-ratio:1; border:0; background:transparent; pointer-events:auto; transform:translate(-50%,-50%); }
       .stage-panel.is-focused { width:min(100vh,50vw); height:min(100vh,50vw); }
       .stage-panel-close { top:3px; right:3px; width:26px; height:26px; }
+      .region-panel #rotate-quadrilateral-block-button { min-height:32px; margin-top:3px; padding:5px; font-size:9px; }
+      .region-rotation-help { font-size:8px !important; }
       .piece { width:30px; height:30px; }
       .piece-controls { position:fixed; z-index:5; top:50%; right:0; bottom:auto; left:auto; display:flex; flex-direction:column; flex-wrap:nowrap; align-items:stretch; justify-content:center; width:min(25vw,210px); height:calc(100vh - 12px); min-height:0; margin:0; padding:8px max(48px,env(safe-area-inset-right)) 8px 8px; gap:6px; overflow-x:hidden; overflow-y:auto; background:rgba(247,244,237,.94); box-shadow:0 0 16px rgba(32,33,31,.14); pointer-events:auto; transform:translateY(-50%); }
       .piece-button { width:100%; min-width:0; min-height:38px; justify-content:flex-start; padding:4px 6px; font-size:9px; }
@@ -302,11 +323,9 @@
       #statistics-button { top:max(5px,env(safe-area-inset-top)); }
       #war-button { top:auto; bottom:max(5px,env(safe-area-inset-bottom)); }
       #pass-turn-button:disabled { cursor:not-allowed; }
-      .turn-panel .campaign-actions { position:fixed; z-index:11; right:25vw; bottom:24px; left:25vw; justify-content:center; pointer-events:auto; }
-      .turn-panel .campaign-actions button { position:static; width:min(180px,46%); min-height:34px; flex:0 1 180px; padding:6px; border-radius:4px; background:rgba(247,244,237,.96); box-shadow:0 3px 12px rgba(32,33,31,.2); pointer-events:auto; transform:none; }
-      .app.is-rotation-guide #rotate-picker-button { display:flex !important; width:auto; min-width:42px; gap:6px; padding:7px 10px; border-radius:8px; white-space:nowrap; }
-      .app.is-rotation-guide #rotate-picker-button .turn-button-label { position:static; width:auto; height:auto; overflow:visible; clip:auto; clip-path:none; font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
-      .rotation-picker-trigger { display:grid !important; }
+      .turn-panel .campaign-actions { position:fixed; z-index:11; right:4vw; bottom:24px; left:4vw; justify-content:center; gap:5px; pointer-events:auto; }
+      .turn-panel .campaign-actions button { position:static; width:min(140px,32%); min-height:34px; flex:1 1 0; padding:6px 3px; border-radius:4px; background:rgba(247,244,237,.96); box-shadow:0 3px 12px rgba(32,33,31,.2); pointer-events:auto; transform:none; }
+      .app.is-rotation-guide .region-panel #rotate-quadrilateral-block-button { box-shadow:0 0 0 3px rgba(243,198,107,.7),0 0 22px 5px rgba(255,218,127,.78); }
       .controls-label { display:none; }
       #controls { position:fixed; z-index:30; inset:0; display:none; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:center; width:100%; max-width:none; padding:46px 16px 16px; gap:8px; overflow:auto; background:rgba(24,24,22,.88); }
       #controls.is-rotation-picker-open { display:grid; }
@@ -327,4 +346,4 @@
     }
     .app.is-rotation-guide #controls { grid-template-columns:1fr; }
     .app.is-rotation-guide #controls .layer-controls:not([data-layer="8"]) { display:none !important; }
-    @media (prefers-reduced-motion:reduce) { .stage,.layer,.pieces,.debug-canvas,button { transition:none; } .board-focus-outline { animation:none; } }
+    @media (prefers-reduced-motion:reduce) { .stage,.layer,.pieces,.debug-canvas,button { transition:none; } .board-focus-outline,.quadrilateral-rotation-arrow { animation:none !important; } }

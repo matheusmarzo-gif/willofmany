@@ -96,6 +96,13 @@ test('circular board regions explicitly identify their independently rotating di
   assignments.forEach(([name, disco]) => {
     assert.equal(disco, name.split('-')[0], `${name} belongs to its layer disk`);
   });
+  assert.match(gameClient, /function getRotatableCircularDiskForRegion\(regionCode\)/);
+  assert.match(gameClient, /function focusCircularRotationDisk\(block, disco\)/);
+  assert.match(gameClient, /function updateCircularRotationOverlay\(svgNamespace\)/);
+  assert.match(gameClient, /rotateCircularDisk\(mode\.blockName, mode\.disco, mode\.direction, true\)/);
+  assert.match(gameClient, /function rotateCircularDisk\(blockName, disco, direction, keepDiskFocus = false\)/);
+  assert.match(gameClient, /mode\.direction = mode\.kind === 'circular'\s*\?\s*gesture\.angleTravel > 0 \? 'right' : 'left'\s*:\s*gesture\.angleTravel > 0 \? 'left' : 'right'/);
+  assert.match(gameClient, /activeRotationKind === 'circular' \? 'GIRAR DISCO' : 'GIRAR BLOCO'/);
 });
 
 test('Level 2 circular sector regions share the configured BC03 disk and preserve rotation', () => {
@@ -126,7 +133,29 @@ test('Level 3 board preserves its campaign rules and all configured block placem
   assert.match(gameClient, /const scale = Number\(currentBoardData\?\.regionFocusScale\) \|\| 1\.8;/);
   assert.match(gameClient, /function getRotatableQuadrilateralBlocks\(\)/);
   assert.match(gameClient, /function updateQuadrilateralRotationBlockPicker\(blocks\)/);
-  assert.match(gameClient, /function rotateQuadrilateralBlock\(blockName, direction\)/);
+  assert.match(gameClient, /function rotateQuadrilateralBlock\(blockName, direction(?:, keepBlockFocus = false)?\)/);
+  assert.match(html, /id="rotate-quadrilateral-block-button"[^>]*>GIRAR BLOCO/);
+  assert.match(gameClient, /function getQuadrilateralRotationCells\(block\)/);
+  assert.match(gameClient, /function beginQuadrilateralRotationGesture\(event\)/);
+  assert.match(gameClient, /Math\.PI \* 4 \/ 3/);
+});
+
+test('campaign supports turn movement undo, Level 3 resource defeat, and contextual rotation guidance', () => {
+  assert.match(html, /id="campaign-undo-button"/);
+  assert.match(gameClient, /function captureCampaignMoveUndo\(/);
+  assert.match(gameClient, /function undoLastCampaignMove\(/);
+  assert.match(gameClient, /campaignMoveUndoHistory: JSON\.parse\(JSON\.stringify\(campaignMoveUndoHistory\)\)/);
+  assert.match(gameClient, /function maybeShowLevelThreeResourceDefeat\(/);
+  assert.match(gameClient, /step !== 'level3-resource-defeat'/);
+  assert.match(gameClient, /title: 'Fim de jogo'[\s\S]*?não tem nenhuma peça F[\s\S]*?reiniciar o Level 3/);
+  assert.match(gameClient, /Toque em GIRAR DISCO no painel da região[\s\S]*?círculo anti-horário/);
+  assert.match(gameClient, /toque em GIRAR BLOCO no painel da região/);
+  assert.match(gameClient, /case 'level2-rotate':[\s\S]*?rotateQuadrilateralBlockButton/);
+  assert.match(gameClient, /case 'level3-region-labels':[\s\S]*?rotateQuadrilateralBlockButton/);
+  assert.match(gameClient, /mode\.direction = mode\.kind === 'circular'\s*\?\s*gesture\.angleTravel > 0 \? 'right' : 'left'\s*:\s*gesture\.angleTravel > 0 \? 'left' : 'right'/);
+  assert.match(gameClient, /focusRegion\(regionCode\)/);
+  assert.match(gameCss, /\.quadrilateral-rotation-cell\.is-vacant/);
+  assert.match(gameCss, /\.region-rotation-overlay\.is-rotating-clockwise/);
   assert.match(gameClient, /rotateQuadrilateralBlocksForLayer\(layerNumber, direction, blockName\)/);
   assert.match(gameClient, /`B\$\{Number\(blockNumber\)\}`/);
   assert.match(gameClient, /gameRules\.rotateQuadrilateralMatrix\(/);

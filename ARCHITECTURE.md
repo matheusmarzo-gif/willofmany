@@ -82,7 +82,8 @@ Para encontrar um ponto de entrada, use a busca do editor pelo nome da função:
 | Promoção e guerra | `refreshPromotionControls`, `startWar`, `recalculateRegionForces`, `updateWarAvailability` | Promoção, propriedade, força, guerra e condição de vitória são interdependentes. Em todos os tabuleiros, a guerra visita primeiro o maior rank (L1), seguindo em ordem decrescente do número de região dentro de cada rank; cada região pode participar de um único bloco por guerra. Cada bloco mantém sua animação antes de ser resolvido, e a marcação de participação é reiniciada no começo da próxima guerra. |
 | Rotação | `getRotatableCircularBlocks`, `getRotatableQuadrilateralBlocks`, `renderCircularRotationControls`, `rotateCircularDisk`, `rotateQuadrilateralBlock`, `rotateQuadrilateralMatrix` | Blocos circulares selecionam o bloco e o `disco`; cada bloco quadricular rotativo também é selecionado individualmente. A matriz gira seus anéis exteriores e internos recursivamente. |
 | Renderização do tabuleiro | `renderBoardLayers`, `refreshRegionVisuals`, `updateBoardFocusOverlay` | As regiões são desenhadas em SVG; peças são elementos separados sobre o tabuleiro. |
-| Campanha e guia | `beginConfiguredGame`, `showCampaignGuide`, `hideCampaignGuide`, `continueCampaignGuide`, `maybeAdvanceLevel2Guide`, `maybeAdvanceLevelThreeGuide` | O guia depende de eventos da partida e estados persistidos; no Level 3, a introdução percorre L8-1 → L8-16 → L8-1 em seis segundos. A mensagem sobre rótulos centraliza instantaneamente L8-1, redesenha tabuleiro/realces e usa essa região como exemplo. As duas mensagens não chamam `scrollIntoView` para SVGs ampliados: isso poderia rolar o conteúdo interno do painel e deslocar o tabuleiro/controle ×. As outras dicas avançam por ações do jogador. |
+| Campanha e guia | `beginConfiguredGame`, `showCampaignGuide`, `hideCampaignGuide`, `continueCampaignGuide`, `maybeAdvanceLevel2Guide`, `maybeAdvanceLevelThreeGuide`, `maybeShowLevelThreeResourceDefeat` | O guia depende de eventos da partida e estados persistidos; no Level 3, a introdução percorre L8-1 → L8-16 → L8-1 em seis segundos. A mensagem sobre rótulos centraliza instantaneamente L8-1 e indica o botão contextual de rotação do painel. Se o jogador ficar sem moedas e sem peças F no Level 3, o Agente exibe a derrota e reinicia o nível ao ser acionado. |
+| Desfazer movimento da campanha | `campaignMoveUndoHistory`, `captureCampaignMoveUndo`, `undoLastCampaignMove` | Registra snapshots das duas regiões, moedas, sacos coletados e progresso do guia para desfazer movimentos em ordem inversa no turno atual. As entradas são persistidas no save; compras, mudanças de composição, guerra e passagem de turno invalidam a pilha. |
 | Turno e IA | `passTurnToNextPlayer`, `scheduleAiTurn`, `getGameSnapshot` | A IA escolhe ações com um snapshot do estado; a aplicação das ações permanece no cliente. |
 | Salvamento e retomada | `saveGame`, `loadSavedGame`, `continueSavedGame` | Alterações no estado persistente precisam ser compatíveis com saves existentes. |
 | Bluetooth | `publishBluetoothAction`, `applyBluetoothAction` e mensagens tratadas em `MainActivity.java` | Cliente, ponte nativa e protocolo precisam continuar alinhados. |
@@ -117,6 +118,9 @@ acessam variáveis e elementos DOM declarados no mesmo script.
    aliados/inimigos ainda não participantes em blocos de conflito. O cliente
    anima e resolve cada bloco nessa ordem; a lista de participantes é local à
    guerra e começa vazia na próxima iteração.
+   Na campanha, movimentos do jogador mantêm snapshots por turno para desfazer
+   uma ação por vez; mudanças incompatíveis e a troca de turno limpam esses
+   snapshots. O save antigo continua válido sem a nova lista opcional.
 6. A rotação circular usa a identidade do bloco e o campo `disco` para mover as
    regiões do mesmo disco juntas; se houver mais de um bloco circular rotativo,
    o seletor pede primeiro o bloco. Geometria, peças e vizinhança são atualizadas
@@ -135,6 +139,17 @@ acessam variáveis e elementos DOM declarados no mesmo script.
    `regionFocusScale` para ampliar apenas a região em foco. No Level 3, o foco
    usa escala 5.2 e cada região quadricular dispõe até oito posições de peça em
    uma grade 4×2; os ícones mantêm 30 px visuais durante o zoom.
+   O painel da região oferece `GIRAR BLOCO` ou `GIRAR DISCO` para blocos
+   quadriculares e discos circulares rotativos. O cliente enquadra a área de
+   rotação e destaca as células e setores ocupados; posições quadriculares vazias
+   aparecem como células tracejadas. O gesto de círculo reconhece 240° ou mais.
+   Para discos circulares, um gesto horário gira à direita e um gesto
+   anti-horário à esquerda; para blocos quadriculares, mantém-se a associação
+   horária à esquerda e anti-horária à direita. O botão cancela o modo; o
+   fechamento da câmera retorna à visão global. Depois
+   da rotação, o foco volta à última região selecionada. Em áreas quadriculares
+   de tamanho ímpar, a célula central fica fora do destaque porque não participa
+   da rotação recursiva.
    Etiquetas temporárias de custo são posicionadas na camada do painel para
    manter o tamanho visual durante o zoom; a transição de turno do Level 3 dura
    metade do tempo padrão (1,75 s). Os contornos de foco e guerra usam traços
