@@ -9,6 +9,10 @@ const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const gameCss = fs.readFileSync(path.join(root, 'game.css'), 'utf8');
 const gameClient = fs.readFileSync(path.join(root, 'game-client.js'), 'utf8');
+const androidMainActivity = fs.readFileSync(
+  path.join(root, 'android-app', 'app', 'src', 'main', 'java', 'com', 'willofmany', 'app', 'MainActivity.java'),
+  'utf8'
+);
 const circularBoard = JSON.parse(fs.readFileSync(
   path.join(root, 'regioes-will-of-many-circular.json'),
   'utf8'
@@ -61,6 +65,8 @@ test('Android and server builds package all external client resources', () => {
   });
   assert.equal(serverGradle.includes('include "*.json"'), false,
     'server excludes unrelated and debug JSON files');
+  assert.match(androidMainActivity, /"tabuleiro-03\.json"\.equals\(fileName\)/,
+    'Android permits reading the Level 3 board asset');
 });
 
 test('new non-campaign games select the circular board configuration', () => {
