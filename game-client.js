@@ -1,11 +1,15 @@
     const stage = document.querySelector('#stage');
     const app = document.querySelector('.app');
+    app.classList.toggle('is-android-webview', !!window.AndroidBluetooth);
     const startScreen = document.querySelector('#start-screen');
     const startMenu = document.querySelector('#start-menu');
     const newGameOptions = document.querySelector('#new-game-options');
     const startMessage = document.querySelector('#start-message');
     const startGameButton = document.querySelector('#start-game-button');
     const startBackButton = document.querySelector('#start-back-button');
+    const campaignTrailScreen = document.querySelector('#campaign-trail-screen');
+    const campaignTrailLevels = document.querySelector('#campaign-trail-levels');
+    const campaignTrailBackButton = document.querySelector('#campaign-trail-back');
     const tutorialModal = document.querySelector('#tutorial-modal');
     const tutorialOpenButton = document.querySelector('#tutorial-open-button');
     const tutorialCloseButton = document.querySelector('#tutorial-close-button');
@@ -34,9 +38,14 @@
     const onlineCancelButton = document.querySelector('#online-cancel-button');
     const finalModal = document.querySelector('#final-modal');
     const finalSummary = document.querySelector('#final-summary');
+    const campaignVictoryModal = document.querySelector('#campaign-victory-modal');
+    const campaignVictoryMessage = document.querySelector('#campaign-victory-message');
     const campaignNextLevelButton = document.querySelector('#campaign-next-level-button');
+    const campaignVictoryMenuButton = document.querySelector('#campaign-victory-menu-button');
     const finalMenuButton = document.querySelector('#final-menu-button');
-    const finalRestartCampaignButton = document.querySelector('#final-restart-campaign-button');
+    const gameMenuTrigger = document.querySelector('#game-menu-trigger');
+    const gameMenu = document.querySelector('#game-menu');
+    const gameMenuResignButton = document.querySelector('#game-menu-resign-button');
     const campaignActions = document.querySelector('#campaign-actions');
     const campaignUndoButton = document.querySelector('#campaign-undo-button');
     const campaignMenuButton = document.querySelector('#campaign-menu-button');
@@ -112,8 +121,6 @@
     const openPromotionButton = document.querySelector('#open-promotion-button');
     const openRelegationButton = document.querySelector('#open-relegation-button');
     const passTurnButton = document.querySelector('#pass-turn-button');
-    const rotatePickerButton = document.querySelector('#rotate-picker-button');
-    const rotationPickerClose = document.querySelector('#rotation-picker-close');
     const turnTransition = document.querySelector('#turn-transition');
     const turnTransitionMessage = document.querySelector('#turn-transition-message');
     const moveModal = document.querySelector('#move-modal');
@@ -222,7 +229,9 @@
     const campaignLevelFiles = {
       'tabuleiro-01': 'tabuleiro-01.json',
       'tabuleiro-02': 'tabuleiro-02.json',
-      'tabuleiro-03': 'tabuleiro-03.json'
+      'tabuleiro-03': 'tabuleiro-03.json',
+      'tabuleiro-04': 'tabuleiro-04.json',
+      'tabuleiro-05': 'tabuleiro-05.json'
     };
     const levelThreeRegionCodeMigration = {
       'L8-8': 'L8-10',
@@ -330,8 +339,58 @@
       return nextLevelId;
     }
 
-    function getCampaignCoinsPerTurn(level) {
+    function getCampaignTrailPosition(index) {
+      const positions = [
+        [16, 78], [49, 54], [78, 38], [89, 59], [74, 79], [51, 84],
+        [32, 68], [21, 46], [39, 30], [63, 24], [83, 15], [92, 40]
+      ];
+      if (index < positions.length) return positions[index];
+      const extraIndex = index - positions.length;
+      return [10 + ((extraIndex * 17) % 80), 20 + ((extraIndex * 23) % 62)];
+    }
+
+    function renderCampaignTrail() {
+      const levels = getCampaignLevelOrder();
+      const unlockedThrough = levels.indexOf(getUnlockedCampaignLevelId());
+      campaignTrailLevels.replaceChildren();
+      levels.forEach((levelId, index) => {
+        const button = document.createElement('button');
+        const isUnlocked = index <= unlockedThrough;
+        button.type = 'button';
+        button.className = `campaign-trail-level${isUnlocked ? '' : ' is-locked'}${index === unlockedThrough ? ' is-current' : ''}`;
+        button.dataset.levelId = levelId;
+        button.textContent = `L${index + 1}`;
+        button.setAttribute('aria-label', isUnlocked
+          ? `Iniciar Level ${index + 1}`
+          : `Level ${index + 1} bloqueado`);
+        button.title = isUnlocked ? `Iniciar Level ${index + 1}` : 'Conclua o level anterior para desbloquear';
+        button.disabled = !isUnlocked;
+        const [left, top] = getCampaignTrailPosition(index);
+        button.style.left = `${left}%`;
+        button.style.top = `${top}%`;
+        campaignTrailLevels.appendChild(button);
+      });
+    }
+
+    function showCampaignTrail() {
+      selectedCampaignLevelId = getUnlockedCampaignLevelId();
+      renderCampaignTrail();
+      newGameOptions.classList.add('is-hidden');
+      campaignTrailScreen.classList.remove('is-hidden');
+      startMessage.textContent = '';
+      campaignTrailBackButton.focus({ preventScroll: true });
+    }
+
+    function hideCampaignTrail() {
+      campaignTrailScreen.classList.add('is-hidden');
+      newGameOptions.classList.remove('is-hidden');
+      startBackButton.focus({ preventScroll: true });
+    }
+
+    function getCampaignCoinsPerTurn(level, turn = currentTurn) {
       const coinsPerTurn = Number(level?.coinsPerTurn);
+      const zeroIncomeAtTurn = Number(level?.coinsPerTurnStopAtTurn);
+      if (Number.isFinite(zeroIncomeAtTurn) && turn >= zeroIncomeAtTurn) return 0;
       return Number.isFinite(coinsPerTurn) ? Math.max(0, coinsPerTurn) : 4;
     }
 
@@ -409,8 +468,12 @@
       campaignIntro.setAttribute('aria-hidden', 'true');
       campaignGuide.classList.add('is-hidden');
       campaignGuide.setAttribute('aria-hidden', 'true');
+      campaignVictoryModal.classList.add('is-hidden');
+      campaignVictoryModal.setAttribute('aria-hidden', 'true');
       campaignGuideSpotlights.replaceChildren();
       turnPoints.classList.remove('is-guide-pinned');
+      gameMenu.classList.add('is-hidden');
+      gameMenu.setAttribute('aria-hidden', 'true');
       updateBoardFocusOverlay();
       campaignDefeat.classList.add('is-hidden');
       campaignDefeat.setAttribute('aria-hidden', 'true');
@@ -513,7 +576,13 @@
           'level2-recycle', 'await-l81',
           'level3-intro', 'level3-region-labels', 'await-l8-8', 'await-l8-10',
           'level3-battle-tip', 'await-l8-14', 'level3-promotion-tip',
-          'await-l7-1', 'level3-recruitment-tip', 'complete'
+          'await-l7-1', 'level3-recruitment-tip',
+          'level4-intro', 'await-level4-l8-10', 'level4-battle-tip',
+          'level4-battle-order',
+          'level5-intro', 'await-level5-l8-3', 'level5-support-tip',
+          'await-level5-l7-1', 'level5-force-tip',
+          'level3-resource-defeat',
+          'level4-resource-defeat', 'complete'
         ].includes(save.campaignGuideStep)
           ? save.campaignGuideStep
           : 'complete';
@@ -1794,6 +1863,8 @@
       saveGame();
       maybeAdvanceLevel2Guide();
       maybeAdvanceLevelThreeGuide();
+      maybeAdvanceLevelFourGuide();
+      maybeAdvanceLevelFiveGuide();
       const centerWinner = getCenterConqueror();
       if (centerWinner && (!isOnlineGame() || onlineTeam === 'orange')) {
         finishGame(centerWinner, 'center');
@@ -1802,6 +1873,7 @@
       } else if (isAutomatic && (!isOnlineGame() || onlineTeam === 'orange')) {
         finishGame(null, 'turn30');
       }
+      maybeShowCampaignResourceDefeat();
     }
 
     function recalculateRegionForces() {
@@ -2359,12 +2431,15 @@
     }
 
     function updateTurnState() {
+      if (finishCampaignIfObjectiveMet()) return;
       renderPiecePurchaseButtons();
       passTurnButton.disabled = !isLocalPlayersTurn() || isWarRunning || isGameOver || isAiTurnRunning;
       updateTurnPointsDisplay();
       maybeAdvanceLevel2Guide();
       maybeAdvanceLevelThreeGuide();
-      maybeShowLevelThreeResourceDefeat();
+      maybeAdvanceLevelFourGuide();
+      maybeAdvanceLevelFiveGuide();
+      maybeShowCampaignResourceDefeat();
       campaignUndoButton.disabled = !isCampaignGame() || !campaignMoveUndoHistory.length ||
         !isLocalPlayersTurn() || isWarRunning || isGameOver || isAiTurnRunning;
       campaignUndoButton.title = campaignUndoButton.disabled
@@ -2372,8 +2447,12 @@
         : `Desfazer o último movimento (${campaignMoveUndoHistory.length} disponível)`;
     }
 
-    function maybeShowLevelThreeResourceDefeat() {
-      if (!isCampaignGame() || activeCampaignLevel.id !== 'tabuleiro-03' ||
+    function maybeShowCampaignResourceDefeat() {
+      const defeatStep = {
+        'tabuleiro-03': 'level3-resource-defeat',
+        'tabuleiro-04': 'level4-resource-defeat'
+      }[activeCampaignLevel?.id];
+      if (!isCampaignGame() || !defeatStep ||
           isGameOver || currentTeam !== humanTeam ||
           Number(pontosDoTurn[humanTeam]) > 0) return;
       const hasFighter = Object.values(regionPiecesByRegion)
@@ -2386,7 +2465,7 @@
       passTurnButton.disabled = true;
       updateWarAvailability();
       if (!campaignGuide.classList.contains('is-hidden')) hideCampaignGuide();
-      showCampaignGuide('level3-resource-defeat');
+      showCampaignGuide(defeatStep);
     }
 
     function getRegionProbeBoxesForLayer(layerNumber, regionNumber) {
@@ -3006,6 +3085,8 @@
           (rotatableQuadrilateralBlock?.name || rotatableCircularDisk?.block.name) &&
         (activeRotationKind !== 'circular' ||
           quadrilateralRotationMode.disco === rotatableCircularDisk?.disco);
+      const selectedRotationPath = rotatableQuadrilateralBlock?.regions
+        .find((region) => (region.code || region.name) === regionCode)?.rotationPath || null;
       const canRotateSelected = rotatableQuadrilateralBlock
         ? canRotateQuadrilateralBlock(rotatableQuadrilateralBlock)
         : rotatableCircularDisk && canRotateCircularDisk(
@@ -3030,7 +3111,9 @@
         ? `Girando ${quadrilateralRotationMode.kind === 'circular' ? 'o disco' : 'o bloco'} ${animatedDirectionIsClockwise ? 'no sentido horário' : 'no sentido anti-horário'}…`
         : activeRotationKind === 'circular'
           ? 'Desenhe um círculo sobre o disco: sentido horário gira à direita; anti-horário gira à esquerda.'
-          : 'Desenhe um círculo sobre as células destacadas: horário gira à esquerda; anti-horário gira à direita.';
+          : selectedRotationPath
+            ? 'Rotação especial: as células M(1,2) → M(2,2) → M(3,2) alternam de posição. Desenhe um círculo sobre a linha destacada.'
+            : 'Desenhe um círculo sobre as células destacadas: horário gira à esquerda; anti-horário gira à direita.';
       regionLayerOrangeForce.textContent = formatStatisticsNumber(layerFinalForces.orange);
       regionLayerBlueForce.textContent = formatStatisticsNumber(layerFinalForces.blue);
       regionPieceCounts.textContent = `Peças: ${safeCounts.orange + safeCounts.blue}`;
@@ -3808,15 +3891,34 @@
 
     function getRegionFocusPoint(regionCode, applyRotation = true) {
       const match = String(regionCode || '').match(/^L(\d+)-(\d+)$/);
-      if (!match || !allRegionMasks) return null;
+      if (!match) return null;
       const layer = Number(match[1]);
       const region = match[2];
+      const geometry = regionGeometryByCode[regionCode];
+      if (geometry?.shape === 'quadrilateral' &&
+          Array.isArray(geometry.cells) && geometry.cells.length) {
+        const bounds = geometry.cells.reduce((result, cell) => ({
+          left: Math.min(result.left, cell.x - cell.width / 2),
+          right: Math.max(result.right, cell.x + cell.width / 2),
+          top: Math.min(result.top, cell.y - cell.height / 2),
+          bottom: Math.max(result.bottom, cell.y + cell.height / 2)
+        }), {
+          left: Number.POSITIVE_INFINITY,
+          right: Number.NEGATIVE_INFINITY,
+          top: Number.POSITIVE_INFINITY,
+          bottom: Number.NEGATIVE_INFINITY
+        });
+        return {
+          x: ((bounds.left + bounds.right) / 2 / 908) * 100,
+          y: ((bounds.top + bounds.bottom) / 2 / 908) * 100
+        };
+      }
+      if (!allRegionMasks) return null;
       const tiles = allRegionMasks[layer]?.[region];
       if (!Array.isArray(tiles) || !tiles.length) return null;
       const rotation = applyRotation ? (getRegionVisualRotation(regionCode) * Math.PI) / 180 : 0;
       const sin = Math.sin(rotation);
       const cos = Math.cos(rotation);
-      const geometry = regionGeometryByCode[regionCode];
       const rotationCenter = currentBoardData?.boardType === 'mixed' && geometry?.shape === 'circular'
         ? { x: geometry.centerX, y: geometry.centerY }
         : { x: 454, y: 454 };
@@ -3839,20 +3941,15 @@
     function getRegionPieceCenter(regionCode) {
       const geometry = regionGeometryByCode[regionCode];
       if (geometry?.shape === 'circular') {
-        return getRegionFocusPoint(regionCode, currentBoardData?.boardType !== 'mixed');
+        return getRegionFocusPoint(regionCode, false);
       }
       if (geometry?.shape !== 'quadrilateral' ||
           !Number.isFinite(geometry.centerX) || !Number.isFinite(geometry.centerY)) {
-        return getRegionFocusPoint(regionCode);
+        return getRegionFocusPoint(regionCode, false);
       }
-      const rotation = getRegionVisualRotation(regionCode);
-      const angle = (rotation * Math.PI) / 180;
-      const center = getRegionRotationCenter(regionCode);
-      const dx = geometry.centerX - center.x;
-      const dy = geometry.centerY - center.y;
       return {
-        x: (center.x + dx * Math.cos(angle) - dy * Math.sin(angle)) / 908 * 100,
-        y: (center.y + dx * Math.sin(angle) + dy * Math.cos(angle)) / 908 * 100
+        x: geometry.centerX / 908 * 100,
+        y: geometry.centerY / 908 * 100
       };
     }
 
@@ -3889,12 +3986,13 @@
       const cos = Math.cos(angle);
       const match = String(regionCode).match(/^L\d+-(\d+)$/);
       const tiles = match ? allRegionMasks?.[layerNumber]?.[match[1]] : null;
-      const center = regionGeometryByCode[regionCode]?.shape === 'circular'
-        && !isMixedCircular ? {
-          x: (454 + (slotCenter.x * 908 - 454) * cos - (slotCenter.y * 908 - 454) * sin) / 908,
-          y: (454 + (slotCenter.x * 908 - 454) * sin + (slotCenter.y * 908 - 454) * cos) / 908
-        }
-        : slotCenter;
+      const rotationCenter = getRegionRotationCenter(regionCode);
+      const centerX = slotCenter.x * 908 - rotationCenter.x;
+      const centerY = slotCenter.y * 908 - rotationCenter.y;
+      const center = {
+        x: (rotationCenter.x + centerX * cos - centerY * sin) / 908,
+        y: (rotationCenter.y + centerX * sin + centerY * cos) / 908
+      };
 
       if (regionGeometryByCode[regionCode]?.shape !== 'circular' &&
           Array.isArray(tiles) && tiles.length) {
@@ -4053,7 +4151,7 @@
       const rect = stagePanel.getBoundingClientRect();
       const scale = Number(currentBoardData?.regionFocusScale) || 1.8;
       if (currentBoardData?.boardType === 'mixed' ||
-          currentBoardData?.campaign?.id === 'tabuleiro-03') {
+          ['tabuleiro-03', 'tabuleiro-05'].includes(currentBoardData?.campaign?.id)) {
         stageZoom = scale;
         stageZoomOffset = {
           x: ((50 - point.x) / 100) * rect.width * scale,
@@ -4166,7 +4264,7 @@
     function getSafeSlots(layerNumber, regionNumber, applyRotation = true) {
       const regionCode = `L${layerNumber}-${regionNumber}`;
       const geometry = regionGeometryByCode[regionCode];
-      if (currentBoardData?.campaign?.id === 'tabuleiro-03' &&
+      if (['tabuleiro-03', 'tabuleiro-05'].includes(currentBoardData?.campaign?.id) &&
           geometry?.shape === 'quadrilateral' && Array.isArray(geometry.cells)) {
         return geometry.cells.flatMap((cell) => {
           const slots = [];
@@ -4480,6 +4578,7 @@
           centerY,
           matrix,
           rotationArea: block.rotationArea || null,
+          rotationSteps: Number(block.rotationSteps) === 2 ? 2 : 1,
           rotationEnabled: block.rotationEnabled !== false,
           regions: block.regions
         });
@@ -4810,18 +4909,23 @@
         window.clearTimeout(quadrilateralRotationReturnTimeout);
         quadrilateralRotationReturnTimeout = null;
       }
+      const rotationPath = kind === 'quadrilateral'
+        ? block.regions.find((region) =>
+          (region.code || region.name) === selectedRegionCode)?.rotationPath || null
+        : null;
       quadrilateralRotationMode = {
         kind,
         blockName: String(block.name),
         disco,
         selectedRegionCode,
+        rotationPath,
         gesture: null,
         direction: null,
         animating: false
       };
       app.classList.add('is-quadrilateral-rotation-mode');
       if (kind === 'circular') focusCircularRotationDisk(block, disco);
-      else focusQuadrilateralRotationBlock(block);
+      else focusQuadrilateralRotationBlock(block, rotationPath);
       updateBoardFocusOverlay();
       updateSelectedRegionPanel(selectedRegionCode);
     }
@@ -4857,7 +4961,7 @@
         : null;
       const bounds = mode.kind === 'circular'
         ? circularBlock && getCircularRotationDiskScreenBounds(circularBlock, mode.disco)
-        : block && getQuadrilateralRotationBlockScreenBounds(block);
+        : block && getQuadrilateralRotationBlockScreenBounds(block, mode.rotationPath);
       if (!bounds ||
           event.clientX < bounds.left - 18 || event.clientX > bounds.right + 18 ||
           event.clientY < bounds.top - 18 || event.clientY > bounds.bottom + 18) {
@@ -4904,7 +5008,7 @@
         : null;
       const bounds = mode.kind === 'circular'
         ? circularBlock && getCircularRotationDiskScreenBounds(circularBlock, mode.disco)
-        : block && getQuadrilateralRotationBlockScreenBounds(block);
+        : block && getQuadrilateralRotationBlockScreenBounds(block, mode.rotationPath);
       if (!bounds) return;
       const angle = Math.atan2(event.clientY - bounds.centerY, event.clientX - bounds.centerX);
       let delta = angle - gesture.lastAngle;
@@ -4940,7 +5044,7 @@
       updateSelectedRegionPanel(mode.selectedRegionCode);
       const rotationSucceeded = mode.kind === 'circular'
         ? rotateCircularDisk(mode.blockName, mode.disco, mode.direction, true)
-        : rotateQuadrilateralBlock(mode.blockName, mode.direction, true);
+        : rotateQuadrilateralBlock(mode.blockName, mode.direction, true, mode.rotationPath);
       if (!rotationSucceeded) {
         mode.animating = false;
         mode.direction = null;
@@ -4953,7 +5057,7 @@
       }, mode.kind === 'circular' ? 3200 : 850);
     }
 
-    function rotateQuadrilateralBlock(blockName, direction, keepBlockFocus = false) {
+    function rotateQuadrilateralBlock(blockName, direction, keepBlockFocus = false, rotationPath = null) {
       const block = getRotatableQuadrilateralBlocks().find((item) =>
         String(item.name) === String(blockName));
       if (!block || !canRotateQuadrilateralBlock(block)) {
@@ -4968,7 +5072,12 @@
       campaignGuide.classList.remove('is-rotation-picker-open');
       if (!keepBlockFocus) resetStageZoom();
       playRotationSound();
-      if (!rotateQuadrilateralBlocksForLayer(layerNumber, direction, blockName)) return false;
+      if (!rotateQuadrilateralBlocksForLayer(
+        layerNumber,
+        direction,
+        blockName,
+        rotationPath
+      )) return false;
       rotationAnimationVersion += 1;
       hasRotatedThisTurn = true;
       lastRotatedLayer = layerNumber;
@@ -4985,13 +5094,19 @@
         team: currentTeam,
         layer: layerNumber,
         block: String(block.name),
-        direction
+        direction,
+        ...(rotationPath ? { rotationPath } : {})
       });
       finishIfCenterConquered();
       return true;
     }
 
-    function rotateQuadrilateralBlocksForLayer(layerNumber, direction, selectedBlockName = null) {
+    function rotateQuadrilateralBlocksForLayer(
+      layerNumber,
+      direction,
+      selectedBlockName = null,
+      rotationPath = null
+    ) {
       if (!quadrilateralBoard || !currentBoardData) return false;
       const rotatableNames = quadrilateralBoard.blocks
         .filter((block) => block.rotationEnabled &&
@@ -5004,11 +5119,12 @@
       rotatableNames.forEach((blockName) => {
         const block = quadrilateralBoard.blocks.find((item) => item.name === blockName);
         if (!block) throw new Error(`bloco quadricular ausente: ${blockName}`);
-        const matrix = gameRules.rotateQuadrilateralMatrix(
-          quadrilateralBoard.matrices[blockName],
-          direction,
-          block.rotationArea
-        );
+        let matrix = quadrilateralBoard.matrices[blockName];
+        for (let step = 0; step < block.rotationSteps; step += 1) {
+          matrix = rotationPath && String(block.name) === String(selectedBlockName)
+            ? gameRules.rotateQuadrilateralMatrixPath(matrix, direction, rotationPath)
+            : gameRules.rotateQuadrilateralMatrix(matrix, direction, block.rotationArea);
+        }
         const sourceBlock = currentBoardData.blocks.find((block) => String(block.name || '') === blockName);
         if (!sourceBlock) throw new Error(`bloco quadricular ausente: ${blockName}`);
         sourceBlock.matrix = matrix;
@@ -5098,8 +5214,27 @@
       ].join(' ');
     }
 
-    function getQuadrilateralRotationCells(block) {
+    function getQuadrilateralRotationCells(block, rotationPath = null) {
       if (!quadrilateralBoard || !block) return [];
+      if (Array.isArray(rotationPath)) {
+        return rotationPath.flatMap((position) => {
+          if (!Array.isArray(position) || position.length !== 2 ||
+              !position.every(Number.isInteger)) return [];
+          const [row, column] = position;
+          if (row < 1 || column < 1 || row > block.size || column > block.size) return [];
+          return [{
+            row,
+            column,
+            regionCode: quadrilateralBoard.matrices[block.name][row - 1]?.[column - 1] || null,
+            x: quadrilateralBoard.offsetX +
+              (block.centerX + (row - 1) * block.width) * quadrilateralBoard.scale,
+            y: quadrilateralBoard.offsetY +
+              (block.centerY + (column - 1) * block.height) * quadrilateralBoard.scale,
+            width: block.width * quadrilateralBoard.scale,
+            height: block.height * quadrilateralBoard.scale
+          }];
+        });
+      }
       const area = block.rotationArea || { row: 1, column: 1, size: block.size };
       const startRow = Number(area.row);
       const startColumn = Number(area.column);
@@ -5201,8 +5336,8 @@
       updateStageZoom();
     }
 
-    function getQuadrilateralRotationBlockScreenBounds(block) {
-      const cells = getQuadrilateralRotationCells(block);
+    function getQuadrilateralRotationBlockScreenBounds(block, rotationPath = null) {
+      const cells = getQuadrilateralRotationCells(block, rotationPath);
       const bounds = getQuadrilateralRotationBounds(cells);
       if (!bounds) return null;
       const rect = stagePanel.getBoundingClientRect();
@@ -5222,8 +5357,8 @@
       };
     }
 
-    function focusQuadrilateralRotationBlock(block) {
-      const cells = getQuadrilateralRotationCells(block);
+    function focusQuadrilateralRotationBlock(block, rotationPath = null) {
+      const cells = getQuadrilateralRotationCells(block, rotationPath);
       const bounds = getQuadrilateralRotationBounds(cells);
       if (!bounds) throw new Error(`não foi possível enquadrar o bloco ${block.name}`);
       const rect = stagePanel.getBoundingClientRect();
@@ -5255,7 +5390,7 @@
       const block = quadrilateralBoard.blocks.find((item) =>
         String(item.name) === quadrilateralRotationMode.blockName);
       if (!block) return;
-      const cells = getQuadrilateralRotationCells(block);
+      const cells = getQuadrilateralRotationCells(block, quadrilateralRotationMode.rotationPath);
       const bounds = getQuadrilateralRotationBounds(cells);
       if (!bounds) return;
 
@@ -5967,38 +6102,6 @@
     document.querySelectorAll('.layer-button[data-layer="8"]').forEach((button) => button.classList.add('is-active'));
     updateRotationControls();
     renderPiecePurchaseButtons();
-    rotatePickerButton.addEventListener('click', () => {
-      controls.classList.add('is-rotation-picker-open');
-      app.classList.add('is-rotation-picker-open');
-      const circularBlocks = getRotatableCircularBlocks();
-      selectedCircularRotationBlock = circularBlocks.length === 1
-        ? circularBlocks[0].name
-        : null;
-      updateCircularRotationBlockPicker(circularBlocks);
-      const quadrilateralBlocks = getRotatableQuadrilateralBlocks();
-      selectedQuadrilateralRotationBlock = quadrilateralBlocks.length === 1
-        ? quadrilateralBlocks[0].name
-        : null;
-      updateQuadrilateralRotationBlockPicker(quadrilateralBlocks);
-      campaignGuide.classList.toggle('is-rotation-picker-open',
-        ['level2-rotate', 'level2-rotate-again'].includes(campaignGuideStep));
-      rotationPickerClose.focus({ preventScroll: true });
-      updateCampaignGuideSpotlights();
-    });
-    rotationPickerClose.addEventListener('click', () => {
-      controls.classList.remove('is-rotation-picker-open');
-      app.classList.remove('is-rotation-picker-open');
-      campaignGuide.classList.remove('is-rotation-picker-open');
-      rotatePickerButton.focus({ preventScroll: true });
-      updateCampaignGuideSpotlights();
-    });
-    document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || !controls.classList.contains('is-rotation-picker-open')) return;
-      controls.classList.remove('is-rotation-picker-open');
-      app.classList.remove('is-rotation-picker-open');
-      campaignGuide.classList.remove('is-rotation-picker-open');
-      rotatePickerButton.focus({ preventScroll: true });
-    });
     function renderFinalSummary(winner, reason) {
       const layers = [];
       for (let layer = 8; layer >= 1; layer -= 1) {
@@ -6075,15 +6178,20 @@
       localStorage.removeItem('will-of-many-save');
       updateWarAvailability();
       passTurnButton.disabled = true;
-      renderFinalSummary(winner, reason);
-      const nextLevelNumber = campaignNextLevelId
-        ? getCampaignLevelOrder().indexOf(campaignNextLevelId) + 1
-        : 0;
-      campaignNextLevelButton.classList.toggle('is-hidden', reason !== 'campaign' || !campaignNextLevelId);
-      finalRestartCampaignButton.classList.toggle('is-hidden', reason !== 'campaign');
-      if (campaignNextLevelId) {
-        campaignNextLevelButton.textContent = `Continuar para o Level ${nextLevelNumber}`;
+      if (reason === 'campaign') {
+        campaignVictoryMessage.textContent =
+          `Você concluiu ${activeCampaignLevel?.name || 'este level'}!`;
+        campaignNextLevelButton.classList.toggle('is-hidden', !campaignNextLevelId);
+        if (campaignNextLevelId) {
+          const nextLevelNumber = getCampaignLevelOrder().indexOf(campaignNextLevelId) + 1;
+          campaignNextLevelButton.textContent = `Continuar para o Level ${nextLevelNumber}`;
+        }
+        finalModal.classList.add('is-hidden');
+        campaignVictoryModal.classList.remove('is-hidden');
+        campaignVictoryModal.setAttribute('aria-hidden', 'false');
+        return;
       }
+      renderFinalSummary(winner, reason);
       finalModal.classList.remove('is-hidden');
     }
 
@@ -6096,7 +6204,7 @@
     }
 
     function finishCampaignIfObjectiveMet() {
-      if (!isCampaignGame() || !campaignObjectiveRegions.length ||
+      if (!isGameStarted || isGameOver || !isCampaignGame() || !campaignObjectiveRegions.length ||
           !campaignObjectiveRegions.every((regionCode) => getRegionDominador(regionCode) === 'orange')) {
         return false;
       }
@@ -6115,8 +6223,10 @@
       localStorage.removeItem('will-of-many-save');
       passTurnButton.disabled = true;
       const turnLimit = Math.max(1, Number(activeCampaignLevel?.turnLimit) || 1);
-      const turnWord = turnLimit === 1 ? 'turno' : 'turnos';
-      const message = `Você perdeu: tinha apenas ${turnLimit} ${turnWord} para concluir este level.`;
+      const displayedTurnLimit = Math.max(1,
+        Number(activeCampaignLevel?.turnLimitCurrentTurn) || turnLimit);
+      const turnWord = displayedTurnLimit === 1 ? 'turno' : 'turnos';
+      const message = `Você perdeu: tinha apenas ${displayedTurnLimit} ${turnWord} para concluir este level.`;
       readout.textContent = `${message} ${activeCampaignLevel.name} será reiniciado...`;
       campaignDefeatMessage.textContent = `${message} ${activeCampaignLevel.name} será reiniciado...`;
       campaignDefeat.classList.remove('is-hidden');
@@ -6141,6 +6251,18 @@
       if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-03' && [
         'level3-intro', 'level3-region-labels', 'level3-battle-tip',
         'level3-promotion-tip', 'level3-recruitment-tip'
+      ].includes(campaignGuideStep)) {
+        showCampaignGuide(campaignGuideStep);
+        return;
+      }
+      if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-04' && [
+        'level4-intro', 'level4-battle-tip', 'level4-battle-order'
+      ].includes(campaignGuideStep)) {
+        showCampaignGuide(campaignGuideStep);
+        return;
+      }
+      if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-05' && [
+        'level5-intro', 'level5-support-tip', 'level5-force-tip'
       ].includes(campaignGuideStep)) {
         showCampaignGuide(campaignGuideStep);
         return;
@@ -6272,6 +6394,15 @@
             openPromotionButton,
             openRelegationButton
           ].filter(Boolean);
+        case 'level5-intro':
+          return campaignObjectiveRegions.map(getCampaignRegionShape).filter(Boolean);
+        case 'level5-support-tip':
+          return [
+            getCampaignRegionShape('L8-2'),
+            getCampaignRegionShape('L7-1')
+          ].filter(Boolean);
+        case 'level5-force-tip':
+          return [getCampaignRegionShape('L7-1'), regionForce, regionFinalForce].filter(Boolean);
         default: return [];
       }
     }
@@ -6397,7 +6528,7 @@
 
     function showCampaignGuide(step) {
       if (!isCampaignGame() || !isGameStarted ||
-          (isGameOver && step !== 'level3-resource-defeat')) return;
+          (isGameOver && !['level3-resource-defeat', 'level4-resource-defeat'].includes(step))) return;
       const approachRegion = getCampaignApproachRegion();
       const guideContent = {
         coins: {
@@ -6490,9 +6621,44 @@
           message: 'Com pelo menos 16 unidades nas regiões vermelhas, você pode recrutar uma unidade G diretamente em L7-1. Mover uma peça de uma região amarela para uma vermelha é um rebaixamento: você recebe metade do valor da peça.',
           dismissible: true
         },
+        'level4-intro': {
+          title: 'A ordem das batalhas',
+          message: 'O objetivo desse mapa é conquistar todas as regiões inimigas! Vamos ter que usar a ordem com que as batalhas acontecem a nosso favor.',
+          dismissible: true
+        },
+        'level4-battle-tip': {
+          title: 'Use o círculo a seu favor',
+          message: 'Gire o círculo de forma inteligente para lutar! Se você escolher a ordem certa conseguirá conquistar todas as regiões inimigas.',
+          dismissible: true
+        },
+        'level4-battle-order': {
+          title: 'Defina a ordem do combate',
+          message: 'Para definir quem luta primeiro são escolhidas as regiões de acordo com o rank (amarelo primeiro que vermelho) e do maior índice antes do menor (L8-10 primeiro que L8-7). Usando a ordem de batalha você poderá ganhar duas batalhas dessa região!',
+          dismissible: true
+        },
         'level3-resource-defeat': {
           title: 'Fim de jogo',
           message: 'Você ficou sem moedas e não tem nenhuma peça F. O Agente deseja mais sorte na próxima tentativa. Toque para reiniciar o Level 3.',
+          dismissible: true
+        },
+        'level4-resource-defeat': {
+          title: 'Fim de jogo',
+          message: 'Você ficou sem moedas e não tem nenhuma peça F. O Agente deseja mais sorte na próxima tentativa. Toque para reiniciar o Level 4.',
+          dismissible: true
+        },
+        'level5-intro': {
+          title: 'Level 5: conquiste L8-12',
+          message: 'Esse nível é desafiador! Você precisará usar a ordem de preferência nas batalhas para atrair forças inimigas mais fortes em batalhas menores enquanto você conquista mais aliados. O Objetivo é conquistar L8-12.',
+          dismissible: true
+        },
+        'level5-support-tip': {
+          title: 'Prepare o suporte para L8-9',
+          message: 'Estamos mais próximos de concluir o nível! Para que as forças em L8-9 tenham mais chances vamos colocar unidades de suporte em L7-1, que são as unidades de Rank Amarelo!',
+          dismissible: true
+        },
+        'level5-force-tip': {
+          title: 'A força do Rank Amarelo',
+          message: 'Unidades no Rank Amarelo recebem metade da força das unidades vermelhas aliadas adjacentes, limitadas a 8 unidades vermelhas para cada amarela. Além disso elas multiplicam essa força! L7-1 também tem uma rotação especial: com ela selecionada, as posições M(1,2), M(2,2) e M(3,2) alternam entre si. Lutar usando unidades de rank superior é o que pode te trazer a vitória!',
           dismissible: true
         }
       }[step];
@@ -6530,7 +6696,8 @@
             : ['level2-rotate', 'level2-rotate-again'].includes(step)
               ? 'Toque em GIRAR DISCO e faça um gesto anti-horário'
             : step === 'level2-final-war' ? 'Toque no botão Guerra destacado'
-              : step === 'level3-resource-defeat' ? 'Toque na mensagem para reiniciar'
+              : ['level3-resource-defeat', 'level4-resource-defeat'].includes(step)
+                ? 'Toque na mensagem para reiniciar'
               : 'Toque na mensagem para continuar';
       campaignGuideCard.removeAttribute('data-position');
       campaignGuide.classList.remove('is-hidden');
@@ -6628,6 +6795,16 @@
         selectedRegionCode = 'L7-1';
         updateSelectedRegionPanel(selectedRegionCode);
         focusRegion('L7-1');
+      } else if (step === 'level5-support-tip') {
+        selectedRegionCode = 'L8-2';
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegion('L8-2');
+      } else if (step === 'level5-force-tip') {
+        selectedRegionCode = 'L7-1';
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegion('L7-1');
+      } else if (step === 'level5-intro') {
+        focusRegion('L8-12');
       }
       const primaryTarget = step === 'purchase'
         ? document.querySelector('#piece-controls .piece-button[data-stage="g"]')
@@ -6688,7 +6865,7 @@
 
     function continueCampaignGuide() {
       if (!campaignGuideDismissible || campaignGuide.classList.contains('is-hidden')) return;
-      if (campaignGuideStep === 'level3-resource-defeat') {
+      if (['level3-resource-defeat', 'level4-resource-defeat'].includes(campaignGuideStep)) {
         hideCampaignGuide();
         restartCampaignLevel();
         return;
@@ -6711,11 +6888,16 @@
         'level3-region-labels': 'await-l8-10',
         'level3-battle-tip': 'await-l8-14',
         'level3-promotion-tip': 'await-l7-1',
+        'level4-intro': 'await-level4-l8-10',
+        'level4-battle-tip': 'level4-battle-order',
+        'level5-intro': 'await-level5-l8-3',
+        'level5-support-tip': 'await-level5-l7-1',
+        'level5-force-tip': 'complete',
         'level3-recruitment-tip': 'complete'
       }[campaignGuideStep] || 'complete';
       hideCampaignGuide();
       campaignGuideStep = nextStep;
-      if (nextStep === 'level3-region-labels') {
+      if (['level3-region-labels', 'level4-battle-order'].includes(nextStep)) {
         showCampaignGuide(nextStep);
         return;
       }
@@ -6739,10 +6921,13 @@
         selectedRegionCode = 'L8-14';
         updateSelectedRegionPanel(selectedRegionCode);
         focusRegion('L8-14');
+      } else if (campaignGuideStep === 'await-level5-l8-3') {
+        focusRegion('L8-9');
       }
       saveGame();
       if (nextStep === 'await-army') maybeShowCampaignWarGuide();
       if (isCampaignLevelTwo()) maybeAdvanceLevel2Guide();
+      maybeAdvanceLevelFiveGuide();
     }
 
     function isCampaignGuideActionAllowed(target, eventType) {
@@ -6821,8 +7006,29 @@
       }
     }
 
+    function maybeAdvanceLevelFourGuide() {
+      if (!isCampaignGame() || activeCampaignLevel.id !== 'tabuleiro-04' || isGameOver) return;
+      if (campaignGuideStep === 'await-level4-l8-10' &&
+          getRegionDominador('L8-10') === 'orange') {
+        showCampaignGuide('level4-battle-tip');
+      }
+    }
+
+    function maybeAdvanceLevelFiveGuide() {
+      if (!isCampaignGame() || activeCampaignLevel.id !== 'tabuleiro-05' || isGameOver) return;
+      if (campaignGuideStep === 'await-level5-l8-3' &&
+          getRegionDominador('L8-2') === 'orange') {
+        showCampaignGuide('level5-support-tip');
+      } else if (campaignGuideStep === 'await-level5-l7-1' &&
+          getTeamSoldierCount('L7-1', 'orange') > 0) {
+        showCampaignGuide('level5-force-tip');
+      }
+    }
+
     function returnCampaignToMenu() {
       if (!isCampaignGame()) return;
+      gameMenu.classList.add('is-hidden');
+      gameMenu.setAttribute('aria-hidden', 'true');
       gameSessionVersion += 1;
       isGameStarted = false;
       isGameOver = true;
@@ -6840,6 +7046,8 @@
       campaignDefeat.classList.add('is-hidden');
       campaignDefeat.setAttribute('aria-hidden', 'true');
       campaignActions.classList.add('is-hidden');
+      campaignVictoryModal.classList.add('is-hidden');
+      campaignVictoryModal.setAttribute('aria-hidden', 'true');
       finalModal.classList.add('is-hidden');
       turnTransition.classList.remove('is-visible');
       turnTransition.setAttribute('aria-hidden', 'true');
@@ -6852,6 +7060,8 @@
 
     async function restartCampaignLevel() {
       if (!isCampaignGame()) return;
+      gameMenu.classList.add('is-hidden');
+      gameMenu.setAttribute('aria-hidden', 'true');
       gameSessionVersion += 1;
       isGameStarted = false;
       isGameOver = true;
@@ -6864,12 +7074,10 @@
       campaignDefeat.setAttribute('aria-hidden', 'true');
       finalModal.classList.add('is-hidden');
       campaignRestartButton.disabled = true;
-      finalRestartCampaignButton.disabled = true;
       try {
         await beginConfiguredGame();
       } finally {
         campaignRestartButton.disabled = false;
-        finalRestartCampaignButton.disabled = false;
       }
     }
 
@@ -6881,10 +7089,11 @@
       updateWarAvailability();
       updateTurnPointsDisplay();
       campaignActions.classList.toggle('is-hidden', !isCampaignGame() || !isGameStarted);
-      finalRestartCampaignButton.classList.add('is-hidden');
+      gameMenuResignButton.classList.toggle('is-hidden', isCampaignGame() || !isGameStarted);
       focusStrongestRegionForTeam(currentTeam);
       updateSelectedRegionPanel(selectedRegionCode);
       updateTurnState();
+      if (isGameOver) return;
       showCampaignIntro();
       if ((gameMode === 'ai' || isCampaignGame()) && currentTeam === aiTeam) scheduleAiTurn();
     }
@@ -7046,6 +7255,16 @@
       passTurnButton.disabled = true;
       const roundResult = scoreCurrentRound();
       if (finishIfCenterConquered()) return;
+      const campaignCurrentTurnLimit = Number(activeCampaignLevel?.turnLimitCurrentTurn);
+      if (isCampaignGame() && Number.isFinite(campaignCurrentTurnLimit) &&
+          campaignCurrentTurnLimit > 0 && currentTurn >= campaignCurrentTurnLimit) {
+        if (currentTeam === aiTeam) {
+          if (!finishCampaignIfObjectiveMet()) await failCampaignLevel();
+        } else {
+          await failCampaignLevel();
+        }
+        return;
+      }
       const campaignTurnLimit = Number(activeCampaignLevel?.turnLimit);
       if (isCampaignGame() && currentTeam === humanTeam &&
           Number.isFinite(campaignTurnLimit) && campaignTurnLimit > 0 &&
@@ -7069,7 +7288,7 @@
       updateRotationControls();
       if (!isCampaignGame() || activeCampaignLevel.preserveCoinsBetweenTurns !== true) {
         pontosDoTurn[currentTeam] = isCampaignGame()
-          ? getCampaignCoinsPerTurn(activeCampaignLevel)
+          ? getCampaignCoinsPerTurn(activeCampaignLevel, currentTurn)
           : getTurnPointIncome(currentTurn);
       }
       const wheatReport = isCampaignGame() ? null : applyWheatForTurn(currentTeam);
@@ -7108,7 +7327,11 @@
     }
 
     passTurnButton.addEventListener('click', passTurnToNextPlayer);
-    campaignUndoButton.addEventListener('click', undoLastCampaignMove);
+    campaignUndoButton.addEventListener('click', () => {
+      undoLastCampaignMove();
+      gameMenu.classList.add('is-hidden');
+      gameMenu.setAttribute('aria-hidden', 'true');
+    });
     warButton.addEventListener('click', () => {
       if (isCampaignGame() && campaignGuideStep === 'war') {
         hideCampaignGuide();
@@ -8116,54 +8339,58 @@
         } else if (action.type === 'rotate' && Number.isInteger(action.layer)) {
           updateRotationControls();
           const direction = action.direction === 'left' ? 'left' : 'right';
-          let button = [...controls.querySelectorAll('.layer-button[data-rotation-block]')]
-            .find((candidate) =>
-              candidate.dataset.rotationBlock === action.block &&
-              candidate.dataset.disco === action.disco &&
-              Number(candidate.dataset.layer) === action.layer &&
-              candidate.dataset.direction === direction);
-          if (!button && action.block && !action.disco) {
-            selectedQuadrilateralRotationBlock = action.block;
-            updateQuadrilateralRotationBlockPicker(getRotatableQuadrilateralBlocks());
-            button = [...controls.querySelectorAll('.quadrilateral-rotation-button')]
+          if (Array.isArray(action.rotationPath) && action.block) {
+            rotateQuadrilateralBlock(action.block, direction, false, action.rotationPath);
+          } else {
+            let button = [...controls.querySelectorAll('.layer-button[data-rotation-block]')]
               .find((candidate) =>
                 candidate.dataset.rotationBlock === action.block &&
+                candidate.dataset.disco === action.disco &&
                 Number(candidate.dataset.layer) === action.layer &&
                 candidate.dataset.direction === direction);
-          }
-          let circularDisksOnLayer = 0;
-          if (!button && !action.block && !action.disco) {
-            const layerDisks = new Map();
-            getRotatableCircularBlocks().forEach((block) => {
-              (block.regions || []).forEach((region) => {
-                const layer = Number(region.layer ||
-                  String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]);
-                if (layer === action.layer) {
-                  layerDisks.set(getCircularDiskKey(block.name, getRegionDiskName(region)), {
-                    block: block.name,
-                    disco: getRegionDiskName(region)
-                  });
-                }
-              });
-            });
-            circularDisksOnLayer = layerDisks.size;
-            if (layerDisks.size === 1) {
-              const [{ block, disco }] = layerDisks.values();
-              button = [...controls.querySelectorAll('.layer-button[data-rotation-block]')]
-                .find((candidate) => candidate.dataset.rotationBlock === block &&
-                  candidate.dataset.disco === disco &&
+            if (!button && action.block && !action.disco) {
+              selectedQuadrilateralRotationBlock = action.block;
+              updateQuadrilateralRotationBlockPicker(getRotatableQuadrilateralBlocks());
+              button = [...controls.querySelectorAll('.quadrilateral-rotation-button')]
+                .find((candidate) =>
+                  candidate.dataset.rotationBlock === action.block &&
+                  Number(candidate.dataset.layer) === action.layer &&
                   candidate.dataset.direction === direction);
             }
+            let circularDisksOnLayer = 0;
+            if (!button && !action.block && !action.disco) {
+              const layerDisks = new Map();
+              getRotatableCircularBlocks().forEach((block) => {
+                (block.regions || []).forEach((region) => {
+                  const layer = Number(region.layer ||
+                    String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]);
+                  if (layer === action.layer) {
+                    layerDisks.set(getCircularDiskKey(block.name, getRegionDiskName(region)), {
+                      block: block.name,
+                      disco: getRegionDiskName(region)
+                    });
+                  }
+                });
+              });
+              circularDisksOnLayer = layerDisks.size;
+              if (layerDisks.size === 1) {
+                const [{ block, disco }] = layerDisks.values();
+                button = [...controls.querySelectorAll('.layer-button[data-rotation-block]')]
+                  .find((candidate) => candidate.dataset.rotationBlock === block &&
+                    candidate.dataset.disco === disco &&
+                    candidate.dataset.direction === direction);
+              }
+            }
+            if (!button && !action.block && !action.disco && circularDisksOnLayer === 0) {
+              button = [...controls.querySelectorAll('.layer-button:not([data-rotation-block])')]
+                .find((candidate) => Number(candidate.dataset.layer) === action.layer &&
+                  candidate.dataset.direction === direction);
+            }
+            if (!button && circularDisksOnLayer > 1) {
+              startMessage.textContent = 'A rotação recebida não identifica qual disco circular deve girar.';
+            }
+            if (button) button.click();
           }
-          if (!button && !action.block && !action.disco && circularDisksOnLayer === 0) {
-            button = [...controls.querySelectorAll('.layer-button:not([data-rotation-block])')]
-              .find((candidate) => Number(candidate.dataset.layer) === action.layer &&
-                candidate.dataset.direction === direction);
-          }
-          if (!button && circularDisksOnLayer > 1) {
-            startMessage.textContent = 'A rotação recebida não identifica qual disco circular deve girar.';
-          }
-          if (button) button.click();
         } else {
           startMessage.textContent = 'Ação Bluetooth desconhecida; atualizando o estado recebido.';
         }
@@ -8341,7 +8568,13 @@
         if (gameMode === 'online' || gameMode === 'campaign') selectedStartSpeed = '1';
         if (gameMode === 'campaign') {
           selectedStartColor = 'orange';
-          selectedCampaignLevelId = getUnlockedCampaignLevelId();
+          if (lobbyPoll) {
+            window.clearInterval(lobbyPoll);
+            lobbyPoll = null;
+          }
+          updateStartModeSelection();
+          showCampaignTrail();
+          return;
         }
         updateStartModeSelection();
         startMessage.textContent = gameMode === 'bluetooth' && !window.AndroidBluetooth
@@ -8466,7 +8699,9 @@
         campaignGuideStep = campaignIntroPending
           ? 'intro'
           : activeCampaignLevel.id === 'tabuleiro-02' ? 'level2-intro'
-            : activeCampaignLevel.id === 'tabuleiro-03' ? 'level3-intro' : 'complete';
+            : activeCampaignLevel.id === 'tabuleiro-03' ? 'level3-intro'
+              : activeCampaignLevel.id === 'tabuleiro-04' ? 'level4-intro'
+                : activeCampaignLevel.id === 'tabuleiro-05' ? 'level5-intro' : 'complete';
         campaignLevel2SeenSectors = [];
         if (!campaignObjectiveRegions.length) {
           startMessage.textContent = 'O level da campanha não define regiões iniciais azuis para conquistar.';
@@ -8562,6 +8797,7 @@
     startMenu.addEventListener('click', (event) => {
       const action = event.target.closest('button')?.dataset.startAction;
       if (action === 'new') {
+        campaignTrailScreen.classList.add('is-hidden');
         startMenu.classList.add('is-hidden');
         newGameOptions.classList.remove('is-hidden');
         startMessage.textContent = '';
@@ -8570,11 +8806,61 @@
       if (action === 'exit') {
         startMessage.textContent = 'Até a próxima partida.';
         startMenu.classList.add('is-hidden');
+        if (typeof window.AndroidBluetooth?.closeApp === 'function') {
+          window.AndroidBluetooth.closeApp();
+          return;
+        }
         window.setTimeout(() => {
           window.close();
           startMenu.classList.remove('is-hidden');
         }, 250);
       }
+    });
+    gameMenuTrigger.addEventListener('click', () => {
+      if (!isGameStarted || isGameOver) return;
+      const isOpening = gameMenu.classList.contains('is-hidden');
+      gameMenu.classList.toggle('is-hidden', !isOpening);
+      gameMenu.setAttribute('aria-hidden', String(!isOpening));
+      if (isOpening) {
+        campaignActions.classList.toggle('is-hidden', !isCampaignGame());
+        gameMenuResignButton.classList.toggle('is-hidden', isCampaignGame());
+      }
+    });
+    gameMenu.addEventListener('click', (event) => {
+      if (event.target === gameMenu) {
+        gameMenu.classList.add('is-hidden');
+        gameMenu.setAttribute('aria-hidden', 'true');
+        gameMenuTrigger.focus({ preventScroll: true });
+      }
+    });
+    gameMenuResignButton.addEventListener('click', () => {
+      gameMenu.classList.add('is-hidden');
+      gameMenu.setAttribute('aria-hidden', 'true');
+      if (isOnlineGame() && !isGameOver) {
+        abandonMatchButton.click();
+        return;
+      }
+      if (window.AndroidBluetooth && (bluetoothConnected || bluetoothRole)) {
+        window.AndroidBluetooth.disconnect();
+      }
+      bluetoothConnected = false;
+      bluetoothRole = null;
+      isGameStarted = false;
+      isGameOver = true;
+      isAiTurnRunning = false;
+      isWarRunning = false;
+      localStorage.removeItem('will-of-many-save');
+      app.classList.add('is-hidden');
+      startMenu.classList.remove('is-hidden');
+      newGameOptions.classList.add('is-hidden');
+      startScreen.classList.remove('is-hidden');
+      startMessage.textContent = '';
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || gameMenu.classList.contains('is-hidden')) return;
+      gameMenu.classList.add('is-hidden');
+      gameMenu.setAttribute('aria-hidden', 'true');
+      gameMenuTrigger.focus({ preventScroll: true });
     });
     function renderTutorialSlide(index) {
       currentTutorialSlide = Math.max(0, Math.min(index, tutorialSlides.length - 1));
@@ -8640,7 +8926,6 @@
     startGameButton.addEventListener('click', beginConfiguredGame);
     campaignMenuButton.addEventListener('click', returnCampaignToMenu);
     campaignRestartButton.addEventListener('click', restartCampaignLevel);
-    finalRestartCampaignButton.addEventListener('click', restartCampaignLevel);
     campaignIntroDismiss.addEventListener('click', dismissCampaignIntro);
     campaignGuideContinue.addEventListener('click', continueCampaignGuide);
     ['pointerdown', 'click'].forEach((eventType) => {
@@ -8672,10 +8957,12 @@
       if (!campaignNextLevelId) return;
       selectedCampaignLevelId = campaignNextLevelId;
       gameMode = 'campaign';
-      finalModal.classList.add('is-hidden');
+      campaignVictoryModal.classList.add('is-hidden');
+      campaignVictoryModal.setAttribute('aria-hidden', 'true');
       campaignNextLevelId = null;
       await beginConfiguredGame();
     });
+    campaignVictoryMenuButton.addEventListener('click', returnCampaignToMenu);
     startBackButton.addEventListener('click', () => {
       if (window.AndroidBluetooth && bluetoothRole && !isGameStarted) {
         window.AndroidBluetooth.disconnect();
@@ -8686,6 +8973,15 @@
       startMenu.classList.remove('is-hidden');
       startMessage.textContent = '';
     });
+    campaignTrailBackButton.addEventListener('click', hideCampaignTrail);
+    campaignTrailLevels.addEventListener('click', async (event) => {
+      const levelButton = event.target.closest('button[data-level-id]');
+      if (!levelButton || levelButton.disabled) return;
+      selectedCampaignLevelId = levelButton.dataset.levelId;
+      gameMode = 'campaign';
+      campaignTrailScreen.classList.add('is-hidden');
+      await beginConfiguredGame();
+    });
     finalMenuButton.addEventListener('click', () => {
       if (isCampaignGame()) {
         returnCampaignToMenu();
@@ -8694,6 +8990,8 @@
       if (window.AndroidBluetooth && bluetoothConnected) {
         window.AndroidBluetooth.disconnect();
       }
+      gameMenu.classList.add('is-hidden');
+      gameMenu.setAttribute('aria-hidden', 'true');
       bluetoothConnected = false;
       bluetoothRole = null;
       finalModal.classList.add('is-hidden');

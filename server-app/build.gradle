@@ -43,6 +43,8 @@ tasks.named("processResources") {
         include "tabuleiro-01.json"
         include "tabuleiro-02.json"
         include "tabuleiro-03.json"
+        include "tabuleiro-04.json"
+        include "tabuleiro-05.json"
         include "*.png"
         include "*.svg"
         into "static"

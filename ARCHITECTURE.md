@@ -16,9 +16,12 @@ O jogo tem três partes que compartilham ou complementam a experiência:
    `game.css` mantém os estilos, `game-client.js` contém a lógica de interação,
    `game-rules.js` contém funções puras de regras/composição e
    `will-of-many-ai.js` implementa as decisões da IA.
-2. **Aplicativo Android**: um `WebView` usa o mesmo jogo web e integra recursos
-   nativos como Bluetooth e login Google. O Gradle copia os arquivos web e os
-   dados da raiz para os assets do APK.
+2. **Aplicativo Android (plataforma exclusiva de jogo)**: um `WebView` usa o
+   mesmo jogo web e integra recursos nativos como Bluetooth e login Google. O
+   Gradle copia os arquivos web e os dados da raiz para os assets do APK. Todo
+   teste de experiência e aceitação do jogo deve ser feito nesta versão Android;
+   navegador desktop pode ajudar na inspeção, mas não substitui a validação no
+   WebView/aparelho Android.
 3. **Servidor Spring Boot**: oferece os modos online, matchmaking, persistência e
    recursos de autenticação. Ele também empacota a página web para servir o jogo.
 
@@ -28,6 +31,12 @@ e protocolos no mesmo escopo. O antigo JSON de região incorporado foi removido:
 os tabuleiros são carregados de arquivos externos, e uma falha agora é informada
 em vez de recorrer silenciosamente a um snapshot antigo. Extrações futuras devem
 continuar pequenas e cobertas por testes.
+
+O aplicativo Android é a plataforma exclusiva para jogar e a referência de
+aceitação de interface, toque, layout e fluxo. O servidor Spring Boot deve
+continuar empacotando a mesma versão dos recursos web para manter o modo online
+atualizado; valide também os testes do servidor quando mudanças compartilhadas
+ou de integração puderem afetá-lo.
 
 ## Mapa de arquivos
 
@@ -40,7 +49,7 @@ continuar pequenas e cobertas por testes.
 | `will-of-many-ai.js` | Escolha de ações da IA; exporta `window.WillOfManyAI.chooseAction(snapshot)`. | Comportamento do oponente automático. |
 | `tests/game-rules.test.js` | Testes de caracterização do módulo de regras, usando `node:test` sem dependências adicionais. | Validar composição, conversões de unidades, custos e reembolsos. |
 | `tests/asset-entrypoints.test.js` | Garante a ordem dos recursos de entrada e sua inclusão nos builds Android e servidor. | Alterar caminhos, módulos web externos ou configurações de empacotamento. |
-| `tabuleiro-01.json`, `tabuleiro-02.json`, `tabuleiro-03.json` | Configuração de campanha por nível: regiões, blocos, peças iniciais, moedas, objetivo, escala de exibição/foco, rotação e limite de turnos. `preserveCoinsBetweenTurns` mantém o saldo ao passar o turno; `aiActionsEnabled: false` faz a IA passar automaticamente. Regiões de blocos circulares declaram também `disco`; blocos quadriculares podem definir `rotationArea` para girar uma submatriz específica em vez de toda a matriz. | Criar ou ajustar um nível de campanha e a qual disco cada região pertence. |
+| `tabuleiro-01.json`–`tabuleiro-05.json` | Configuração de campanha por nível: regiões, blocos, peças iniciais, moedas, objetivo, escala de exibição/foco, rotação e limite de turnos. `preserveCoinsBetweenTurns` mantém o saldo ao passar o turno; `aiActionsEnabled: false` faz a IA passar automaticamente. `turnLimitCurrentTurn` define um limite pelo número exibido do turno; blocos quadriculares podem definir `rotationArea` ou `rotationSteps` para personalizar a rotação. | Criar ou ajustar um nível de campanha e a qual disco cada região pertence. |
 | `regioes-will-of-many-circular.json`, `regioes-will-of-many.json`, `will-of-many-final.json` | Máscaras/regiões usadas para compor o tabuleiro e derivar geometria e vizinhança. O tabuleiro circular é a fonte padrão para todos os modos não campanha; os outros JSONs são apenas fallbacks de carregamento inicial. No tabuleiro circular atual, `disco` identifica o anel rotativo de cada região. | Geometria, regiões, dados-base e vizinhança do tabuleiro padrão. |
 | `regioes-will-of-many-l8.json` | Dados auxiliares de regiões L8 usados por ferramentas/edição. Confirme os pontos de leitura antes de tratá-lo como fonte do tabuleiro ativo. | Investigação de geometria e edição de regiões L8. |
 | `editor-regioes.html` | Ferramenta visual de edição/inspeção de regiões e dados auxiliares. | Ajustar ou depurar máscaras e caixas de região. |
@@ -74,15 +83,16 @@ Para encontrar um ponto de entrada, use a busca do editor pelo nome da função:
 | --- | --- | --- |
 | Configuração e estado | `regionPiecesByRegion`, `regionForceStats`, `currentBoardData`, `campaignLevelFiles` em `game-client.js`; pesos e ordem de peça em `game-rules.js` | Estado vivo permanece no cliente; regras puras compartilhadas ficam no módulo. |
 | Carregamento de tabuleiro | `loadRegionMasks`, `loadBoardFile`, `applyRegionData`, `normalizeImportedRegionGeometry` | Carregamento inicial das máscaras e carregamento explícito de níveis. |
-| Geometria e vizinhança | `regionGeometryByCode`, `regionNeighborCache`, `recomputeNeighborCacheForLayer`, `getRegionCalculationOrder` | Geometria, rotação e vizinhança também alimentam regras e destaques. |
+| Geometria e vizinhança | `regionGeometryByCode`, `regionNeighborCache`, `recomputeNeighborCacheForLayer`, `getRegionCalculationOrder`, `getRegionFocusPoint` | Geometria, rotação e vizinhança também alimentam regras e destaques. O foco de regiões quadriculares usa os limites das células desenhadas para centralizar a mesma forma que aparece na tela, sem depender das máscaras rasterizadas. |
 | Compra e composição | `renderPiecePurchaseButtons`, `addPiece`, `mergeRegionTeam`, `refreshRegionVisuals` | A compra altera o estado lógico e depois atualiza peças, forças e painéis. |
 | Economia da campanha | `getCampaignCoinsPerTurn`, `passTurnToNextPlayer`, `activeCampaignLevel.preserveCoinsBetweenTurns` | Configure renda, moedas iniciais e persistência do saldo nos metadados do JSON do nível. |
 | Sacos de moedas | `regionGeometryByCode[regionCode].bagCoins`, `campaignCollectedBags`, `updateSelectedRegionPanel`, `collectCampaignBagAtRegion` | O painel da região selecionada mostra o valor de um saco ainda não coletado; ao coletá-lo, o indicador some junto com o ícone do tabuleiro. |
 | Movimento e descarte | `beginPieceDrag`, `finishPieceDrag`, `getDragTargets`, `performRelegation`, `performRecycle` | O arraste usa hit-testing, alvos válidos e uma camada visual própria. |
 | Promoção e guerra | `refreshPromotionControls`, `startWar`, `recalculateRegionForces`, `updateWarAvailability` | Promoção, propriedade, força, guerra e condição de vitória são interdependentes. Em todos os tabuleiros, a guerra visita primeiro o maior rank (L1), seguindo em ordem decrescente do número de região dentro de cada rank; cada região pode participar de um único bloco por guerra. Cada bloco mantém sua animação antes de ser resolvido, e a marcação de participação é reiniciada no começo da próxima guerra. |
-| Rotação | `getRotatableCircularBlocks`, `getRotatableQuadrilateralBlocks`, `renderCircularRotationControls`, `rotateCircularDisk`, `rotateQuadrilateralBlock`, `rotateQuadrilateralMatrix` | Blocos circulares selecionam o bloco e o `disco`; cada bloco quadricular rotativo também é selecionado individualmente. A matriz gira seus anéis exteriores e internos recursivamente. |
-| Renderização do tabuleiro | `renderBoardLayers`, `refreshRegionVisuals`, `updateBoardFocusOverlay` | As regiões são desenhadas em SVG; peças são elementos separados sobre o tabuleiro. |
-| Campanha e guia | `beginConfiguredGame`, `showCampaignGuide`, `hideCampaignGuide`, `continueCampaignGuide`, `maybeAdvanceLevel2Guide`, `maybeAdvanceLevelThreeGuide`, `maybeShowLevelThreeResourceDefeat` | O guia depende de eventos da partida e estados persistidos; no Level 3, a introdução percorre L8-1 → L8-16 → L8-1 em seis segundos. A mensagem sobre rótulos centraliza instantaneamente L8-1 e indica o botão contextual de rotação do painel. Se o jogador ficar sem moedas e sem peças F no Level 3, o Agente exibe a derrota e reinicia o nível ao ser acionado. |
+| Rotação | `getRotatableCircularBlocks`, `getRotatableQuadrilateralBlocks`, `renderCircularRotationControls`, `rotateCircularDisk`, `rotateQuadrilateralBlock`, `rotateQuadrilateralMatrix`, `rotateQuadrilateralMatrixPath` | Blocos circulares selecionam o bloco e o `disco`; cada bloco quadricular rotativo também é selecionado individualmente. A matriz gira seus anéis exteriores e internos recursivamente, com suporte a áreas quadradas e percursos ordenados de células. No Level 5, selecionar L7-1 destaca e gira apenas a linha M(1,2) → M(2,2) → M(3,2); a ação transmite o percurso via Bluetooth. |
+| Renderização do tabuleiro | `renderBoardLayers`, `refreshRegionVisuals`, `updateBoardFocusOverlay` | As regiões são desenhadas em SVG; peças são elementos separados sobre o tabuleiro. Level 3 usa zoom de foco `5.2`; Level 5 usa `3.4` para manter a região selecionada inteira dentro do painel. Ambos usam oito posições por célula quadricular, distribuídas em grade 4×2. |
+| Menu da partida | `game-menu-trigger`, `returnCampaignToMenu`, `restartCampaignLevel`, `undoLastCampaignMove` | O menu superior reúne, na campanha, desfazer, retornar ao menu principal e reiniciar o level; nos demais modos oferece desistência e retorno ao início. No modo online, a desistência mantém a confirmação/protocolo de surrender existente. “Sair” na tela inicial usa a ponte Android para encerrar a Activity. |
+| Campanha e guia | `showCampaignTrail`, `renderCampaignTrail`, `beginConfiguredGame`, `showCampaignGuide`, `hideCampaignGuide`, `continueCampaignGuide`, `maybeAdvanceLevel2Guide`, `maybeAdvanceLevelThreeGuide`, `maybeAdvanceLevelFourGuide`, `maybeAdvanceLevelFiveGuide`, `maybeShowCampaignResourceDefeat`, `campaign-victory-modal` | Selecionar Campanha sempre abre primeiro a trilha ilustrada vetorial, desenhada em `index.html`; os marcadores são gerados na ordem de `campaignLevelFiles`, e os levels até o progresso salvo podem ser iniciados. Os níveis futuros aparecem bloqueados até o anterior ser concluído. Ao completar um level, o jogo mostra um painel de parabéns com retorno ao menu principal e, quando houver outro level disponível, a opção de continuar. O guia do Level 4 introduz a ordem das batalhas e explica o uso do círculo ao conquistar L8-10; se as moedas acabarem sem uma peça F laranja, o Agente oferece reiniciar esse level. No Level 5, a fala inicial foca L8-12 e retorna à região inicial L8-9 ao avançar; depois o Agente orienta suporte em L7-1 após a conquista de L8-3 e destaca a força, a rotação especial de L7-1 e a força final ao entrar a primeira unidade laranja em L7-1. |
 | Desfazer movimento da campanha | `campaignMoveUndoHistory`, `captureCampaignMoveUndo`, `undoLastCampaignMove` | Registra snapshots das duas regiões, moedas, sacos coletados e progresso do guia para desfazer movimentos em ordem inversa no turno atual. As entradas são persistidas no save; compras, mudanças de composição, guerra e passagem de turno invalidam a pilha. |
 | Turno e IA | `passTurnToNextPlayer`, `scheduleAiTurn`, `getGameSnapshot` | A IA escolhe ações com um snapshot do estado; a aplicação das ações permanece no cliente. |
 | Salvamento e retomada | `saveGame`, `loadSavedGame`, `continueSavedGame` | Alterações no estado persistente precisam ser compatíveis com saves existentes. |
@@ -105,9 +115,10 @@ acessam variáveis e elementos DOM declarados no mesmo script.
 3. No modo campanha, `beginConfiguredGame` carrega o JSON do nível antes de
    preparar peças iniciais, objetivo e estado do guia.
    O mapa `campaignLevelFiles` mantém a ordem de desbloqueio dos níveis. Configure
-   `initialCoins`, `coinsPerTurn`, `preserveCoinsBetweenTurns` e
-   `aiActionsEnabled` no bloco `campaign`, sem criar exceções por número de
-   level no fluxo de turnos.
+   `initialCoins`, `coinsPerTurn`, `coinsPerTurnStopAtTurn`,
+   `preserveCoinsBetweenTurns` e `aiActionsEnabled` no bloco `campaign`, sem
+   criar exceções por número de level no fluxo de turnos. `coinsPerTurnStopAtTurn`
+   é opcional e zera a renda ao iniciar o turno indicado.
 4. Ações como comprar, mover, promover, descartar, girar ou resolver uma guerra
    atualizam `regionPiecesByRegion` e estruturas relacionadas.
 5. As ações que alteram a composição/posição atualizam forças, visuais, controles
@@ -143,6 +154,10 @@ acessam variáveis e elementos DOM declarados no mesmo script.
    quadriculares e discos circulares rotativos. O cliente enquadra a área de
    rotação e destaca as células e setores ocupados; posições quadriculares vazias
    aparecem como células tracejadas. O gesto de círculo reconhece 240° ou mais.
+   O antigo atalho de rotação do canto superior esquerdo foi removido; a entrada
+   de rotação é o botão contextual no painel da região. No WebView Android, o
+   ícone de menu fica no canto superior esquerdo e agrupa as ações da campanha;
+   os botões não ocupam mais a borda inferior do tabuleiro.
    Para discos circulares, um gesto horário gira à direita e um gesto
    anti-horário à esquerda; para blocos quadriculares, mantém-se a associação
    horária à esquerda e anti-horária à direita. O botão cancela o modo; o
@@ -248,12 +263,13 @@ incluídos pelo Spring Boot. Não basta o módulo funcionar em um único ambient
 - A versão web parte de `index.html` e dos arquivos estáticos na raiz. O CSS e a
   lógica principal são arquivos externos carregados em ordem explícita.
 - A tarefa `prepareWebAssets` em `android-app/app/build.gradle` copia HTML,
-  CSS, JavaScript, PNG, JSON e SVG da raiz; confira o filtro ao adicionar outro
-  tipo de arquivo.
+  CSS, JavaScript, PNG, JSON e SVG da raiz; a trilha da campanha é SVG inline no
+  HTML e não depende de uma imagem externa.
 - `server-app/build.gradle` empacota explicitamente `index.html`, `game.css`,
   `game-client.js`, `game-rules.js`, `will-of-many-ai.js`, PNG e SVG. Ao adicionar
   outro recurso web, avalie também esse filtro.
-- `MainActivity.java` contém mais de uma integração nativa. Alterações de WebView
+- `MainActivity.java` contém mais de uma integração nativa, incluindo o
+  encerramento da Activity solicitado pelo menu “Sair”. Alterações de WebView
   podem afetar carregamento local, URL online, Bluetooth e login Google.
 - Os dados do tabuleiro são arquivos externos. Se o carregamento falhar, o cliente
   informa o erro e permite carregar um JSON manualmente; não existe mais um
@@ -262,3 +278,20 @@ incluídos pelo Spring Boot. Não basta o módulo funcionar em um único ambient
   atualizar referências no cliente e nas listas de assets/bridge correspondentes.
 - Alterações locais existentes podem ser relacionadas a uma correção em curso.
   Não as descarte ao organizar ou extrair código.
+
+## Testes e validação por plataforma
+
+- O jogo é destinado exclusivamente ao aplicativo Android. Faça nele a
+  validação de aceitação para toda mudança de mecânica, interface ou fluxo,
+  usando o APK recém-compilado e, quando disponível, um aparelho Android; a
+  inspeção no navegador desktop é apenas auxiliar.
+- Para qualquer mudança nos arquivos web, Android ou assets, compile o APK com
+  `.\gradlew.bat --no-daemon assembleDebug` em `android-app/` e confira o
+  resultado e os recursos incluídos. Teste os cenários tocáveis afetados no
+  WebView, inclusive layout/orientação se a mudança for visual.
+- O modo online continua servido pelo Spring Boot. Mantenha os recursos web e
+  imagens correspondentes empacotados em `server-app/build.gradle`, execute os
+  testes do servidor quando a alteração puder afetar o online e confira o
+  conteúdo empacotado sempre que novos assets forem introduzidos.
+- Os testes automatizados Node das regras e pontos de entrada continuam sendo
+  executados; eles complementam, mas não substituem, a validação Android.

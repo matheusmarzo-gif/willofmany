@@ -70,6 +70,85 @@
       </div>
       <p class="start-message" id="start-message" aria-live="polite"></p>
     </div>
+    <section class="campaign-trail-screen is-hidden" id="campaign-trail-screen" aria-labelledby="campaign-trail-title">
+      <div class="campaign-trail-card">
+        <header class="campaign-trail-header">
+          <div>
+            <p class="campaign-trail-eyebrow">Iter Romanus</p>
+            <h2 id="campaign-trail-title">Trilha da campanha</h2>
+            <p>Escolha um level desbloqueado para continuar sua jornada.</p>
+          </div>
+          <button class="campaign-trail-back" id="campaign-trail-back" type="button">Voltar</button>
+        </header>
+        <div class="campaign-trail-map" role="group" aria-label="Trilha ilustrada dos levels da campanha">
+          <svg class="campaign-trail-art" viewBox="0 0 1000 400" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="trail-ground" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#78905c"></stop>
+                <stop offset=".52" stop-color="#a9a36c"></stop>
+                <stop offset="1" stop-color="#6c8356"></stop>
+              </linearGradient>
+              <linearGradient id="trail-road" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#f4dfaa"></stop>
+                <stop offset="1" stop-color="#b58a50"></stop>
+              </linearGradient>
+              <pattern id="trail-grass" width="46" height="38" patternUnits="userSpaceOnUse">
+                <path d="M7 31q3-9 6-12m-2 7q-6-4-6-8m29 16q1-7 5-11m-2 7q-5-3-5-7" fill="none" stroke="#425b3b" stroke-opacity=".28" stroke-width="2"></path>
+                <circle cx="23" cy="9" r="2" fill="#ead18b" fill-opacity=".42"></circle>
+              </pattern>
+              <g id="trail-tree">
+                <path d="M0 18h5l-1 9h-3z" fill="#64482f"></path>
+                <circle cx="2" cy="12" r="8" fill="#3c6345" stroke="#d3c27d" stroke-width="1.5"></circle>
+                <circle cx="-3" cy="14" r="4" fill="#55764c"></circle>
+                <circle cx="7" cy="15" r="4" fill="#6d8050"></circle>
+              </g>
+            </defs>
+            <rect width="1000" height="400" fill="url(#trail-ground)"></rect>
+            <rect width="1000" height="400" fill="url(#trail-grass)"></rect>
+            <path d="M72 314C154 285 154 251 226 248s136 38 202 6 82-79 144-82 119 25 176-8 84-70 179-78" fill="none" stroke="#42563b" stroke-opacity=".35" stroke-width="96" stroke-linecap="round"></path>
+            <path d="M72 314C154 285 154 251 226 248s136 38 202 6 82-79 144-82 119 25 176-8 84-70 179-78" fill="none" stroke="#80613a" stroke-width="77" stroke-linecap="round"></path>
+            <path d="M72 314C154 285 154 251 226 248s136 38 202 6 82-79 144-82 119 25 176-8 84-70 179-78" fill="none" stroke="url(#trail-road)" stroke-width="67" stroke-linecap="round"></path>
+            <path d="M72 314C154 285 154 251 226 248s136 38 202 6 82-79 144-82 119 25 176-8 84-70 179-78" fill="none" stroke="#f8e9c0" stroke-opacity=".75" stroke-width="2" stroke-dasharray="3 15" stroke-linecap="round"></path>
+            <g fill="#dfc58e" stroke="#80613a" stroke-width="3">
+              <ellipse cx="344" cy="110" rx="76" ry="32"></ellipse>
+              <ellipse cx="344" cy="110" rx="59" ry="21" fill="#798d5b"></ellipse>
+              <path d="M322 86h45l-4-15h-37zM326 85v20m12-20v20m13-20v20m12-20v20M318 106h52v8h-52z"></path>
+              <path d="M648 302h91v-45l-46-29-45 29z"></path>
+              <path d="M660 302v-38h68v38m-59-37v37m17-37v37m17-37v37m-39-49h51"></path>
+              <path d="M861 111h76V76l-38-24-38 24z"></path>
+              <path d="M872 111V80h54v31m-43-30v30m15-30v30m15-30v30"></path>
+            </g>
+            <g fill="#74543a">
+              <path d="M319 126h51v7h-51zM650 304h87v8h-87zM863 113h72v7h-72z"></path>
+              <path d="M332 70h25l-12-18zM680 222h25l-12-18zM887 52h25l-12-18z"></path>
+            </g>
+            <g>
+              <use href="#trail-tree" x="238" y="92"></use><use href="#trail-tree" x="272" y="132"></use>
+              <use href="#trail-tree" x="411" y="146"></use><use href="#trail-tree" x="448" y="104"></use>
+              <use href="#trail-tree" x="572" y="285"></use><use href="#trail-tree" x="608" y="326"></use>
+              <use href="#trail-tree" x="774" y="244"></use><use href="#trail-tree" x="812" y="287"></use>
+              <use href="#trail-tree" x="934" y="191"></use><use href="#trail-tree" x="962" y="220"></use>
+              <use href="#trail-tree" x="97" y="144"></use><use href="#trail-tree" x="132" y="176"></use>
+            </g>
+            <g fill="#f0dda9" stroke="#715339" stroke-width="3">
+              <path d="M83 103h18v42H83zM77 98h30v8H77zM87 111h10v34H87z"></path>
+              <path d="M521 312h15v36h-15zM516 306h25v8h-25zM523 319h11v29h-11z"></path>
+              <path d="M927 307h17v43h-17zM922 301h27v8h-27zM931 315h10v35h-10z"></path>
+            </g>
+            <g fill="#fff1c7" font-family="Georgia,serif" font-size="15" font-weight="bold" letter-spacing="2">
+              <text x="303" y="162">CAMPUS</text>
+              <text x="657" y="333">VIA SACRA</text>
+              <text x="841" y="145">ROMA</text>
+            </g>
+          </svg>
+          <div class="campaign-trail-levels" id="campaign-trail-levels"></div>
+        </div>
+        <footer class="campaign-trail-legend">
+          <span><i class="campaign-trail-key is-unlocked"></i>Disponível</span>
+          <span><i class="campaign-trail-key is-locked"></i>Bloqueado</span>
+        </footer>
+      </div>
+    </section>
   </section>
   <section class="tutorial-modal is-hidden" id="tutorial-modal" role="dialog" aria-modal="true" aria-labelledby="tutorial-title" aria-hidden="true">
     <div class="tutorial-card">
@@ -105,11 +184,24 @@
     </div>
   </section>
   <main class="app">
+    <button class="game-menu-trigger" id="game-menu-trigger" type="button" aria-label="Abrir menu" title="Menu" aria-haspopup="dialog" aria-controls="game-menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+    </button>
+    <section class="game-modal is-hidden" id="game-menu" role="dialog" aria-modal="true" aria-labelledby="game-menu-title" aria-hidden="true">
+      <div class="game-modal-card game-menu-card">
+        <h2 id="game-menu-title">Menu</h2>
+        <div class="campaign-actions is-hidden" id="campaign-actions">
+          <button id="campaign-undo-button" type="button" title="Desfazer o último movimento" disabled>Desfazer</button>
+          <button id="campaign-menu-button" type="button">Retornar ao menu principal</button>
+          <button id="campaign-restart-button" type="button">Reiniciar level</button>
+        </div>
+        <button class="game-menu-resign is-hidden" id="game-menu-resign-button" type="button">Desistir da partida</button>
+      </div>
+    </section>
     <section class="intro" aria-labelledby="title">
       <p class="eyebrow">The Will of Many</p>
       <div class="rule" aria-hidden="true"></div>
       <p class="controls-label">Girar disco</p>
-      <button class="rotation-picker-close" id="rotation-picker-close" type="button">Fechar</button>
       <div class="controls" id="controls" aria-label="Controles dos discos"></div>
       <section class="turn-panel" aria-live="polite">
         <p id="turn-number">Turn 1</p>
@@ -118,10 +210,6 @@
         <p id="campaign-objective" class="is-hidden"></p>
         <p id="turn-wheat"><svg id="turn-wheat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V4m0 5C8 9 6 7 6 4c4 0 6 2 6 5Zm0 5c4 0 6-2 6-5-4 0-6 2-6 5Zm0-4C8 12 6 10 6 7c4 0 6 2 6 5Zm0 7c4 0 6-2 6-5-4 0-6 2-6 5Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></svg><span id="turn-wheat-value">Trigo: 0</span></p>
         <p id="wheat-feedback" class="is-hidden" aria-live="polite"></p>
-        <button class="turn-button rotation-picker-trigger" id="rotate-picker-button" type="button" aria-label="Girar disco" title="Girar disco">
-          <svg class="turn-button-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 3.5v4M12 3.5l-2.5 2.5M12 3.5l2.5 2.5M12 20.5v-4M12 20.5l-2.5-2.5M12 20.5l2.5-2.5"></path></svg>
-          <span class="turn-button-label">Girar disco</span>
-        </button>
         <button class="turn-button" id="pass-turn-button" type="button" aria-label="Passar a vez" title="Passar a vez">
           <svg class="turn-button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"></path></svg>
           <span class="turn-button-label">Passar a vez</span>
@@ -130,11 +218,6 @@
           <svg class="turn-button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"></path></svg>
           <span class="turn-button-label">Abandonar partida</span>
         </button>
-        <div class="campaign-actions is-hidden" id="campaign-actions">
-          <button id="campaign-undo-button" type="button" title="Desfazer o último movimento" disabled>Desfazer</button>
-          <button id="campaign-menu-button" type="button">Retornar ao menu</button>
-          <button id="campaign-restart-button" type="button">Reiniciar level</button>
-        </div>
         <button class="turn-button" id="statistics-button" type="button" aria-label="Estatísticas" title="Estatísticas">
           <svg class="turn-button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11h4v9M10 20V5h4v15M16 20v-8h4v8M3 20h18"></path></svg>
           <span class="turn-button-label">Estatísticas</span>
@@ -267,9 +350,15 @@
     <div class="game-modal-card final-card">
       <h2 id="final-modal-title">Fim de jogo</h2>
       <div id="final-summary"></div>
-      <button class="modal-close is-hidden" id="campaign-next-level-button" type="button">Continuar para o próximo level</button>
-      <button class="modal-close is-hidden" id="final-restart-campaign-button" type="button">Reiniciar level</button>
       <button class="modal-close" id="final-menu-button" type="button">Voltar ao menu</button>
+    </div>
+  </div>
+  <div class="game-modal is-hidden" id="campaign-victory-modal" role="dialog" aria-modal="true" aria-labelledby="campaign-victory-title" aria-hidden="true">
+    <div class="game-modal-card campaign-victory-card">
+      <h2 id="campaign-victory-title">Parabéns!</h2>
+      <p id="campaign-victory-message"></p>
+      <button class="modal-close" id="campaign-victory-menu-button" type="button">Voltar ao menu principal</button>
+      <button class="modal-close is-hidden" id="campaign-next-level-button" type="button">Continuar para o próximo level</button>
     </div>
   </div>
   <div class="game-modal is-hidden" id="abandon-match-modal" role="dialog" aria-modal="true" aria-labelledby="abandon-match-title">

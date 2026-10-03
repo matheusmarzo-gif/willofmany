@@ -6,6 +6,27 @@
     body { margin:0; color:var(--ink); background:radial-gradient(circle at 78% 14%, rgba(167,72,45,.1), transparent 25rem), linear-gradient(135deg,#f5f1e8,var(--paper) 48%,#e6e0d5); font-family:"Trebuchet MS","Gill Sans",sans-serif; }
     .start-screen { position:fixed; inset:0; z-index:300; display:grid; place-items:center; padding:24px; background:radial-gradient(circle at 50% 20%, rgba(167,72,45,.12), transparent 28rem), linear-gradient(135deg,#f5f1e8,var(--paper) 48%,#e6e0d5); }
     .start-screen.is-hidden { display:none; }
+    .campaign-trail-screen { position:absolute; inset:0; z-index:1; display:grid; place-items:center; overflow:auto; padding:clamp(10px,2.5vw,32px); background:rgba(34,27,20,.88); }
+    .campaign-trail-screen.is-hidden { display:none; }
+    .campaign-trail-card { display:grid; gap:clamp(8px,1.5vh,16px); width:min(1180px,100%); max-height:100%; padding:clamp(12px,2.2vw,24px); border:1px solid rgba(255,246,218,.55); border-radius:8px; background:linear-gradient(145deg,#f9f2df,#e6d5b3); box-shadow:0 22px 70px rgba(0,0,0,.46); }
+    .campaign-trail-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    .campaign-trail-eyebrow { margin:0 0 3px; color:#875328; font-size:10px; font-weight:800; letter-spacing:.22em; text-transform:uppercase; }
+    .campaign-trail-header h2 { margin:0; color:#392a1e; font:400 clamp(22px,4vw,36px)/1 Georgia,"Times New Roman",serif; }
+    .campaign-trail-header p:last-child { margin:5px 0 0; color:#665541; font-size:clamp(10px,1.7vw,13px); }
+    .campaign-trail-back { flex:none; min-height:38px; padding:8px 16px; }
+    .campaign-trail-map { position:relative; width:100%; height:clamp(220px,54vh,470px); margin:0 auto; overflow:hidden; border:3px solid #705335; border-radius:12px; background:linear-gradient(145deg,#9eaa70,#d6c18a 52%,#71865b); box-shadow:inset 0 0 0 4px rgba(248,230,185,.5),0 7px 20px rgba(61,41,20,.32); }
+    .campaign-trail-art { display:block; width:100%; height:100%; }
+    .campaign-trail-levels { position:absolute; inset:0; }
+    .campaign-trail-level { position:absolute; display:grid; place-items:center; width:clamp(44px,6.5vw,70px); height:clamp(44px,6.5vw,70px); padding:4px; border:3px solid #fff5d8; border-radius:50%; color:#fff8df; background:radial-gradient(circle at 35% 27%,#d9a14d,#774322 78%); box-shadow:0 3px 9px rgba(42,27,15,.68),0 0 0 2px rgba(104,61,28,.65); font:800 clamp(11px,2vw,16px)/1 "Trebuchet MS","Gill Sans",sans-serif; letter-spacing:.02em; transform:translate(-50%,-50%); cursor:pointer; }
+    .campaign-trail-level::after { position:absolute; right:-7px; bottom:-5px; display:grid; place-items:center; width:21px; height:21px; border:2px solid #fff5d8; border-radius:50%; color:#fff; background:#56713a; content:"+"; font-size:12px; font-weight:900; }
+    .campaign-trail-level:hover, .campaign-trail-level:focus-visible { z-index:2; border-color:#fff; background:radial-gradient(circle at 35% 27%,#f1c96c,#9a4d24 78%); outline:3px solid rgba(255,224,138,.78); outline-offset:3px; transform:translate(-50%,-50%) scale(1.08); }
+    .campaign-trail-level.is-current { box-shadow:0 0 0 5px rgba(227,180,81,.58),0 4px 12px rgba(42,27,15,.72); animation:region-outline-pulse 1s ease-in-out infinite alternate; }
+    .campaign-trail-level.is-locked { border-color:#ded5c3; color:#e9e1d2; background:radial-gradient(circle at 35% 27%,#8b877c,#46443f 78%); cursor:not-allowed; filter:saturate(.45); }
+    .campaign-trail-level.is-locked::after { color:#eee4d2; background:#68635a; content:"x"; font-size:10px; }
+    .campaign-trail-legend { display:flex; justify-content:center; gap:clamp(14px,4vw,34px); color:#5a4935; font-size:11px; font-weight:700; }
+    .campaign-trail-legend span { display:inline-flex; align-items:center; gap:6px; }
+    .campaign-trail-key { width:13px; height:13px; border:2px solid #fff5d8; border-radius:50%; background:#9a6232; box-shadow:0 1px 4px rgba(0,0,0,.35); }
+    .campaign-trail-key.is-locked { background:#68635a; }
     .start-card { width:min(420px,100%); padding:clamp(30px,8vw,60px); border:1px solid var(--line); background:rgba(255,255,255,.72); box-shadow:0 18px 50px rgba(32,33,31,.12); text-align:center; }
     .start-card h1 { max-width:none; margin:0 0 32px; }
     .start-menu, .new-game-options { display:grid; gap:10px; }
@@ -48,10 +69,19 @@
     .online-diagnostics button { min-height:36px; padding:6px 10px; font-size:11px; }
     .online-match-button { min-height:40px; padding:8px; }
     .final-card { max-height:80vh; }
+    .campaign-victory-card { width:min(400px,100%); text-align:center; }
+    .campaign-victory-card h2 { margin-bottom:10px; color:var(--accent); font-family:Georgia,"Times New Roman",serif; font-size:clamp(28px,6vw,38px); }
+    .campaign-victory-card p { margin:0 0 8px; }
     .final-summary { max-height:48vh; overflow:auto; color:var(--muted); font-size:12px; line-height:1.55; }
     .final-summary h3 { margin:14px 0 4px; color:var(--ink); font-size:14px; }
     .app { width:min(1240px,100%); min-height:100vh; margin:0 auto; padding:clamp(24px,5vw,68px) clamp(18px,6vw,88px); display:grid; grid-template-columns:minmax(250px,320px) 1fr; gap:clamp(30px,7vw,100px); align-items:center; }
     .app.is-hidden { display:none; }
+    .game-menu-trigger { position:fixed; z-index:90; top:max(10px,env(safe-area-inset-top)); left:max(10px,env(safe-area-inset-left)); display:grid; place-items:center; width:46px; height:46px; min-height:46px; margin:0; padding:10px; border:1px solid rgba(32,33,31,.18); border-radius:50%; background:rgba(247,244,237,.96); box-shadow:0 3px 12px rgba(32,33,31,.2); }
+    .game-menu-trigger svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+    .game-menu-card { width:min(320px,100%); }
+    .game-menu-card h2 { margin-bottom:16px; }
+    .game-menu-card .campaign-actions { display:flex; flex-direction:column; gap:10px; }
+    .game-menu-card .campaign-actions button, .game-menu-resign { width:100%; min-height:46px; margin:0; padding:10px; font-size:13px; }
     .eyebrow, .controls-label { color:var(--accent); font-size:11px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; }
     .eyebrow { margin:0 0 18px; }
     h1 { max-width:290px; margin:0; font-family:Georgia,"Times New Roman",serif; font-size:clamp(42px,5vw,68px); font-weight:400; line-height:.94; letter-spacing:-.04em; }
@@ -59,7 +89,6 @@
     .rule { width:58px; height:1px; margin:28px 0; background:var(--accent); }
     .controls-label { margin:0 0 12px; color:var(--muted); font-size:10px; letter-spacing:.16em; }
     .controls { display:grid; grid-template-columns:repeat(4,minmax(80px,1fr)); gap:8px; max-width:360px; }
-    .rotation-picker-open, .rotation-picker-close { display:none; }
     .layer-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:3px; }
     #controls .rotation-disk-controls.is-rotation-group-hidden,
     #controls .layer-controls.is-suppressed-by-circular-picker { display:none !important; }
@@ -263,6 +292,16 @@
     @media (orientation:landscape) and (max-height:600px) and (max-width:1000px) {
       html, body { width:100%; height:100%; min-height:0; overflow:hidden; }
       .start-screen { place-items:start center; overflow:auto; padding:8px; }
+      .campaign-trail-screen { padding:7px; }
+      .campaign-trail-card { width:100%; gap:6px; max-height:100%; padding:8px; }
+      .campaign-trail-header { gap:8px; }
+      .campaign-trail-header h2 { font-size:clamp(18px,5vw,28px); }
+      .campaign-trail-header p:last-child { max-width:65vw; }
+      .campaign-trail-back { min-height:32px; padding:6px 10px; }
+      .campaign-trail-map { width:100%; height:clamp(190px,58dvh,430px); max-height:none; }
+      .campaign-trail-level { width:clamp(36px,8vw,56px); height:clamp(36px,8vw,56px); border-width:2px; }
+      .campaign-trail-level::after { width:17px; height:17px; font-size:10px; }
+      .campaign-trail-legend { font-size:9px; }
       .start-card { width:min(560px,100%); max-height:96vh; overflow:auto; padding:10px 16px; }
       .start-card h1 { margin-bottom:8px; font-size:36px; }
       .start-menu, .new-game-options { gap:5px; }
@@ -315,16 +354,16 @@
       .turn-panel button:hover, .turn-panel button:focus-visible { transform:none; }
       .turn-panel .turn-button-icon { display:block; }
       .turn-panel .turn-button-label { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; clip-path:inset(50%); }
-      #rotate-picker-button, #pass-turn-button { left:max(5px,env(safe-area-inset-left)); }
-      #rotate-picker-button, #pass-turn-button, #statistics-button, #war-button { transform:none; }
+      #pass-turn-button { left:max(5px,env(safe-area-inset-left)); }
+      #pass-turn-button, #statistics-button, #war-button { transform:none; }
       #statistics-button, #war-button { right:max(5px,env(safe-area-inset-right)); }
-      #rotate-picker-button { top:max(5px,env(safe-area-inset-top)); }
       #pass-turn-button { top:var(--region-actions-pass-top,calc(50% + 135px)); }
       #statistics-button { top:max(5px,env(safe-area-inset-top)); }
       #war-button { top:auto; bottom:max(5px,env(safe-area-inset-bottom)); }
       #pass-turn-button:disabled { cursor:not-allowed; }
-      .turn-panel .campaign-actions { position:fixed; z-index:11; right:4vw; bottom:24px; left:4vw; justify-content:center; gap:5px; pointer-events:auto; }
-      .turn-panel .campaign-actions button { position:static; width:min(140px,32%); min-height:34px; flex:1 1 0; padding:6px 3px; border-radius:4px; background:rgba(247,244,237,.96); box-shadow:0 3px 12px rgba(32,33,31,.2); pointer-events:auto; transform:none; }
+      .game-menu-trigger { width:42px; height:42px; min-height:42px; padding:8px; }
+      .game-menu-trigger svg { width:23px; height:23px; }
+      .game-menu-card .campaign-actions button, .game-menu-resign { min-height:48px; }
       .app.is-rotation-guide .region-panel #rotate-quadrilateral-block-button { box-shadow:0 0 0 3px rgba(243,198,107,.7),0 0 22px 5px rgba(255,218,127,.78); }
       .controls-label { display:none; }
       #controls { position:fixed; z-index:30; inset:0; display:none; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:center; width:100%; max-width:none; padding:46px 16px 16px; gap:8px; overflow:auto; background:rgba(24,24,22,.88); }
@@ -335,8 +374,6 @@
       #controls .rotation-block-button, #controls .rotation-block-back { color:#fffaf4; border-color:rgba(255,255,255,.3); background:rgba(255,255,255,.12); }
       #controls .layer-button { min-height:34px; color:#fffaf4; border-color:rgba(255,255,255,.3); background:rgba(255,255,255,.12); font-size:10px; }
       #controls .layer-button:disabled { color:rgba(255,255,255,.4); background:rgba(120,120,120,.35); }
-      .rotation-picker-close { position:fixed; z-index:32; top:8px; right:10px; display:none; min-height:34px; padding:8px 12px; color:#fffaf4; border-color:rgba(255,255,255,.5); background:rgba(255,255,255,.12); }
-      .app.is-rotation-picker-open .rotation-picker-close { display:block; }
       .readout { position:fixed; z-index:4; right:calc(25vw + 4px); bottom:4px; left:calc(25vw + 4px); margin:0; font-size:8px; line-height:1.2; text-shadow:0 1px 3px #fff; pointer-events:none; }
       .debug-tools { position:fixed; z-index:8; right:calc(25vw + 4px); bottom:18px; left:calc(25vw + 4px); margin:0; pointer-events:auto; }
       .debug-button { min-height:24px; padding:4px 6px; font-size:8px; }

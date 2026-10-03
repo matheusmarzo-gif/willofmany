@@ -180,6 +180,38 @@ test('quadrilateral blocks without a custom area keep recursive ring rotation', 
   );
 });
 
+test('quadrilateral rotation path cycles only its ordered cells in either direction', () => {
+  const initial = [
+    ['a', 'b', 'c'],
+    ['d', 'e', 'f'],
+    ['g', 'h', 'i']
+  ];
+  const path = [[1, 2], [2, 2], [3, 2]];
+  assert.deepEqual(
+    rules.rotateQuadrilateralMatrixPath(initial, 'right', path),
+    [
+      ['a', 'h', 'c'],
+      ['d', 'b', 'f'],
+      ['g', 'e', 'i']
+    ]
+  );
+  assert.deepEqual(
+    rules.rotateQuadrilateralMatrixPath(
+      rules.rotateQuadrilateralMatrixPath(initial, 'right', path),
+      'left',
+      path
+    ),
+    initial,
+    'rotating the same path in opposite directions restores the original matrix'
+  );
+  assert.deepEqual(initial[1], ['d', 'e', 'f'],
+    'path rotation does not mutate the source matrix');
+  assert.throws(
+    () => rules.rotateQuadrilateralMatrixPath(initial, 'right', [[2, 1], [2, 1]]),
+    RangeError
+  );
+});
+
 test('recruitment costs include promotion costs from lower layers', () => {
   assert.equal(rules.getRecruitmentCost(8, 'g'), 1);
   assert.equal(rules.getRecruitmentCost(7, 'f'), 28);

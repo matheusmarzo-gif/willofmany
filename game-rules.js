@@ -144,6 +144,44 @@
     return rotated;
   }
 
+  function rotateQuadrilateralMatrixPath(matrix, direction, rotationPath) {
+    if (!Array.isArray(matrix) || !matrix.length ||
+        matrix.some((row) => !Array.isArray(row) || row.length !== matrix.length)) {
+      throw new TypeError('A matriz de rotação deve ser quadrada.');
+    }
+    if (!['left', 'right'].includes(direction)) {
+      throw new TypeError(`Direção de rotação inválida: ${direction}`);
+    }
+    if (!Array.isArray(rotationPath) || rotationPath.length < 2) {
+      throw new RangeError('O percurso de rotação deve conter pelo menos duas células.');
+    }
+
+    const path = rotationPath.map((position) => {
+      if (!Array.isArray(position) || position.length !== 2 ||
+          !position.every(Number.isInteger)) {
+        throw new RangeError('Cada posição do percurso deve conter linha e coluna inteiras.');
+      }
+      const [row, column] = position;
+      if (row < 1 || row > matrix.length || column < 1 || column > matrix.length) {
+        throw new RangeError('O percurso de rotação deve ficar dentro da matriz.');
+      }
+      return [row - 1, column - 1];
+    });
+    const pathKeys = path.map(([row, column]) => `${row}:${column}`);
+    if (new Set(pathKeys).size !== pathKeys.length) {
+      throw new RangeError('O percurso de rotação não pode repetir células.');
+    }
+
+    const rotated = matrix.map((row) => [...row]);
+    const values = path.map(([row, column]) => matrix[row][column]);
+    const offset = direction === 'right' ? 1 : -1;
+    path.forEach(([row, column], index) => {
+      const destination = path[(index + offset + path.length) % path.length];
+      rotated[destination[0]][destination[1]] = values[index];
+    });
+    return rotated;
+  }
+
   function getRegionLayer(regionCode) {
     if (!regionCode) return 0;
     const match = String(regionCode).match(/^L(\d+)-/);
@@ -230,6 +268,7 @@
     getPieceCount,
     areAxisAlignedCellsNeighbors,
     rotateQuadrilateralMatrix,
+    rotateQuadrilateralMatrixPath,
     getRegionLayer,
     getWarRegionOrder,
     buildWarConflicts,

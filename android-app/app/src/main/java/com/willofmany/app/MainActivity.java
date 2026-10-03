@@ -164,6 +164,13 @@ public final class MainActivity extends Activity {
 
     private final class BluetoothBridge {
         @JavascriptInterface
+        public void closeApp() {
+            runOnUiThread(() -> {
+                if (!destroyed) finish();
+            });
+        }
+
+        @JavascriptInterface
         public void openOnlineGame() {
             runOnUiThread(() -> {
                 if (webView != null && !destroyed) {
@@ -177,7 +184,9 @@ public final class MainActivity extends Activity {
             if (!"regioes-will-of-many-circular.json".equals(fileName) &&
                 !"tabuleiro-01.json".equals(fileName) &&
                 !"tabuleiro-02.json".equals(fileName) &&
-                !"tabuleiro-03.json".equals(fileName)) {
+                !"tabuleiro-03.json".equals(fileName) &&
+                !"tabuleiro-04.json".equals(fileName) &&
+                !"tabuleiro-05.json".equals(fileName)) {
                 Log.w(TAG, "Rejeitando arquivo de tabuleiro não permitido: " + fileName);
                 return "";
             }
