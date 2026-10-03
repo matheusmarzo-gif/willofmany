@@ -182,6 +182,27 @@
     return rotated;
   }
 
+  function getQuadrilateralMatrixHorizontalPath(matrix, regionCode) {
+    if (!Array.isArray(matrix) || !matrix.length ||
+        matrix.some((row) => !Array.isArray(row) || row.length !== matrix.length)) {
+      throw new TypeError('A matriz de rotação deve ser quadrada.');
+    }
+    if (typeof regionCode !== 'string' || !regionCode) {
+      throw new TypeError('A região do percurso horizontal é inválida.');
+    }
+
+    let column = null;
+    matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
+      if (code !== regionCode) return;
+      if (column !== null) {
+        throw new RangeError(`A região ${regionCode} aparece mais de uma vez na matriz.`);
+      }
+      column = columnIndex + 1;
+    }));
+    if (column === null) return null;
+    return matrix.map((row, rowIndex) => [rowIndex + 1, column]);
+  }
+
   function getRegionLayer(regionCode) {
     if (!regionCode) return 0;
     const match = String(regionCode).match(/^L(\d+)-/);
@@ -269,6 +290,7 @@
     areAxisAlignedCellsNeighbors,
     rotateQuadrilateralMatrix,
     rotateQuadrilateralMatrixPath,
+    getQuadrilateralMatrixHorizontalPath,
     getRegionLayer,
     getWarRegionOrder,
     buildWarConflicts,

@@ -17,7 +17,7 @@
     "coinsPerTurn": 2,
     "coinsPerTurnStopAtTurn": 12,
     "preserveCoinsBetweenTurns": false,
-    "turnLimitCurrentTurn": 20,
+    "turnLimitCurrentTurn": 22,
     "aiActionsEnabled": false,
     "rotationEnabled": true,
     "objectiveRegions": ["L8-12"],
@@ -226,7 +226,7 @@
           "shape": "quadrilateral",
           "positions": [[2, 2]],
           "maxPieces": 8,
-          "rotationPath": [[1, 2], [2, 2], [3, 2]]
+          "rotationPathAxis": "horizontal"
         }
       ]
     },

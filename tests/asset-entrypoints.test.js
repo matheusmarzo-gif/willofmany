@@ -48,6 +48,14 @@ test('browser entrypoint loads the external client resources in dependency order
   assert.equal(html.includes('embedded-region-data'), false, 'no embedded board fallback remains');
 });
 
+test('turn transition includes its fade-out within the one-second display duration', () => {
+  assert.match(
+    gameClient,
+    /async function showTurnTransition[\s\S]*?await waitForWarAnimation\(750\);\s*turnTransition\.classList\.remove\('is-visible'\)/
+  );
+  assert.match(gameCss, /\.turn-transition \{[^}]*transition:opacity \.25s ease;/);
+});
+
 test('Android and server builds package all external client resources', () => {
   const androidGradle = fs.readFileSync(
     path.join(root, 'android-app', 'app', 'build.gradle'),
@@ -234,7 +242,7 @@ test('Level 5 defines its four blocks, campaign economy, deadline, and doubled B
     coinsPerTurn: 2,
     coinsPerTurnStopAtTurn: 12,
     preserveCoinsBetweenTurns: false,
-    turnLimitCurrentTurn: 20,
+    turnLimitCurrentTurn: 22,
     aiActionsEnabled: false,
     rotationEnabled: true,
     objectiveRegions: ['L8-12'],
@@ -265,7 +273,7 @@ test('Level 5 defines its four blocks, campaign economy, deadline, and doubled B
   assert.equal(levelSevenRegion.rank, 'L8');
   assert.equal(levelSevenRegion.layer, 7,
     'the region keeps its L7 identity while remaining in the L8 rotating block');
-  assert.deepEqual(levelSevenRegion.rotationPath, [[1, 2], [2, 2], [3, 2]]);
+  assert.equal(levelSevenRegion.rotationPathAxis, 'horizontal');
   assert.deepEqual(blocks.BQ03.C_inicial, { x: 750, y: 525 });
   assert.deepEqual(blocks.BQ04.matrix, [['L8-12']]);
   assert.equal(blocks.BQ04.rotationEnabled, false);
@@ -304,6 +312,9 @@ test('Level 5 defines its four blocks, campaign economy, deadline, and doubled B
   assert.match(gameClient, /rotationSteps: Number\(block\.rotationSteps\) === 2 \? 2 : 1/);
   assert.match(gameClient, /step < block\.rotationSteps/);
   assert.match(gameClient, /turnLimitCurrentTurn/);
+  assert.match(gameClient, /team === aiTeam && !isCampaignLevelTwo\(\) &&\s*wasPieceCreatedThisTurn\(regionCode, team, pieceStage\)/);
+  assert.match(gameClient, /const canRecycle = availablePieces >= 2;/);
+  assert.match(gameClient, /await waitForWarAnimation\(750\)/);
   assert.match(
     gameClient,
     /function getCampaignCoinsPerTurn\(level, turn = currentTurn\)[\s\S]*?coinsPerTurnStopAtTurn[\s\S]*?turn >= zeroIncomeAtTurn/
@@ -317,8 +328,9 @@ test('Level 5 defines its four blocks, campaign economy, deadline, and doubled B
     /if \(currentBoardData\?\.boardType === 'mixed' \|\|\s*\['tabuleiro-03', 'tabuleiro-05'\]\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;\s*stageZoomOffset = \{\s*x: \(\(50 - point\.x\) \/ 100\) \* rect\.width \* scale,\s*y: \(\(50 - point\.y\) \/ 100\) \* rect\.height \* scale/
   );
   assert.match(gameClient, /gameRules\.rotateQuadrilateralMatrixPath\(matrix, direction, rotationPath\)/);
-  assert.match(gameClient, /const rotationPath = kind === 'quadrilateral'[\s\S]*?\(region\.code \|\| region\.name\) === selectedRegionCode\)\?\.rotationPath[\s\S]*?rotationPath,\s*gesture: null/);
-  assert.match(gameClient, /regionRotationHelp\.textContent[\s\S]*?M\(1,2\) → M\(2,2\) → M\(3,2\)/);
+  assert.match(gameClient, /function getQuadrilateralRegionRotationPath\(block, region\)[\s\S]*?rotationPathAxis === 'horizontal'[\s\S]*?getQuadrilateralMatrixHorizontalPath/);
+  assert.match(gameClient, /const rotationPath = kind === 'quadrilateral'[\s\S]*?getQuadrilateralRegionRotationPath\(/);
+  assert.match(gameClient, /regionRotationHelp\.textContent[\s\S]*?selectedRotationPath\[0\]\[1\][\s\S]*?M\(3,\$\{selectedRotationPath\[0\]\[1\]\}\)/);
   assert.match(gameClient, /type: 'rotate'[\s\S]*?\.\.\.\(rotationPath \? \{ rotationPath \} : \{\}\)/);
 
   const expectedRight = [
@@ -342,7 +354,7 @@ test('Level 5 campaign guide introduces the objective and advances through suppo
   assert.match(gameClient, /step === 'level5-turn3-tip'\) \{\s*focusRegion\('L8-12'\)/);
   assert.match(gameClient, /const wasLevelFiveTurnThreeTip = campaignGuideStep === 'level5-turn3-tip';[\s\S]*?focusStrongestRegionForTeam\('orange'\)/);
   assert.match(gameClient, /Estamos mais próximos de concluir o nível![\s\S]*?L8-9[\s\S]*?L7-1/);
-  assert.match(gameClient, /Unidades no Rank Amarelo recebem metade da força[\s\S]*?8 unidades vermelhas[\s\S]*?L7-1 também tem uma rotação especial[\s\S]*?rank superior/);
+  assert.match(gameClient, /Unidades no Rank Amarelo recebem metade da força[\s\S]*?8 unidades vermelhas[\s\S]*?L7-1 também tem uma rotação especial[\s\S]*?linha horizontal que ocupa no momento[\s\S]*?rank superior/);
   assert.match(gameClient, /campaignGuideStep === 'await-level5-l8-3'[\s\S]*?getRegionDominador\('L8-2'\) === 'orange'[\s\S]*?showCampaignGuide\('level5-support-tip'\)/);
   assert.match(gameClient, /case 'level5-support-tip':\s*return \[\s*getCampaignRegionShape\('L8-2'\)/);
   assert.match(gameClient, /step === 'level5-support-tip'\) \{\s*selectedRegionCode = 'L8-2'[\s\S]*?focusRegion\('L8-2'\)/);
@@ -429,8 +441,7 @@ test('campaign mode opens a custom illustrated trail with data-driven unlocked l
   assert.match(gameClient, /}, 2000\);/);
   assert.match(gameClient, /is-level-three-intro-pan/);
   assert.match(gameClient, /is-level-three-intro-return/);
-  assert.match(gameClient, /waitForWarAnimation\(duration\)/);
-  assert.match(gameClient, /activeCampaignLevel\.id === 'tabuleiro-03'\s*\?\s*1750\s*:\s*3500/);
+  assert.match(gameClient, /await waitForWarAnimation\(750\)/);
   assert.match(gameClient, /stagePanel\.appendChild\(tag\)/);
   assert.match(gameClient, /regiões vizinhas e as tropas de suporte das regiões adjacentes/);
   assert.match(gameClient, /levelThreeRegionMapVersion/);

@@ -212,6 +212,41 @@ test('quadrilateral rotation path cycles only its ordered cells in either direct
   );
 });
 
+test('quadrilateral horizontal rotation path follows the region current row', () => {
+  assert.deepEqual(
+    rules.getQuadrilateralMatrixHorizontalPath([
+      ['a', 'b', 'c'],
+      ['d', 'L7-1', 'f'],
+      ['g', 'h', 'i']
+    ], 'L7-1'),
+    [[1, 2], [2, 2], [3, 2]]
+  );
+  assert.deepEqual(
+    rules.getQuadrilateralMatrixHorizontalPath([
+      ['a', 'b', 'c'],
+      ['L7-1', 'e', 'f'],
+      ['g', 'h', 'i']
+    ], 'L7-1'),
+    [[1, 1], [2, 1], [3, 1]]
+  );
+  assert.deepEqual(
+    rules.getQuadrilateralMatrixHorizontalPath([
+      ['a', 'b', 'c'],
+      ['d', 'e', 'f'],
+      ['g', 'h', 'L7-1']
+    ], 'L7-1'),
+    [[1, 3], [2, 3], [3, 3]]
+  );
+  assert.equal(
+    rules.getQuadrilateralMatrixHorizontalPath([['a', 'b'], ['c', 'd']], 'L7-1'),
+    null
+  );
+  assert.throws(
+    () => rules.getQuadrilateralMatrixHorizontalPath([['L7-1', 'L7-1'], ['a', 'b']], 'L7-1'),
+    RangeError
+  );
+});
+
 test('recruitment costs include promotion costs from lower layers', () => {
   assert.equal(rules.getRecruitmentCost(8, 'g'), 1);
   assert.equal(rules.getRecruitmentCost(7, 'f'), 28);

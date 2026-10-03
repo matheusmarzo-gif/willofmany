@@ -1324,6 +1324,16 @@
         piece.team === team && piece.source === regionCode && piece.stage === stage);
     }
 
+    function getQuadrilateralRegionRotationPath(block, region) {
+      if (region?.rotationPathAxis === 'horizontal') {
+        return gameRules.getQuadrilateralMatrixHorizontalPath(
+          quadrilateralBoard?.matrices?.[block.name],
+          region.code || region.name
+        );
+      }
+      return Array.isArray(region?.rotationPath) ? region.rotationPath : null;
+    }
+
     function hasDirectRecruitmentPromotionCapacity(targetLayer, team, requiredSoldiers) {
       const minimumSoldiers = Number(requiredSoldiers);
       if (!Number.isFinite(minimumSoldiers) || minimumSoldiers <= 0) return false;
@@ -2168,9 +2178,7 @@
       const availablePieces = getTeamPieceCount(sourceCode, currentTeam);
       const targets = getDragTargets(sourceCode, currentTeam, amount, pieceStage);
       if (!amount || !Object.prototype.hasOwnProperty.call(soldierWeights, pieceStage)) return false;
-      const canRecycle = availablePieces >= 2 &&
-        (isCampaignLevelTwo() ||
-          !wasPieceCreatedThisTurn(sourceCode, currentTeam, pieceStage));
+      const canRecycle = availablePieces >= 2;
       if (!targets.length && !canRecycle) return false;
       const dragPiece = document.createElement('img');
       dragPiece.className = 'drag-piece';
@@ -2399,7 +2407,8 @@
     function recyclePiece(regionCode, team, pieceStage) {
       if ((!isApplyingBluetoothAction && !isLocalPlayersTurn()) || team !== currentTeam ||
           !Object.prototype.hasOwnProperty.call(soldierWeights, pieceStage)) return false;
-      if (!isCampaignLevelTwo() && wasPieceCreatedThisTurn(regionCode, team, pieceStage)) {
+      if (team === aiTeam && !isCampaignLevelTwo() &&
+          wasPieceCreatedThisTurn(regionCode, team, pieceStage)) {
         readout.textContent = `${regionCode}: uma peça ${pieceStage.toUpperCase()} recém-promovida não pode ser reciclada neste turno.`;
         return false;
       }
@@ -3092,8 +3101,13 @@
           (rotatableQuadrilateralBlock?.name || rotatableCircularDisk?.block.name) &&
         (activeRotationKind !== 'circular' ||
           quadrilateralRotationMode.disco === rotatableCircularDisk?.disco);
-      const selectedRotationPath = rotatableQuadrilateralBlock?.regions
-        .find((region) => (region.code || region.name) === regionCode)?.rotationPath || null;
+      const selectedRotationPath = rotatableQuadrilateralBlock
+        ? getQuadrilateralRegionRotationPath(
+          rotatableQuadrilateralBlock,
+          rotatableQuadrilateralBlock.regions.find((region) =>
+            (region.code || region.name) === regionCode)
+        )
+        : null;
       const canRotateSelected = rotatableQuadrilateralBlock
         ? canRotateQuadrilateralBlock(rotatableQuadrilateralBlock)
         : rotatableCircularDisk && canRotateCircularDisk(
@@ -3119,7 +3133,7 @@
         : activeRotationKind === 'circular'
           ? 'Desenhe um círculo sobre o disco: sentido horário gira à direita; anti-horário gira à esquerda.'
           : selectedRotationPath
-            ? 'Rotação especial: as células M(1,2) → M(2,2) → M(3,2) alternam de posição. Desenhe um círculo sobre a linha destacada.'
+            ? `Rotação especial: as células M(1,${selectedRotationPath[0][1]}) → M(2,${selectedRotationPath[0][1]}) → M(3,${selectedRotationPath[0][1]}) alternam de posição. Desenhe um círculo sobre a linha destacada.`
             : 'Desenhe um círculo sobre as células destacadas: horário gira à esquerda; anti-horário gira à direita.';
       regionLayerOrangeForce.textContent = formatStatisticsNumber(layerFinalForces.orange);
       regionLayerBlueForce.textContent = formatStatisticsNumber(layerFinalForces.blue);
@@ -4917,8 +4931,11 @@
         quadrilateralRotationReturnTimeout = null;
       }
       const rotationPath = kind === 'quadrilateral'
-        ? block.regions.find((region) =>
-          (region.code || region.name) === selectedRegionCode)?.rotationPath || null
+        ? getQuadrilateralRegionRotationPath(
+          block,
+          block.regions.find((region) =>
+            (region.code || region.name) === selectedRegionCode)
+        )
         : null;
       quadrilateralRotationMode = {
         kind,
@@ -6672,7 +6689,7 @@
         },
         'level5-force-tip': {
           title: 'A força do Rank Amarelo',
-          message: 'Unidades no Rank Amarelo recebem metade da força das unidades vermelhas aliadas adjacentes, limitadas a 8 unidades vermelhas para cada amarela. Além disso elas multiplicam essa força! L7-1 também tem uma rotação especial: com ela selecionada, as posições M(1,2), M(2,2) e M(3,2) alternam entre si. Lutar usando unidades de rank superior é o que pode te trazer a vitória!',
+          message: 'Unidades no Rank Amarelo recebem metade da força das unidades vermelhas aliadas adjacentes, limitadas a 8 unidades vermelhas para cada amarela. Além disso elas multiplicam essa força! L7-1 também tem uma rotação especial: ela gira a linha horizontal que ocupa no momento, movendo suas três posições em sequência. Lutar usando unidades de rank superior é o que pode te trazer a vitória!',
           dismissible: true
         }
       }[step];
@@ -7155,10 +7172,7 @@
       turnTransitionMessage.replaceChildren(player, turn, round, details, score);
       turnTransition.classList.add('is-visible');
       turnTransition.setAttribute('aria-hidden', 'false');
-      const duration = isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-03'
-        ? 1750
-        : 3500;
-      await waitForWarAnimation(duration);
+      await waitForWarAnimation(750);
       turnTransition.classList.remove('is-visible');
       turnTransition.setAttribute('aria-hidden', 'true');
     }
