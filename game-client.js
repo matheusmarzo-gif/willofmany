@@ -220,6 +220,7 @@
     let selectedCampaignLevelId = 'tabuleiro-01';
     let campaignNextLevelId = null;
     let campaignGuideStep = 'complete';
+    let campaignGuideStepBeforeLevel5TurnThreeTip = null;
     let campaignGuideDismissible = false;
     let campaignGuideAnimationTimeout = null;
     let campaignGuideIntroReturnToStart = false;
@@ -457,6 +458,7 @@
       campaignResetPending = false;
       campaignNextLevelId = null;
       campaignGuideStep = 'complete';
+      campaignGuideStepBeforeLevel5TurnThreeTip = null;
       campaignGuideDismissible = false;
       if (campaignGuideAnimationTimeout !== null) {
         window.clearTimeout(campaignGuideAnimationTimeout);
@@ -491,6 +493,7 @@
         boardRotationConfigVersion: 4,
         campaignCollectedBags: [...campaignCollectedBags],
         campaignGuideStep,
+        campaignGuideStepBeforeLevel5TurnThreeTip,
         campaignLevel2SeenSectors: [...campaignLevel2SeenSectors],
         hasRotatedThisTurn, lastRotatedLayer, lastRotatedBy, rotationLockTurn,
         rotations: [...rotations], circularDiskRotations: { ...circularDiskRotations },
@@ -580,12 +583,16 @@
           'level4-intro', 'await-level4-l8-10', 'level4-battle-tip',
           'level4-battle-order',
           'level5-intro', 'await-level5-l8-3', 'level5-support-tip',
-          'await-level5-l7-1', 'level5-force-tip',
+          'await-level5-l7-1', 'level5-force-tip', 'level5-turn3-tip',
           'level3-resource-defeat',
           'level4-resource-defeat', 'complete'
         ].includes(save.campaignGuideStep)
           ? save.campaignGuideStep
           : 'complete';
+        campaignGuideStepBeforeLevel5TurnThreeTip =
+          typeof save.campaignGuideStepBeforeLevel5TurnThreeTip === 'string'
+            ? save.campaignGuideStepBeforeLevel5TurnThreeTip
+            : null;
         if (gameMode === 'campaign' && activeCampaignLevel?.id === 'tabuleiro-03' &&
             campaignGuideStep === 'await-l8-8') {
           campaignGuideStep = 'await-l8-10';
@@ -6262,7 +6269,7 @@
         return;
       }
       if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-05' && [
-        'level5-intro', 'level5-support-tip', 'level5-force-tip'
+        'level5-intro', 'level5-support-tip', 'level5-force-tip', 'level5-turn3-tip'
       ].includes(campaignGuideStep)) {
         showCampaignGuide(campaignGuideStep);
         return;
@@ -6395,6 +6402,8 @@
             openRelegationButton
           ].filter(Boolean);
         case 'level5-intro':
+          return campaignObjectiveRegions.map(getCampaignRegionShape).filter(Boolean);
+        case 'level5-turn3-tip':
           return campaignObjectiveRegions.map(getCampaignRegionShape).filter(Boolean);
         case 'level5-support-tip':
           return [
@@ -6651,6 +6660,11 @@
           message: 'Esse nível é desafiador! Você precisará usar a ordem de preferência nas batalhas para atrair forças inimigas mais fortes em batalhas menores enquanto você conquista mais aliados. O Objetivo é conquistar L8-12.',
           dismissible: true
         },
+        'level5-turn3-tip': {
+          title: 'O maior desafio até agora',
+          message: 'Uma unidade E equivale a 6 unidades do tipo F. Este mapa será o maior desafio até agora!',
+          dismissible: true
+        },
         'level5-support-tip': {
           title: 'Prepare o suporte para L8-9',
           message: 'Estamos mais próximos de concluir o nível! Para que as forças em L8-9 tenham mais chances vamos colocar unidades de suporte em L7-1, que são as unidades de Rank Amarelo!',
@@ -6805,6 +6819,8 @@
         focusRegion('L7-1');
       } else if (step === 'level5-intro') {
         focusRegion('L8-12');
+      } else if (step === 'level5-turn3-tip') {
+        focusRegion('L8-12');
       }
       const primaryTarget = step === 'purchase'
         ? document.querySelector('#piece-controls .piece-button[data-stage="g"]')
@@ -6891,12 +6907,20 @@
         'level4-intro': 'await-level4-l8-10',
         'level4-battle-tip': 'level4-battle-order',
         'level5-intro': 'await-level5-l8-3',
+        'level5-turn3-tip': campaignGuideStepBeforeLevel5TurnThreeTip || 'complete',
         'level5-support-tip': 'await-level5-l7-1',
         'level5-force-tip': 'complete',
         'level3-recruitment-tip': 'complete'
       }[campaignGuideStep] || 'complete';
+      const wasLevelFiveTurnThreeTip = campaignGuideStep === 'level5-turn3-tip';
       hideCampaignGuide();
       campaignGuideStep = nextStep;
+      if (wasLevelFiveTurnThreeTip) campaignGuideStepBeforeLevel5TurnThreeTip = null;
+      if (wasLevelFiveTurnThreeTip) {
+        focusStrongestRegionForTeam('orange');
+        saveGame();
+        return;
+      }
       if (['level3-region-labels', 'level4-battle-order'].includes(nextStep)) {
         showCampaignGuide(nextStep);
         return;
@@ -7312,6 +7336,12 @@
         });
       }
       await showTurnTransition(roundResult);
+      if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-05' &&
+          currentTurn === 3 && currentTeam === humanTeam &&
+          campaignGuideStep !== 'level5-turn3-tip') {
+        campaignGuideStepBeforeLevel5TurnThreeTip = campaignGuideStep;
+        showCampaignGuide('level5-turn3-tip');
+      }
       const wheatMessage = getWheatShortageMessage(wheatReport);
       if (wheatMessage) readout.textContent = wheatMessage;
       passTurnButton.disabled = !isLocalPlayersTurn();

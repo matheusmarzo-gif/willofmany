@@ -337,6 +337,10 @@ test('Level 5 campaign guide introduces the objective and advances through suppo
   assert.match(gameClient, /activeCampaignLevel\.id === 'tabuleiro-05' \? 'level5-intro'/);
   assert.match(gameClient, /'level5-intro', 'await-level5-l8-3', 'level5-support-tip',\s*'await-level5-l7-1', 'level5-force-tip'/);
   assert.match(gameClient, /Esse nível é desafiador![\s\S]*?conquistar L8-12/);
+  assert.match(gameClient, /'level5-turn3-tip': \{[\s\S]*?Uma unidade E equivale a 6 unidades do tipo F/);
+  assert.match(gameClient, /await showTurnTransition\(roundResult\);[\s\S]*?currentTurn === 3 && currentTeam === humanTeam[\s\S]*?showCampaignGuide\('level5-turn3-tip'\)/);
+  assert.match(gameClient, /step === 'level5-turn3-tip'\) \{\s*focusRegion\('L8-12'\)/);
+  assert.match(gameClient, /const wasLevelFiveTurnThreeTip = campaignGuideStep === 'level5-turn3-tip';[\s\S]*?focusStrongestRegionForTeam\('orange'\)/);
   assert.match(gameClient, /Estamos mais próximos de concluir o nível![\s\S]*?L8-9[\s\S]*?L7-1/);
   assert.match(gameClient, /Unidades no Rank Amarelo recebem metade da força[\s\S]*?8 unidades vermelhas[\s\S]*?L7-1 também tem uma rotação especial[\s\S]*?rank superior/);
   assert.match(gameClient, /campaignGuideStep === 'await-level5-l8-3'[\s\S]*?getRegionDominador\('L8-2'\) === 'orange'[\s\S]*?showCampaignGuide\('level5-support-tip'\)/);
