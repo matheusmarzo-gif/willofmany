@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const gameRules = require('../game-rules');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
@@ -31,6 +32,10 @@ const levelFourBoard = JSON.parse(fs.readFileSync(
 ));
 const levelFiveBoard = JSON.parse(fs.readFileSync(
   path.join(root, 'tabuleiro-05.json'),
+  'utf8'
+));
+const levelSixBoard = JSON.parse(fs.readFileSync(
+  path.join(root, 'tabuleiro-06.json'),
   'utf8'
 ));
 
@@ -79,7 +84,8 @@ test('Android and server builds package all external client resources', () => {
     'tabuleiro-02.json',
     'tabuleiro-03.json',
     'tabuleiro-04.json',
-    'tabuleiro-05.json'
+    'tabuleiro-05.json',
+    'tabuleiro-06.json'
   ].forEach((resource) => {
     assert.ok(serverGradle.includes(`include "${resource}"`), `server includes ${resource}`);
   });
@@ -87,6 +93,8 @@ test('Android and server builds package all external client resources', () => {
     'server excludes unrelated and debug JSON files');
   assert.match(androidMainActivity, /"tabuleiro-05\.json"\.equals\(fileName\)/,
     'Android permits reading the Level 5 board asset');
+  assert.match(androidMainActivity, /"tabuleiro-06\.json"\.equals\(fileName\)/,
+    'Android permits reading the Level 6 board asset');
 });
 
 test('new non-campaign games select the circular board configuration', () => {
@@ -119,9 +127,8 @@ test('circular board regions explicitly identify their independently rotating di
   assert.match(gameClient, /function getRotatableCircularDiskForRegion\(regionCode\)/);
   assert.match(gameClient, /function focusCircularRotationDisk\(block, disco\)/);
   assert.match(gameClient, /function updateCircularRotationOverlay\(svgNamespace\)/);
-  assert.match(gameClient, /rotateCircularDisk\(mode\.blockName, mode\.disco, mode\.direction, true\)/);
-  assert.match(gameClient, /function rotateCircularDisk\(blockName, disco, direction, keepDiskFocus = false\)/);
-  assert.match(gameClient, /mode\.direction = mode\.kind === 'circular'\s*\?\s*gesture\.angleTravel > 0 \? 'right' : 'left'\s*:\s*gesture\.angleTravel > 0 \? 'left' : 'right'/);
+  assert.match(gameClient, /rotateCircularDisk\(mode\.blockName, mode\.disco, mode\.direction, true, mode\.passType\)/);
+  assert.match(gameClient, /function rotateCircularDisk\(\s*blockName,\s*disco,\s*direction,\s*keepDiskFocus = false,\s*passType = 'global'/);
   assert.match(gameClient, /activeRotationKind === 'circular' \? 'GIRAR DISCO' : 'GIRAR BLOCO'/);
 });
 
@@ -156,29 +163,32 @@ test('Level 3 board preserves its campaign rules and all configured block placem
   assert.match(gameClient, /regionRotationBlockName\.textContent = rotationBlockLabel;/);
   assert.match(gameClient, /regionBagCoins\.textContent = hasUncollectedBag[\s\S]*?Saco de moedas:/);
   assert.match(html, /id="region-bag-coins" class="is-hidden"/);
-  assert.match(gameClient, /\['tabuleiro-03', 'tabuleiro-05'\]\.includes\(currentBoardData\?\.campaign\?\.id\)/);
+  assert.match(gameClient, /\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06'\]\.includes\(currentBoardData\?\.campaign\?\.id\)/);
   assert.match(
     gameClient,
     /function getRegionFocusPoint\(regionCode, applyRotation = true\) \{[\s\S]*?geometry\?\.shape === 'quadrilateral' &&\s*Array\.isArray\(geometry\.cells\)[\s\S]*?cell\.x - cell\.width \/ 2[\s\S]*?cell\.x \+ cell\.width \/ 2[\s\S]*?return \{\s*x: \(\(bounds\.left \+ bounds\.right\) \/ 2 \/ 908\) \* 100/
   );
-  assert.match(gameClient, /const scale = Number\(currentBoardData\?\.regionFocusScale\) \|\| 1\.8;/);
+  assert.match(gameClient, /const scale = Number\(focusScale\) \|\| Number\(currentBoardData\?\.regionFocusScale\) \|\| 1\.8;/);
   assert.match(gameClient, /function getRotatableQuadrilateralBlocks\(\)/);
   assert.match(gameClient, /function updateQuadrilateralRotationBlockPicker\(blocks\)/);
-  assert.match(gameClient, /function rotateQuadrilateralBlock\(blockName, direction, keepBlockFocus = false, rotationPath = null\)/);
+  assert.match(gameClient, /function rotateQuadrilateralBlock\(\s*blockName,\s*direction,\s*keepBlockFocus = false,\s*rotationPath = null,\s*passType = 'global'/);
   assert.match(html, /id="rotate-quadrilateral-block-button"[^>]*>GIRAR BLOCO/);
   assert.match(gameClient, /function getQuadrilateralRotationCells\(block(?:, rotationPath = null)?\)/);
   assert.match(gameClient, /function beginQuadrilateralRotationGesture\(event\)/);
   assert.match(gameClient, /Math\.PI \* 4 \/ 3/);
 });
 
-test('campaign supports turn movement undo, resource defeat, and contextual rotation guidance', () => {
-  assert.match(html, /id="campaign-undo-button"/);
-  assert.match(gameClient, /function captureCampaignMoveUndo\(/);
-  assert.match(gameClient, /function undoLastCampaignMove\(/);
-  assert.match(gameClient, /campaignMoveUndoHistory: JSON\.parse\(JSON\.stringify\(campaignMoveUndoHistory\)\)/);
+test('campaign can restart the current turn, handle resource defeat, and show contextual rotation guidance', () => {
+  assert.match(html, /id="campaign-restart-turn-button"[^>]*>Reiniciar turno/);
+  assert.match(gameClient, /function createGameSaveState\(\)/);
+  assert.match(gameClient, /function captureCampaignTurnStartSnapshot\(\)/);
+  assert.match(gameClient, /save\.campaignTurnStartSnapshot = campaignTurnStartSnapshot/);
+  assert.match(gameClient, /function restartCampaignTurn\(\)[\s\S]*?campaignTurnStartSnapshot\?\.regionPiecesByRegion[\s\S]*?loadSavedGame\(\)[\s\S]*?updateRotationControls\(\)[\s\S]*?updateTurnState\(\)/);
+  assert.match(gameClient, /campaignRestartTurnButton\.disabled = !isCampaignGame\(\) \|\| !campaignTurnStartSnapshot/);
+  assert.match(gameClient, /captureCampaignTurnStartSnapshot\(\);\s*saveGame\(\);/);
   assert.match(gameClient, /function maybeShowCampaignResourceDefeat\(/);
   assert.match(gameClient, /isGameOver && !\['level3-resource-defeat', 'level4-resource-defeat'\]\.includes\(step\)/);
-  assert.match(gameClient, /title: 'Fim de jogo'[\s\S]*?não tem nenhuma peça F[\s\S]*?reiniciar o Level 3/);
+  assert.match(gameClient, /title: 'Fim de jogo'[\s\S]*?não tem nenhuma peça F[\s\S]*?Clique para reiniciar/);
   assert.match(gameClient, /Toque em GIRAR DISCO no painel da região[\s\S]*?círculo anti-horário/);
   assert.match(gameClient, /toque em GIRAR BLOCO no painel da região/);
   assert.match(gameClient, /case 'level2-rotate':[\s\S]*?rotateQuadrilateralBlockButton/);
@@ -208,9 +218,12 @@ test('Level 4 copies Level 2 with its objective and initial armies updated', () 
     { team: 'blue', stage: 'f' },
     { team: 'blue', stage: 'g' }
   ];
+  expectedBoard.blocks
+    .flatMap((block) => block.regions)
+    .find((region) => region.code === 'L8-8').bagCoins = 10;
 
   assert.deepEqual(levelFourBoard, expectedBoard,
-    'Level 4 preserves Level 2 board data except its campaign metadata and L8-1 pieces');
+    'Level 4 preserves Level 2 board data except its campaign metadata, L8-1/L8-9 pieces, and L8-8 bag value');
   const initialEnemyRegions = levelFourBoard.blocks
     .flatMap((block) => block.regions)
     .filter((region) => region.initialPieces?.some((piece) => piece.team === 'blue'))
@@ -220,6 +233,9 @@ test('Level 4 copies Level 2 with its objective and initial armies updated', () 
     'the player must capture every region containing initial blue pieces');
   assert.deepEqual(startingRegion.initialPieces,
     [{ team: 'blue', stage: 'f' }, { team: 'blue', stage: 'f' }]);
+  assert.equal(levelFourBoard.blocks
+    .flatMap((block) => block.regions)
+    .find((region) => region.code === 'L8-8').bagCoins, 10);
   assert.match(gameClient, /'tabuleiro-04': 'tabuleiro-04\.json'/);
   assert.match(gameClient, /activeCampaignLevel\.id === 'tabuleiro-04' \? 'level4-intro'/);
   assert.match(gameClient, /campaignGuideStep === 'await-level4-l8-10'[\s\S]*?getRegionDominador\('L8-10'\) === 'orange'/);
@@ -238,9 +254,9 @@ test('Level 5 defines its four blocks, campaign economy, deadline, and doubled B
   assert.deepEqual(levelFiveBoard.campaign, {
     id: 'tabuleiro-05',
     name: 'Tabuleiro 05',
-    initialCoins: 9,
-    coinsPerTurn: 2,
-    coinsPerTurnStopAtTurn: 12,
+    initialCoins: 12,
+    coinsPerTurn: 4,
+    coinsPerTurnStopAtTurn: 6,
     preserveCoinsBetweenTurns: false,
     turnLimitCurrentTurn: 22,
     aiActionsEnabled: false,
@@ -251,30 +267,36 @@ test('Level 5 defines its four blocks, campaign economy, deadline, and doubled B
 
   const blocks = Object.fromEntries(levelFiveBoard.blocks.map((block) => [block.name, block]));
   assert.deepEqual(Object.keys(blocks), ['BQ01', 'BQ02', 'BQ03', 'BQ04']);
+  assert.match(gameClient, /let selectedRotationPassType = 'global'/);
+  assert.match(gameClient, /if \(selectedRotationPassType === 'local' && !localPassAvailable\) \{\s*selectedRotationPassType = 'global';/);
+  assert.doesNotMatch(gameClient, /selectedRotationPassType === 'global' && !globalPassAvailable/);
   assert.deepEqual(blocks.BQ01.matrix, [
     [null, 'L8-5', null],
-    ['L8-4', 'L8-6', 'L8-8'],
-    [null, 'L8-7', null]
+    ['L8-4', 'L8-6', 'L8-7'],
+    [null, 'L8-8', null]
   ]);
   assert.equal(blocks.BQ01.rotationSteps, 2);
   assert.equal(blocks.BQ01.rotationEnabled, true);
   assert.deepEqual(blocks.BQ01.C_inicial, { x: 250, y: 75 });
   assert.deepEqual(blocks.BQ02.matrix, [
-    ['L8-2', 'L8-3'],
-    [null, 'L8-1']
+    ['L8-2', null],
+    ['L8-3', 'L8-1']
   ]);
   assert.deepEqual(blocks.BQ02.C_inicial, { x: 1750, y: 225 });
   assert.deepEqual(blocks.BQ03.matrix, [
-    ['L8-9', null, null],
-    ['L8-10', 'L7-1', null],
-    ['L8-11', null, null]
+    ['L8-9', 'L8-10', 'L8-11'],
+    [null, 'L7-1', null],
+    [null, null, null]
   ]);
   const levelSevenRegion = blocks.BQ03.regions.find((region) => region.code === 'L7-1');
   assert.equal(levelSevenRegion.rank, 'L8');
   assert.equal(levelSevenRegion.layer, 7,
     'the region keeps its L7 identity while remaining in the L8 rotating block');
-  assert.equal(levelSevenRegion.rotationPathAxis, 'horizontal');
+  assert.equal(blocks.BQ03.linearRotationEnabled, true,
+    'the central linear rotation belongs to BQ03 positions, not to L7-1');
+  assert.equal(levelSevenRegion.rotationPathAxis, undefined);
   assert.deepEqual(blocks.BQ03.C_inicial, { x: 750, y: 525 });
+  assert.match(gameClient, /linearRotationEnabled: block\.linearRotationEnabled === true/);
   assert.deepEqual(blocks.BQ04.matrix, [['L8-12']]);
   assert.equal(blocks.BQ04.rotationEnabled, false);
   assert.deepEqual(blocks.BQ04.C_inicial, { x: 250, y: 525 });
@@ -321,22 +343,44 @@ test('Level 5 defines its four blocks, campaign economy, deadline, and doubled B
   );
   assert.match(
     gameClient,
-    /if \(\['tabuleiro-03', 'tabuleiro-05'\]\.includes\(currentBoardData\?\.campaign\?\.id\)[\s\S]*?for \(let row = 0; row < 2; row \+= 1\)[\s\S]*?for \(let column = 0; column < 4; column \+= 1\)[\s\S]*?\.slice\(0, 8\)/
+    /if \(\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06'\]\.includes\(currentBoardData\?\.campaign\?\.id\)[\s\S]*?for \(let row = 0; row < 2; row \+= 1\)[\s\S]*?for \(let column = 0; column < 4; column \+= 1\)[\s\S]*?\.slice\(0, 8\)/
   );
   assert.match(
     gameClient,
-    /if \(currentBoardData\?\.boardType === 'mixed' \|\|\s*\['tabuleiro-03', 'tabuleiro-05'\]\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;\s*stageZoomOffset = \{\s*x: \(\(50 - point\.x\) \/ 100\) \* rect\.width \* scale,\s*y: \(\(50 - point\.y\) \/ 100\) \* rect\.height \* scale/
+    /if \(currentBoardData\?\.boardType === 'mixed' \|\|\s*\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06'\]\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;\s*stageZoomOffset = \{\s*x: \(\(50 - point\.x\) \/ 100\) \* rect\.width \* scale,\s*y: \(\(50 - point\.y\) \/ 100\) \* rect\.height \* scale/
   );
   assert.match(gameClient, /gameRules\.rotateQuadrilateralMatrixPath\(matrix, direction, rotationPath\)/);
-  assert.match(gameClient, /function getQuadrilateralRegionRotationPath\(block, region\)[\s\S]*?rotationPathAxis === 'horizontal'[\s\S]*?getQuadrilateralMatrixHorizontalPath/);
+  assert.match(gameClient, /function getQuadrilateralRegionRotationPath\(block, region, target\)[\s\S]*?target\.rotationType === 'linear'[\s\S]*?getQuadrilateralMatrixLinearPaths/);
+  assert.match(gameClient, /gameRules\.getQuadrilateralMatrixRingPath\(matrix, \[row \+ 1, column \+ 1\]\)/);
+  assert.match(gameClient, /targetPath\?\.linear \? targetPath\.horizontal : targetPath/);
   assert.match(gameClient, /const rotationPath = kind === 'quadrilateral'[\s\S]*?getQuadrilateralRegionRotationPath\(/);
-  assert.match(gameClient, /regionRotationHelp\.textContent[\s\S]*?selectedRotationPath\[0\]\[1\][\s\S]*?M\(3,\$\{selectedRotationPath\[0\]\[1\]\}\)/);
-  assert.match(gameClient, /type: 'rotate'[\s\S]*?\.\.\.\(rotationPath \? \{ rotationPath \} : \{\}\)/);
+  assert.match(gameClient, /selectedRotationPaths\?\.linear[\s\S]*?traço horizontal ou vertical/);
+  assert.match(gameClient, /mode\.linearRotationPaths[\s\S]*?const deltaX = event\.clientX - gesture\.startX[\s\S]*?mode\.rotationPath = horizontal/);
+  assert.match(gameClient, /mode\.direction = routeDirection > 0 \? 'right' : 'left'/);
+  assert.match(gameClient, /routeIndex: 0[\s\S]*?routeIndex: 1[\s\S]*?routeIndex: 2[\s\S]*?routeIndex: 3/);
+  assert.match(gameClient, /mode\.direction === 'left'\s*\?\s*\[\.\.\.mode\.rotationPath\]\.reverse\(\)\s*:\s*mode\.rotationPath/);
+  assert.match(gameCss, /quadrilateral-linear-route-cue 2\.8s linear infinite/);
+  assert.match(gameClient, /type: 'rotate'[\s\S]*?rotationPassType: passType[\s\S]*?\.\.\.\(rotationPath \? \{ rotationPath \} : \{\}\)/);
+  assert.match(html, /id="rotation-pass-panel"[\s\S]*?id="region-panel"/);
+  assert.match(html, /id="rotation-target-options"[^]*?id="rotation-local-pass-button"/);
+  assert.doesNotMatch(html, /rotation-target-select|Alvo da rotação/);
+  assert.match(gameClient, /function getQuadrilateralRotationTargetsForRegion\(block, region\)[\s\S]*?getQuadrilateralMatrixRotationGroups[\s\S]*?quadrilateral:\$\{block\.name\}:linear:\$\{group\.index\}[\s\S]*?quadrilateral:\$\{block\.name\}:ring:\$\{group\.index\}/);
+  assert.match(gameClient, /function recordRotationOwnership\(regionCode\)[\s\S]*?getRotationTargetsForRegion\(regionCode\)\.forEach\(\(target\) => \{\s*localRotationPasses\[owner\]\.push\(\{ regionCode, targetKey: target\.key \}\)/);
+  assert.match(gameClient, /function restoreRotationOwnershipAfterUndo\(regionCode\)[\s\S]*?new Set\(getRotationTargetsForRegion\(regionCode\)\.map\(\(target\) => target\.key\)\)/);
+  assert.match(gameClient, /legacyPathRegionCode[\s\S]*?legacyLinearTarget[\s\S]*?targetKey = matchingTarget\?\.key \|\| legacyLinearTarget\?\.key \|\| savedTargetKey/);
+  assert.match(gameClient, /restoreRotationOwnershipAfterUndo\(regionCode\)/);
+  assert.match(gameClient, /function getRotationTargetForLayer\(layerNumber\)[\s\S]*?key: `layer:\$\{layerNumber\}`/);
+  assert.match(gameClient, /getRotationTargetsForRegion\(regionCode\)[\s\S]*?getQuadrilateralRotationTargetsForRegion\(quadrilateralBlock, region\)/);
+  assert.match(gameClient, /function recordRotationUse\(targetKey, layerNumber, passType\)[\s\S]*?passType === 'local'[\s\S]*?consumeLocalRotationPass\(currentTeam, targetKey\)[\s\S]*?hasRotatedThisTurn = true[\s\S]*?rotationLocksByTarget\[targetKey\]/);
+  assert.match(gameClient, /rotationPassType: passType/);
+  assert.match(gameClient, /passType === 'local'[\s\S]*?clearCampaignMoveUndoHistory\(\)/);
+  assert.match(gameClient, /localRotationPasses: JSON\.parse\(JSON\.stringify\(localRotationPasses\)\)[\s\S]*?rotationOwnershipByRegion[\s\S]*?rotationLocksByTarget/);
+  assert.match(gameClient, /rotationPassType === 'local' \? 'local' : 'global'/);
 
   const expectedRight = [
     [null, 'L8-4', null],
-    ['L8-7', 'L8-6', 'L8-5'],
-    [null, 'L8-8', null]
+    ['L8-8', 'L8-6', 'L8-5'],
+    [null, 'L8-7', null]
   ];
   const rules = require(path.join(root, 'game-rules.js'));
   const once = rules.rotateQuadrilateralMatrix(blocks.BQ01.matrix, 'right');
@@ -345,28 +389,252 @@ test('Level 5 defines its four blocks, campaign economy, deadline, and doubled B
     'a BQ01 clockwise action advances the matrix perimeter by two positions');
 });
 
+test('Level 6 defines its complete 5x5 board, no-income campaign, and ring/linear rotations', () => {
+  assert.equal(levelSixBoard.regionFocusScale, 3);
+  assert.deepEqual(levelSixBoard.campaign, {
+    id: 'tabuleiro-06',
+    name: 'Tabuleiro 06',
+    initialCoins: 0,
+    coinsPerTurn: 0,
+    preserveCoinsBetweenTurns: false,
+    aiActionsEnabled: false,
+    rotationEnabled: true,
+    warIncludesCornerContact: true,
+    objectiveRegions: Array.from({ length: 25 }, (_, index) => {
+      const number = index + 1;
+      return ({
+        8: 'L7-8',
+        12: 'L7-12',
+        13: 'L6-13',
+        14: 'L7-14',
+        18: 'L7-18'
+      })[number] || `L8-${number}`;
+    }),
+    objectiveText: 'Domine todas as regiões',
+    objective: { type: 'captureAllRegions' }
+  });
+  assert.match(gameClient, /'tabuleiro-06': 'tabuleiro-06\.json'/);
+  assert.match(gameClient, /activeCampaignLevel\.objectiveText \|\| `conquiste/);
+  assert.match(gameClient, /function finishCampaignIfObjectiveMet\(\)[\s\S]*?campaignObjectiveRegions\.every\(\(regionCode\) => getRegionDominador\(regionCode\) === 'orange'\)/);
+
+  const [block] = levelSixBoard.blocks;
+  assert.equal(block.name, 'BQ01');
+  assert.equal(block.type, 'quadrilateral');
+  assert.equal(block.matrixSize, 5);
+  assert.deepEqual(block.matrix, [
+    ['L8-1', 'L8-2', 'L8-3', 'L8-4', 'L8-5'],
+    ['L8-6', 'L8-7', 'L7-8', 'L8-9', 'L8-10'],
+    ['L8-11', 'L7-12', 'L6-13', 'L7-14', 'L8-15'],
+    ['L8-16', 'L8-17', 'L7-18', 'L8-19', 'L8-20'],
+    ['L8-21', 'L8-22', 'L8-23', 'L8-24', 'L8-25']
+  ]);
+  assert.deepEqual(block.C_inicial, { x: 250, y: 75 });
+  assert.equal(block.L1, 150);
+  assert.equal(block.L2, 500);
+  assert.equal(block.rotationEnabled, true);
+  assert.equal(block.linearRotationEnabled, true);
+  assert.equal(block.regions.length, 25);
+  assert.match(
+    gameClient,
+    /x: offsetX \+ \(block\.centerX \+ columnIndex \* block\.width\) \* scale,[\s\S]*?y: offsetY \+ \(block\.centerY \+ rowIndex \* block\.height\) \* scale/
+  );
+  block.regions.forEach((region) => {
+    const actualPosition = [];
+    block.matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
+      if (code === region.code) actualPosition.push([rowIndex + 1, columnIndex + 1]);
+    }));
+    assert.deepEqual(region.positions, actualPosition, `${region.code} matrix position`);
+    assert.equal(region.maxPieces, region.layer);
+  });
+
+  const initialArmy = {
+    'L8-1': ['orange', 'f', 4], 'L8-2': ['orange', 'f', 2],
+    'L8-3': ['blue', 'e', 1], 'L8-4': ['orange', 'f', 2],
+    'L8-5': ['orange', 'f', 4], 'L8-6': ['orange', 'f', 2],
+    'L8-7': ['blue', 'f', 2], 'L7-8': ['blue', 'f', 1],
+    'L8-9': ['blue', 'f', 2], 'L8-10': ['orange', 'f', 2],
+    'L8-11': ['blue', 'e', 1], 'L7-12': ['blue', 'f', 1],
+    'L6-13': ['blue', 'g', 4], 'L7-14': ['blue', 'f', 1],
+    'L8-15': ['blue', 'e', 1], 'L8-16': ['orange', 'f', 2],
+    'L8-17': ['blue', 'f', 2], 'L7-18': ['blue', 'f', 1],
+    'L8-19': ['blue', 'f', 2], 'L8-20': ['orange', 'f', 2],
+    'L8-21': ['orange', 'f', 4], 'L8-22': ['orange', 'f', 2],
+    'L8-23': ['blue', 'e', 1], 'L8-24': ['orange', 'f', 2],
+    'L8-25': ['orange', 'f', 4]
+  };
+  Object.entries(initialArmy).forEach(([code, [team, stage, count]]) => {
+    assert.deepEqual(
+      block.regions.find((region) => region.code === code).initialPieces,
+      Array.from({ length: count }, () => ({ team, stage })),
+      `${code} initial army`
+    );
+  });
+
+  const matrixCenterCross = ['L8-3', 'L7-8', 'L6-13', 'L7-18', 'L8-23',
+    'L8-11', 'L7-12', 'L7-14', 'L8-15'];
+  matrixCenterCross.forEach((regionCode) => {
+    const position = block.regions.find((region) => region.code === regionCode).positions[0];
+    const ring = Math.min(
+      position[0] - 1,
+      position[1] - 1,
+      block.matrixSize - position[0],
+      block.matrixSize - position[1]
+    );
+    assert.deepEqual(
+      gameRules.getQuadrilateralMatrixRotationGroups(block.matrix, regionCode, block.linearRotationEnabled),
+      [
+        ...(block.matrixSize - ring * 2 > 1 ? [{ type: 'ring', index: ring + 1 }] : []),
+        { type: 'linear', index: 3 }
+      ],
+      `${regionCode} exposes its applicable ring and central line/column rotation`
+    );
+  });
+  const levelSixCells = Object.fromEntries(block.regions.map((region) => {
+    const [row, column] = region.positions[0];
+    return [region.code, {
+      x: block.C_inicial.x + (column - 1) * block.L2,
+      y: block.C_inicial.y + (row - 1) * block.L1,
+      width: block.L2,
+      height: block.L1
+    }];
+  }));
+  const centerToL8Neighbors = ['L8-7', 'L8-9', 'L8-17', 'L8-19'];
+  centerToL8Neighbors.forEach((neighborCode) => {
+    const neighbor = levelSixCells[neighborCode];
+    assert.equal(
+      gameRules.areAxisAlignedCellsNeighbors(
+        levelSixCells['L6-13'],
+        neighbor,
+        1,
+        levelSixBoard.campaign.warIncludesCornerContact
+      ),
+      true,
+      `${neighborCode} is physically adjacent to L6-13 for war conflicts`
+    );
+    assert.equal(
+      gameRules.areAxisAlignedCellsNeighbors(levelSixCells['L6-13'], neighbor),
+      false,
+      `${neighborCode} does not become a movement or promotion neighbor`
+    );
+  });
+  assert.deepEqual(
+    gameRules.buildWarConflicts(
+      gameRules.getWarRegionOrder(['L6-13', ...centerToL8Neighbors]),
+      {
+        'L6-13': centerToL8Neighbors,
+        ...Object.fromEntries(centerToL8Neighbors.map((code) => [code, ['L6-13']]))
+      },
+      {
+        'L6-13': 'blue',
+        ...Object.fromEntries(centerToL8Neighbors.map((code) => [code, 'orange']))
+      }
+    ),
+    [{
+      regionCode: 'L6-13',
+      alliedRegions: ['L6-13'],
+      enemyRegions: centerToL8Neighbors,
+      attacker: 'blue'
+    }],
+    'war must group the blue center with the four diagonal L8 regions'
+  );
+  assert.match(
+    gameClient,
+    /function getCombatNeighbors\(regionCode\)[\s\S]*?warIncludesCornerContact === true[\s\S]*?areAxisAlignedCellsNeighbors\(firstCell, secondCell, 1, true\)/
+  );
+  assert.match(
+    gameClient,
+    /function getQuadrilateralRotationCells[\s\S]*?\(block\.centerX \+ \(column - 1\) \* block\.width\)[\s\S]*?\(block\.centerY \+ \(row - 1\) \* block\.height\)/
+  );
+  assert.match(
+    gameClient,
+    /if \(currentBoardData\?\.boardType === 'mixed' \|\|\s*\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06'\]\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;/
+  );
+  assert.match(
+    gameClient,
+    /if \(\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06'\]\.includes\(currentBoardData\?\.campaign\?\.id\) &&\s*geometry\?\.shape === 'quadrilateral'/
+  );
+  assert.match(gameClient, /function focusRegion\(regionCode, focusScale = null\)[\s\S]*?Number\(focusScale\) \|\| Number\(currentBoardData\?\.regionFocusScale\)/);
+  assert.match(
+    gameClient,
+    /const restoreLevelSixView = isCampaignGame\(\) && activeCampaignLevel\.id === 'tabuleiro-06'[\s\S]*?focusRegion\(block\.regionCode, restoreLevelSixView \? 2 : null\)[\s\S]*?if \(restoreLevelSixView\) restoreStageView\(\);\s*else resetStageZoom\(\)/
+  );
+  assert.match(gameClient, /if \(!blocks\.length\)[\s\S]*?restoreStageView\(\)/);
+});
+
 test('Level 5 campaign guide introduces the objective and advances through support and force lessons', () => {
   assert.match(gameClient, /activeCampaignLevel\.id === 'tabuleiro-05' \? 'level5-intro'/);
-  assert.match(gameClient, /'level5-intro', 'await-level5-l8-3', 'level5-support-tip',\s*'await-level5-l7-1', 'level5-force-tip'/);
+  assert.match(gameClient, /'level5-intro', 'level5-neighbor-tip', 'await-level5-l8-10'[\s\S]*?'level5-rotation-groups-tip', 'level5-rotation-passes-tip'[\s\S]*?'level5-rotation-action-tip', 'await-level5-l8-2'/);
   assert.match(gameClient, /Esse nível é desafiador![\s\S]*?conquistar L8-12/);
+  assert.match(gameClient, /'level5-neighbor-tip': \{[\s\S]*?Vamos começar conquistando as duas regiões vizinhas vermelhas/);
+  assert.match(gameClient, /case 'level5-neighbor-tip':\s*return \['L8-10', 'L8-8'\]\.map\(getCampaignRegionShape\)/);
+  assert.match(gameClient, /'level5-rotation-groups-tip': \{[\s\S]*?dois tipos de rotação: um em anel e outro de forma linear/);
+  assert.match(gameClient, /case 'level5-rotation-groups-tip':\s*return \[rotationPassPanelTitle, rotationTargetOptions\]/);
+  assert.match(gameClient, /'level5-rotation-passes-tip': \{[\s\S]*?passes locais são acumulativos[\s\S]*?passes globais[\s\S]*?passe novo por turno/);
+  assert.match(gameClient, /case 'level5-rotation-passes-tip':\s*return \[rotationLocalPassButton, rotationGlobalPassButton\]/);
+  assert.match(gameClient, /'level5-rotation-action-tip': \{[\s\S]*?Vamos girar o disco uma vez para ficar mais próximo das unidades inimigas!/);
+  assert.match(gameClient, /'level5-rotation-groups-tip', 'level5-rotation-passes-tip'\]\.includes\(step\)\) \{\s*return rotationPassPanel/);
+  assert.match(gameClient, /'level5-intro': 'level5-neighbor-tip'[\s\S]*?'level5-neighbor-tip': 'await-level5-l8-10'[\s\S]*?'level5-rotation-groups-tip': 'level5-rotation-passes-tip'[\s\S]*?'level5-rotation-passes-tip': 'level5-rotation-action-tip'/);
+  assert.match(gameClient, /'level5-neighbor-tip', 'level5-rotation-passes-tip', 'level5-rotation-action-tip'[\s\S]*?\.includes\(nextStep\)/);
+  assert.match(gameClient, /campaignGuideStep === 'await-level5-l8-10'[\s\S]*?getRegionDominador\('L8-10'\) === 'orange'[\s\S]*?showCampaignGuide\('level5-rotation-groups-tip'\)/);
   assert.match(gameClient, /'level5-turn3-tip': \{[\s\S]*?Uma unidade E equivale a 6 unidades do tipo F/);
   assert.match(gameClient, /await showTurnTransition\(roundResult\);[\s\S]*?currentTurn === 3 && currentTeam === humanTeam[\s\S]*?showCampaignGuide\('level5-turn3-tip'\)/);
   assert.match(gameClient, /step === 'level5-turn3-tip'\) \{\s*focusRegion\('L8-12'\)/);
-  assert.match(gameClient, /const wasLevelFiveTurnThreeTip = campaignGuideStep === 'level5-turn3-tip';[\s\S]*?focusStrongestRegionForTeam\('orange'\)/);
+  assert.match(gameClient, /const wasLevelFiveTurnTip = \['level5-turn3-tip', 'level5-turn5-tip'\][\s\S]*?focusStrongestRegionForTeam\('orange'\)/);
+  assert.match(gameClient, /'level5-turn5-tip': \{[\s\S]*?Coloque uma tropa 'g' para contra L8-2![\s\S]*?vencer as tropas em L8-1!/);
+  assert.match(gameClient, /await showTurnTransition\(roundResult\);[\s\S]*?currentTurn === 5 && currentTeam === humanTeam[\s\S]*?showCampaignGuide\('level5-turn5-tip'\)/);
+  assert.match(gameClient, /function getLevelFiveTurnFiveFocusRegions\(\)[\s\S]*?'L8-2'[\s\S]*?'L8-1'[\s\S]*?getNeighborRegionCode\('L8-2', 'left'\)/);
+  assert.match(gameClient, /step === 'level5-turn5-tip'\) \{\s*selectedRegionCode = 'L8-2'[\s\S]*?focusRegionGroup\(getLevelFiveTurnFiveFocusRegions\(\)\)/);
+  assert.match(gameClient, /const wasLevelFiveTurnTip = \['level5-turn3-tip', 'level5-turn5-tip'\][\s\S]*?focusStrongestRegionForTeam\('orange'\)/);
   assert.match(gameClient, /Estamos mais próximos de concluir o nível![\s\S]*?L8-9[\s\S]*?L7-1/);
-  assert.match(gameClient, /Unidades no Rank Amarelo recebem metade da força[\s\S]*?8 unidades vermelhas[\s\S]*?L7-1 também tem uma rotação especial[\s\S]*?linha horizontal que ocupa no momento[\s\S]*?rank superior/);
-  assert.match(gameClient, /campaignGuideStep === 'await-level5-l8-3'[\s\S]*?getRegionDominador\('L8-2'\) === 'orange'[\s\S]*?showCampaignGuide\('level5-support-tip'\)/);
+  assert.match(gameClient, /Unidades no Rank Amarelo recebem metade da força[\s\S]*?8 unidades vermelhas[\s\S]*?L7-1 também tem uma rotação especial[\s\S]*?fileira ou coluna que passa por ela[\s\S]*?rank superior/);
+  assert.match(gameClient, /campaignGuideStep === 'await-level5-l8-2'[\s\S]*?getRegionDominador\('L8-2'\) === 'orange'[\s\S]*?showCampaignGuide\('level5-support-tip'\)/);
   assert.match(gameClient, /case 'level5-support-tip':\s*return \[\s*getCampaignRegionShape\('L8-2'\)/);
   assert.match(gameClient, /step === 'level5-support-tip'\) \{\s*selectedRegionCode = 'L8-2'[\s\S]*?focusRegion\('L8-2'\)/);
   assert.match(gameClient, /campaignGuideStep === 'await-level5-l7-1'[\s\S]*?getTeamSoldierCount\('L7-1', 'orange'\) > 0[\s\S]*?showCampaignGuide\('level5-force-tip'\)/);
   assert.match(gameClient, /case 'level5-force-tip':\s*return \[getCampaignRegionShape\('L7-1'\), regionForce, regionFinalForce\]\.filter\(Boolean\)/);
   assert.match(gameClient, /step === 'level5-force-tip'[\s\S]*?selectedRegionCode = 'L7-1'[\s\S]*?focusRegion\('L7-1'\)/);
   assert.match(gameClient, /step === 'level5-intro'\) \{\s*focusRegion\('L8-12'\)/);
-  assert.match(gameClient, /campaignGuideStep === 'await-level5-l8-3'\) \{\s*focusRegion\('L8-9'\)/);
+  assert.match(gameClient, /function focusRegionGroup\(regionCodes\)[\s\S]*?geometry\.cells[\s\S]*?908 \* 0\.76 \/ boundsWidth[\s\S]*?focusedRegionCode = null/);
+  assert.match(gameClient, /step === 'level5-neighbor-tip'\) \{\s*selectedRegionCode = 'L8-9'[\s\S]*?focusRegionGroup\(\['L8-10', 'L8-8'\]\)/);
+  assert.match(gameClient, /step === 'level5-rotation-groups-tip'\) \{\s*selectedRotationTargetKey = targets\.find\(\(target\) =>\s*target\.rotationType === 'ring'\)/);
+  assert.match(gameClient, /'level5-rotation-action-tip'\]\.includes\(step\)\) \{\s*selectedRegionCode = 'L8-10'/);
+  assert.match(gameClient, /campaignGuideStep === 'await-level5-l8-10'\) \{\s*selectedRegionCode = 'L8-9'[\s\S]*?focusRegion\('L8-9'\)/);
+  assert.match(gameClient, /campaignGuideStep === 'await-level5-l8-2'\) \{\s*selectedRegionCode = 'L8-10'[\s\S]*?focusRegion\('L8-10'\)/);
+});
+
+test('Level 6 campaign guide introduces battle and spotlights the yellow rank', () => {
+  assert.match(gameClient, /activeCampaignLevel\.id === 'tabuleiro-06' \? 'level6-intro'/);
+  assert.match(gameClient, /'level6-intro', 'level6-rank-tip'/);
+  assert.match(gameClient, /activeCampaignLevel\.id === 'tabuleiro-06' &&\s*\['level6-intro', 'level6-rank-tip'\]\.includes\(campaignGuideStep\)/);
+  assert.match(gameClient, /'level6-intro': \{\s*title: 'Level 6: Arte da Batalha',\s*message: 'Mostre que você domina a Arte da Batalha! Domine todos os territórios inimigos, mesmo com uma força inferior\.'/);
+  assert.match(gameClient, /'level6-rank-tip': \{\s*title: 'Rank Amarelo',\s*message: 'Temos mais um rank após o laranja, o rank Amarelo\. Para promover uma unidade a Rank Amarelo você precisa de 7 unidades no rank Laranja\. O Rank Amarelo tem um bônus de batalha de 3\.5x a força que recebe; cada unidade no Amarelo pode receber metade da força de até 7 unidades Laranjas\.'/);
+  assert.match(gameClient, /case 'level6-rank-tip':\s*return \[getCampaignRegionShape\('L6-13'\)\]\.filter\(Boolean\)/);
+  assert.match(gameClient, /step === 'level6-rank-tip'\) \{\s*selectedRegionCode = 'L6-13'[\s\S]*?focusRegion\('L6-13'\)/);
+  assert.match(gameClient, /'level6-intro': 'level6-rank-tip',\s*'level6-rank-tip': 'complete'/);
+  assert.match(gameClient, /'level5-neighbor-tip', 'level5-rotation-passes-tip', 'level5-rotation-action-tip',\s*'level6-rank-tip'/);
+});
+
+test('campaign agent messages fit without scrolling and continue with clicks anywhere', () => {
+  assert.match(gameClient, /function getCampaignGuideMessagePages\(message\)[\s\S]*?campaignGuideCard\.scrollHeight <= campaignGuideCard\.clientHeight/);
+  assert.match(gameClient, /function advanceCampaignGuideMessage\(\)[\s\S]*?updateCampaignGuideMessagePage\(\)/);
+  assert.match(gameClient, /if \(advanceCampaignGuideMessage\(\)\) return/);
+  assert.match(gameClient, /if \(eventType === 'click'\) \{\s*event\.preventDefault\(\);\s*dismissCampaignIntro\(\);/);
+  assert.match(gameClient, /if \(campaignGuideMessagePage < campaignGuideMessagePages\.length - 1\)[\s\S]*?continueCampaignGuide\(\)/);
+  assert.doesNotMatch(gameClient, /Toque (?:nesta|na) mensagem/);
+  assert.match(gameCss, /\.campaign-guide-card \{[^}]*overflow:hidden;/);
+  assert.match(html, /campaign-intro-hint">Clique para começar/);
+  assert.match(html, /campaign-guide-hint" id="campaign-guide-hint">Clique para continuar/);
+});
+
+test('campaign guide moves away from highlighted action controls', () => {
+  assert.match(gameClient, /function getCampaignGuideActionTarget\(step\)[\s\S]*?rotateQuadrilateralBlockButton/);
+  assert.match(gameClient, /function positionCampaignGuideAwayFromAction\(\)[\s\S]*?overlapsAction[\s\S]*?position: 'top'[\s\S]*?position: 'right'[\s\S]*?position: 'bottom'[\s\S]*?position: 'left'/);
+  assert.match(gameClient, /positionCampaignGuideAwayFromAction\(\)/);
+  assert.match(gameClient, /message: 'Escolha um passe Local ou Global no painel acima e faça um gesto anti-horário sobre o disco para evitar os inimigos!'/);
 });
 
 test('game menu groups campaign actions and Android exit closes the app', () => {
-  assert.match(html, /id="game-menu-trigger"[^]*?id="game-menu"[^]*?id="campaign-undo-button"[^]*?id="campaign-menu-button"[^]*?id="campaign-restart-button"/);
+  assert.match(html, /id="game-menu-trigger"[^]*?id="game-menu"[^]*?id="campaign-restart-turn-button"[^]*?id="campaign-menu-button"[^]*?id="campaign-restart-button"/);
   assert.match(html, /id="campaign-menu-button"[^>]*>Retornar ao menu principal/);
   assert.match(html, /id="game-menu-resign-button"[^>]*>Desistir da partida/);
   assert.match(gameClient, /gameMenuTrigger\.addEventListener\('click'/);
@@ -409,7 +677,7 @@ test('campaign mode opens a custom illustrated trail with data-driven unlocked l
   assert.match(gameCss, /\.campaign-trail-map \{[^}]*background:linear-gradient/);
   assert.match(gameCss, /\.campaign-trail-level::after \{[^}]*content:"\+"/);
   assert.match(gameCss, /\.campaign-trail-level\.is-locked::after \{[^}]*content:"x"/);
-  assert.match(gameClient, /mode\.direction = mode\.kind === 'circular'\s*\?\s*gesture\.angleTravel > 0 \? 'right' : 'left'\s*:\s*gesture\.angleTravel > 0 \? 'left' : 'right'/);
+  assert.match(gameClient, /mode\.direction = mode\.kind === 'circular'\s*\?\s*gesture\.angleTravel > 0 \? 'right' : 'left'\s*:\s*gesture\.angleTravel > 0 \? 'right' : 'left'/);
   assert.match(gameClient, /focusRegion\(regionCode\)/);
   assert.match(gameCss, /\.quadrilateral-rotation-cell\.is-vacant/);
   assert.match(gameCss, /\.region-rotation-overlay\.is-rotating-clockwise/);
@@ -474,11 +742,11 @@ test('campaign mode opens a custom illustrated trail with data-driven unlocked l
   const expectedRegions = {
     BQ01: [['L8-1', 1, 1], ['L8-2', 2, 1], ['L8-3', 3, 1],
       ['L8-4', 1, 2], ['L8-5', 1, 3]],
-    BQ02: [['L8-6', 1, 1], ['L8-7', 2, 1]],
-    BQ03: [['L8-10', 1, 1], ['L8-11', 2, 1]],
-    BQ04: [['L8-8', 2, 1], ['L8-9', 2, 2]],
-    BQ05: [['L8-12', 1, 1], ['L8-13', 1, 2], ['L8-14', 1, 3],
-      ['L7-1', 1, 4], ['L8-15', 1, 5], ['L8-16', 1, 6]]
+    BQ02: [['L8-6', 1, 1], ['L8-7', 1, 2]],
+    BQ03: [['L8-10', 1, 1], ['L8-11', 1, 2]],
+    BQ04: [['L8-8', 1, 2], ['L8-9', 2, 2]],
+    BQ05: [['L8-12', 1, 1], ['L8-13', 2, 1], ['L8-14', 3, 1],
+      ['L7-1', 4, 1], ['L8-15', 5, 1], ['L8-16', 6, 1]]
   };
   assert.deepEqual(levelThreeBoard.blocks.map((block) => block.name),
     Object.keys(expectedRegions));

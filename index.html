@@ -191,7 +191,7 @@
       <div class="game-modal-card game-menu-card">
         <h2 id="game-menu-title">Menu</h2>
         <div class="campaign-actions is-hidden" id="campaign-actions">
-          <button id="campaign-undo-button" type="button" title="Desfazer o último movimento" disabled>Desfazer</button>
+          <button id="campaign-restart-turn-button" type="button" title="Reiniciar o turno atual" disabled>Reiniciar turno</button>
           <button id="campaign-menu-button" type="button">Retornar ao menu principal</button>
           <button id="campaign-restart-button" type="button">Reiniciar level</button>
         </div>
@@ -250,6 +250,13 @@
         </div>
       </div>
       <div class="piece-controls" id="piece-controls" aria-label="Comprar peças"></div>
+      <section class="rotation-pass-panel is-hidden" id="rotation-pass-panel" aria-live="polite">
+        <p class="rotation-pass-panel-title" id="rotation-pass-panel-title">Passes de rotação</p>
+        <div class="rotation-target-options is-hidden" id="rotation-target-options"
+             role="group" aria-label="Tipo de rotação"></div>
+        <button type="button" id="rotation-local-pass-button" aria-pressed="false"></button>
+        <button type="button" id="rotation-global-pass-button" aria-pressed="false"></button>
+      </section>
       <aside class="region-panel" id="region-panel" aria-live="polite">
         <p class="region-panel-label">Região selecionada</p>
         <h3>
@@ -380,7 +387,7 @@
         <span class="campaign-agent-name">Agente da campanha</span>
         <strong id="campaign-intro-title">Level 1: conquiste o território inimigo</strong>
         <span>Seu objetivo é dominar todas as regiões do oponente. Construa unidades e avance até a região mais próxima do inimigo. Para tomá-la, você precisa ter ao menos 2 unidades nessa região e declarar <b>Guerra</b>. Ao vencer o combate e conquistar o território, você vence o level.</span>
-        <span class="campaign-intro-hint">Toque na mensagem para começar</span>
+        <span class="campaign-intro-hint">Clique para começar</span>
       </span>
     </button>
   </section>
@@ -412,7 +419,7 @@
           <span id="campaign-guide-message"></span>
         </span>
       </button>
-      <span class="campaign-guide-hint" id="campaign-guide-hint">Toque na mensagem para continuar</span>
+      <span class="campaign-guide-hint" id="campaign-guide-hint">Clique para continuar</span>
     </article>
   </section>
   <script src="game-rules.js"></script>

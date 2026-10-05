@@ -71,7 +71,12 @@
     return ascendingStages.reduce((total, stage) => total + Number(teamCounts[stage] || 0), 0);
   }
 
-  function areAxisAlignedCellsNeighbors(firstCell, secondCell, tolerance = 1) {
+  function areAxisAlignedCellsNeighbors(
+    firstCell,
+    secondCell,
+    tolerance = 1,
+    includeCornerContact = false
+  ) {
     if (!firstCell || !secondCell) return false;
     const firstLeft = Number(firstCell.x) - Number(firstCell.width) / 2;
     const firstRight = Number(firstCell.x) + Number(firstCell.width) / 2;
@@ -86,14 +91,15 @@
       Math.max(firstTop, secondTop);
     const horizontalOverlap = Math.min(firstRight, secondRight) -
       Math.max(firstLeft, secondLeft);
+    const minimumOverlap = includeCornerContact ? -epsilon : epsilon;
     return (
       (Math.abs(firstRight - secondLeft) <= epsilon ||
         Math.abs(secondRight - firstLeft) <= epsilon) &&
-      verticalOverlap > epsilon
+      verticalOverlap > minimumOverlap
     ) || (
       (Math.abs(firstBottom - secondTop) <= epsilon ||
         Math.abs(secondBottom - firstTop) <= epsilon) &&
-      horizontalOverlap > epsilon
+      horizontalOverlap > minimumOverlap
     );
   }
 
@@ -182,25 +188,98 @@
     return rotated;
   }
 
-  function getQuadrilateralMatrixHorizontalPath(matrix, regionCode) {
+  function getQuadrilateralMatrixRingPath(matrix, position) {
+    if (!Array.isArray(matrix) || !matrix.length ||
+        matrix.some((row) => !Array.isArray(row) || row.length !== matrix.length)) {
+      throw new TypeError('A matriz de rotação deve ser quadrada.');
+    }
+    if (!Array.isArray(position) || position.length !== 2 ||
+        !position.every(Number.isInteger)) {
+      throw new RangeError('A posição deve conter linha e coluna inteiras.');
+    }
+    const [row, column] = position.map((value) => value - 1);
+    if (row < 0 || row >= matrix.length || column < 0 || column >= matrix.length) {
+      throw new RangeError('A posição deve ficar dentro da matriz.');
+    }
+    const ring = Math.min(row, column, matrix.length - row - 1, matrix.length - column - 1);
+    const top = ring;
+    const left = ring;
+    const size = matrix.length - ring * 2;
+    if (size <= 1) return null;
+    const path = [];
+    for (let currentColumn = left; currentColumn < left + size; currentColumn += 1) {
+      path.push([top + 1, currentColumn + 1]);
+    }
+    for (let currentRow = top + 1; currentRow < top + size; currentRow += 1) {
+      path.push([currentRow + 1, left + size]);
+    }
+    for (let currentColumn = left + size - 2; currentColumn >= left; currentColumn -= 1) {
+      path.push([top + size, currentColumn + 1]);
+    }
+    for (let currentRow = top + size - 2; currentRow > top; currentRow -= 1) {
+      path.push([currentRow + 1, left + 1]);
+    }
+    return path;
+  }
+
+  function getQuadrilateralMatrixRotationGroups(matrix, regionCode, linearRotationEnabled = false) {
     if (!Array.isArray(matrix) || !matrix.length ||
         matrix.some((row) => !Array.isArray(row) || row.length !== matrix.length)) {
       throw new TypeError('A matriz de rotação deve ser quadrada.');
     }
     if (typeof regionCode !== 'string' || !regionCode) {
-      throw new TypeError('A região do percurso horizontal é inválida.');
+      throw new TypeError('A região dos grupos de rotação é inválida.');
     }
 
-    let column = null;
+    let position = null;
     matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
       if (code !== regionCode) return;
-      if (column !== null) {
+      if (position !== null) {
         throw new RangeError(`A região ${regionCode} aparece mais de uma vez na matriz.`);
       }
-      column = columnIndex + 1;
+      position = [rowIndex, columnIndex];
     }));
-    if (column === null) return null;
-    return matrix.map((row, rowIndex) => [rowIndex + 1, column]);
+    if (position === null) return [];
+
+    const [row, column] = position;
+    const ring = Math.min(row, column, matrix.length - row - 1, matrix.length - column - 1);
+    const ringSize = matrix.length - ring * 2;
+    const groups = ringSize > 1 ? [{ type: 'ring', index: ring + 1 }] : [];
+    const center = Math.floor(matrix.length / 2);
+    if (linearRotationEnabled && matrix.length % 2 === 1 &&
+        (row === center || column === center)) {
+      groups.push({ type: 'linear', index: center + 1 });
+    }
+    return groups;
+  }
+
+  function getQuadrilateralMatrixLinearPaths(matrix, regionCode) {
+    if (!Array.isArray(matrix) || !matrix.length ||
+        matrix.some((row) => !Array.isArray(row) || row.length !== matrix.length)) {
+      throw new TypeError('A matriz de rotação deve ser quadrada.');
+    }
+    if (typeof regionCode !== 'string' || !regionCode) {
+      throw new TypeError('A região dos percursos lineares é inválida.');
+    }
+
+    let position = null;
+    matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
+      if (code !== regionCode) return;
+      if (position !== null) {
+        throw new RangeError(`A região ${regionCode} aparece mais de uma vez na matriz.`);
+      }
+      position = [rowIndex + 1, columnIndex + 1];
+    }));
+    if (position === null) return null;
+    const [row, column] = position;
+    return {
+      horizontal: matrix[row - 1].map((value, columnIndex) => [row, columnIndex + 1]),
+      vertical: matrix.map((matrixRow, rowIndex) => [rowIndex + 1, column])
+    };
+  }
+
+  function getQuadrilateralMatrixHorizontalPath(matrix, regionCode) {
+    return getQuadrilateralMatrixLinearPaths(matrix, regionCode)?.horizontal || null;
   }
 
   function getRegionLayer(regionCode) {
@@ -290,6 +369,9 @@
     areAxisAlignedCellsNeighbors,
     rotateQuadrilateralMatrix,
     rotateQuadrilateralMatrixPath,
+    getQuadrilateralMatrixRingPath,
+    getQuadrilateralMatrixRotationGroups,
+    getQuadrilateralMatrixLinearPaths,
     getQuadrilateralMatrixHorizontalPath,
     getRegionLayer,
     getWarRegionOrder,

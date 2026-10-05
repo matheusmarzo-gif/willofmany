@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const rules = require('../game-rules.js');
+const levelFiveBoard = require('../tabuleiro-05.json');
 
 test('piece stage weights preserve the current soldier values', () => {
   assert.deepEqual(rules.soldierWeights, {
@@ -129,6 +130,16 @@ test('quadrilateral cells are neighbors across blocks when rotated edges touch',
   assert.equal(
     rules.areAxisAlignedCellsNeighbors(
       levelThreeL8OneAtThreeThree,
+      { ...levelThreeL8SevenAtOneOne, y: 525 },
+      1,
+      true
+    ),
+    true,
+    'battle adjacency can include corner-only contact when the board enables it'
+  );
+  assert.equal(
+    rules.areAxisAlignedCellsNeighbors(
+      levelThreeL8OneAtThreeThree,
       { ...levelThreeL8SevenAtOneOne, x: 1752 }
     ),
     false,
@@ -212,6 +223,83 @@ test('quadrilateral rotation path cycles only its ordered cells in either direct
   );
 });
 
+test('quadrilateral ring paths rotate only the selected ring and leave the fixed center alone', () => {
+  const initial = [
+    ['a', 'b', 'c'],
+    ['d', 'e', 'f'],
+    ['g', 'h', 'i']
+  ];
+  const ringPath = rules.getQuadrilateralMatrixRingPath(initial, [1, 2]);
+  assert.deepEqual(ringPath, [
+    [1, 1], [1, 2], [1, 3], [2, 3],
+    [3, 3], [3, 2], [3, 1], [2, 1]
+  ]);
+  assert.equal(rules.getQuadrilateralMatrixRingPath(initial, [2, 2]), null);
+  const rotated = rules.rotateQuadrilateralMatrixPath(initial, 'right', ringPath);
+  assert.equal(rotated[1][1], 'e');
+  assert.deepEqual(
+    rotated.flat().sort(),
+    initial.flat().sort(),
+    'rotating a ring preserves every region exactly once'
+  );
+});
+
+test('quadrilateral rotation groups follow matrix positions and overlap at the enabled center cross', () => {
+  const matrix = [
+    ['L8-9', null, null],
+    ['L8-10', 'L7-1', null],
+    ['L8-11', null, null]
+  ];
+  assert.deepEqual(
+    rules.getQuadrilateralMatrixRotationGroups(matrix, 'L8-10', true),
+    [{ type: 'ring', index: 1 }, { type: 'linear', index: 2 }]
+  );
+  const rotatedMatrix = rules.rotateQuadrilateralMatrixPath(
+    matrix,
+    'right',
+    rules.getQuadrilateralMatrixRingPath(matrix, [1, 1])
+  );
+  assert.deepEqual(
+    rules.getQuadrilateralMatrixRotationGroups(rotatedMatrix, 'L8-9', true),
+    [{ type: 'ring', index: 1 }, { type: 'linear', index: 2 }],
+    'a region gains linear membership after rotating into the central cross'
+  );
+  assert.deepEqual(
+    rules.getQuadrilateralMatrixRotationGroups(matrix, 'L7-1', true),
+    [{ type: 'linear', index: 2 }]
+  );
+  assert.deepEqual(
+    rules.getQuadrilateralMatrixRotationGroups(matrix, 'L8-9', false),
+    [{ type: 'ring', index: 1 }]
+  );
+  assert.deepEqual(
+    rules.getQuadrilateralMatrixRotationGroups([
+      ['a', 'b', 'c', 'd', 'e'],
+      ['f', 'g', 'h', 'i', 'j'],
+      ['k', 'l', 'm', 'n', 'o'],
+      ['p', 'q', 'r', 's', 't'],
+      ['u', 'v', 'w', 'x', 'y']
+    ], 'g', true),
+    [{ type: 'ring', index: 2 }]
+  );
+  assert.deepEqual(
+    rules.getQuadrilateralMatrixRotationGroups([
+      ['a', 'b', 'c'],
+      ['d', 'e', 'f'],
+      ['g', 'h', 'i']
+    ], 'b', true),
+    [{ type: 'ring', index: 1 }, { type: 'linear', index: 2 }]
+  );
+  assert.deepEqual(
+    rules.getQuadrilateralMatrixRotationGroups([
+      ['a', 'b', 'c'],
+      ['d', 'e', 'f'],
+      ['g', 'h', 'i']
+    ], 'e', false),
+    []
+  );
+});
+
 test('quadrilateral horizontal rotation path follows the region current row', () => {
   assert.deepEqual(
     rules.getQuadrilateralMatrixHorizontalPath([
@@ -219,7 +307,7 @@ test('quadrilateral horizontal rotation path follows the region current row', ()
       ['d', 'L7-1', 'f'],
       ['g', 'h', 'i']
     ], 'L7-1'),
-    [[1, 2], [2, 2], [3, 2]]
+    [[2, 1], [2, 2], [2, 3]]
   );
   assert.deepEqual(
     rules.getQuadrilateralMatrixHorizontalPath([
@@ -227,7 +315,7 @@ test('quadrilateral horizontal rotation path follows the region current row', ()
       ['L7-1', 'e', 'f'],
       ['g', 'h', 'i']
     ], 'L7-1'),
-    [[1, 1], [2, 1], [3, 1]]
+    [[2, 1], [2, 2], [2, 3]]
   );
   assert.deepEqual(
     rules.getQuadrilateralMatrixHorizontalPath([
@@ -235,7 +323,7 @@ test('quadrilateral horizontal rotation path follows the region current row', ()
       ['d', 'e', 'f'],
       ['g', 'h', 'L7-1']
     ], 'L7-1'),
-    [[1, 3], [2, 3], [3, 3]]
+    [[3, 1], [3, 2], [3, 3]]
   );
   assert.equal(
     rules.getQuadrilateralMatrixHorizontalPath([['a', 'b'], ['c', 'd']], 'L7-1'),
@@ -244,6 +332,75 @@ test('quadrilateral horizontal rotation path follows the region current row', ()
   assert.throws(
     () => rules.getQuadrilateralMatrixHorizontalPath([['L7-1', 'L7-1'], ['a', 'b']], 'L7-1'),
     RangeError
+  );
+});
+
+test('quadrilateral linear rotation paths follow the region row and column', () => {
+  const matrix = [
+    ['a', 'b', 'c', 'd'],
+    ['e', 'f', 'g', 'h'],
+    ['i', 'L7-1', 'k', 'l'],
+    ['m', 'n', 'o', 'p']
+  ];
+  const paths = rules.getQuadrilateralMatrixLinearPaths(matrix, 'L7-1');
+  assert.deepEqual(paths, {
+    horizontal: [[3, 1], [3, 2], [3, 3], [3, 4]],
+    vertical: [[1, 2], [2, 2], [3, 2], [4, 2]]
+  });
+  assert.deepEqual(
+    rules.rotateQuadrilateralMatrixPath(matrix, 'right', paths.horizontal)
+      [2],
+    ['l', 'i', 'L7-1', 'k'],
+    'a left-to-right swipe advances the selected row'
+  );
+  assert.deepEqual(
+    rules.rotateQuadrilateralMatrixPath(matrix, 'left', paths.horizontal)
+      [2],
+    ['L7-1', 'k', 'l', 'i'],
+    'a right-to-left swipe reverses the selected row'
+  );
+  assert.deepEqual(
+    rules.rotateQuadrilateralMatrixPath(matrix, 'right', paths.vertical)
+      .map((row) => row[1]),
+    ['n', 'b', 'f', 'L7-1'],
+    'a top-to-bottom swipe advances the selected column'
+  );
+  assert.deepEqual(
+    rules.rotateQuadrilateralMatrixPath(matrix, 'left', paths.vertical)
+      .map((row) => row[1]),
+    ['f', 'L7-1', 'n', 'b'],
+    'a bottom-to-top swipe reverses the selected column'
+  );
+  assert.equal(
+    rules.getQuadrilateralMatrixLinearPaths([['a', 'b'], ['c', 'd']], 'L7-1'),
+    null
+  );
+  assert.throws(
+    () => rules.getQuadrilateralMatrixLinearPaths(
+      [['L7-1', 'L7-1'], ['a', 'b']],
+      'L7-1'
+    ),
+    RangeError
+  );
+});
+
+test('Level 5 BQ03 linear routes follow horizontal rows and vertical columns', () => {
+  const block = levelFiveBoard.blocks.find((item) => item.name === 'BQ03');
+  const paths = rules.getQuadrilateralMatrixLinearPaths(block.matrix, 'L7-1');
+
+  assert.deepEqual(paths, {
+    horizontal: [[2, 1], [2, 2], [2, 3]],
+    vertical: [[1, 2], [2, 2], [3, 2]]
+  });
+  assert.deepEqual(
+    rules.rotateQuadrilateralMatrixPath(block.matrix, 'right', paths.horizontal),
+    [['L8-9', 'L8-10', 'L8-11'], [null, null, 'L7-1'], [null, null, null]],
+    'a left-to-right swipe moves L7-1 to the right'
+  );
+  assert.deepEqual(
+    rules.rotateQuadrilateralMatrixPath(block.matrix, 'right', paths.vertical),
+    [['L8-9', null, 'L8-11'], [null, 'L8-10', null], [null, 'L7-1', null]],
+    'a top-to-bottom swipe moves L7-1 down'
   );
 });
 

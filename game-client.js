@@ -47,7 +47,7 @@
     const gameMenu = document.querySelector('#game-menu');
     const gameMenuResignButton = document.querySelector('#game-menu-resign-button');
     const campaignActions = document.querySelector('#campaign-actions');
-    const campaignUndoButton = document.querySelector('#campaign-undo-button');
+    const campaignRestartTurnButton = document.querySelector('#campaign-restart-turn-button');
     const campaignMenuButton = document.querySelector('#campaign-menu-button');
     const campaignRestartButton = document.querySelector('#campaign-restart-button');
     const campaignIntro = document.querySelector('#campaign-intro');
@@ -100,6 +100,11 @@
     const regionFreeUnits = document.querySelector('#region-free-units');
     const rotateQuadrilateralBlockButton = document.querySelector('#rotate-quadrilateral-block-button');
     const regionRotationHelp = document.querySelector('#region-rotation-help');
+    const rotationPassPanel = document.querySelector('#rotation-pass-panel');
+    const rotationPassPanelTitle = document.querySelector('#rotation-pass-panel-title');
+    const rotationTargetOptions = document.querySelector('#rotation-target-options');
+    const rotationLocalPassButton = document.querySelector('#rotation-local-pass-button');
+    const rotationGlobalPassButton = document.querySelector('#rotation-global-pass-button');
     const turnPoints = document.querySelector('#turn-points');
     const campaignObjective = document.querySelector('#campaign-objective');
     const turnWheatValue = document.querySelector('#turn-wheat-value');
@@ -221,7 +226,11 @@
     let campaignNextLevelId = null;
     let campaignGuideStep = 'complete';
     let campaignGuideStepBeforeLevel5TurnThreeTip = null;
+    let campaignTurnStartSnapshot = null;
     let campaignGuideDismissible = false;
+    let campaignGuideMessagePages = [];
+    let campaignGuideMessagePage = 0;
+    let campaignGuideFinalHint = 'Clique para continuar';
     let campaignGuideAnimationTimeout = null;
     let campaignGuideIntroReturnToStart = false;
     let campaignIntroPending = false;
@@ -232,7 +241,8 @@
       'tabuleiro-02': 'tabuleiro-02.json',
       'tabuleiro-03': 'tabuleiro-03.json',
       'tabuleiro-04': 'tabuleiro-04.json',
-      'tabuleiro-05': 'tabuleiro-05.json'
+      'tabuleiro-05': 'tabuleiro-05.json',
+      'tabuleiro-06': 'tabuleiro-06.json'
     };
     const levelThreeRegionCodeMigration = {
       'L8-8': 'L8-10',
@@ -286,6 +296,11 @@
     let lastRotatedLayer = null;
     let lastRotatedBy = null;
     let rotationLockTurn = null;
+    const localRotationPasses = { orange: [], blue: [] };
+    const rotationOwnershipByRegion = {};
+    const rotationLocksByTarget = {};
+    let selectedRotationTargetKey = null;
+    let selectedRotationPassType = 'global';
     let isWarRunning = false;
     let heavyRotationLayer = null;
     let pieceDragState = null;
@@ -401,6 +416,12 @@
       Object.keys(regionStats).forEach((key) => delete regionStats[key]);
       Object.keys(regionForceStats).forEach((key) => delete regionForceStats[key]);
       Object.keys(regionCombatState).forEach((key) => delete regionCombatState[key]);
+      localRotationPasses.orange.length = 0;
+      localRotationPasses.blue.length = 0;
+      Object.keys(rotationOwnershipByRegion).forEach((key) => delete rotationOwnershipByRegion[key]);
+      Object.keys(rotationLocksByTarget).forEach((key) => delete rotationLocksByTarget[key]);
+      selectedRotationTargetKey = null;
+      selectedRotationPassType = 'global';
       pieceCounts.orange = 0;
       pieceCounts.blue = 0;
       rotations.fill(0);
@@ -413,6 +434,12 @@
       lastRotatedLayer = null;
       lastRotatedBy = null;
       rotationLockTurn = null;
+      localRotationPasses.orange.length = 0;
+      localRotationPasses.blue.length = 0;
+      Object.keys(rotationOwnershipByRegion).forEach((key) => delete rotationOwnershipByRegion[key]);
+      Object.keys(rotationLocksByTarget).forEach((key) => delete rotationLocksByTarget[key]);
+      selectedRotationTargetKey = null;
+      selectedRotationPassType = 'global';
       selectedCircularRotationBlock = null;
       selectedQuadrilateralRotationBlock = null;
       quadrilateralRotationMode = null;
@@ -450,6 +477,7 @@
       turnCreatedPieces = [];
       victoryPoints = { orange: 0, blue: 0 };
       lastRoundResult = null;
+      campaignTurnStartSnapshot = null;
       wheatBalances = { orange: 0, blue: 0 };
       lastWheatTurnReport = null;
       campaignCollectedBags = [];
@@ -484,9 +512,8 @@
       trashDropZone.classList.remove('is-visible', 'is-target', 'is-guide-visible');
     }
 
-    function saveGame() {
-      if (!isGameStarted || isGameOver || !allRegionMasks) return;
-      const save = {
+    function createGameSaveState() {
+      return {
         gameMode, humanTeam, aiTeam, gameSpeed, currentTeam, currentTurn,
         campaignLevelId: activeCampaignLevel?.id || null,
         levelThreeRegionMapVersion: activeCampaignLevel?.id === 'tabuleiro-03' ? 1 : 0,
@@ -496,6 +523,9 @@
         campaignGuideStepBeforeLevel5TurnThreeTip,
         campaignLevel2SeenSectors: [...campaignLevel2SeenSectors],
         hasRotatedThisTurn, lastRotatedLayer, lastRotatedBy, rotationLockTurn,
+        localRotationPasses: JSON.parse(JSON.stringify(localRotationPasses)),
+        rotationOwnershipByRegion: { ...rotationOwnershipByRegion },
+        rotationLocksByTarget: JSON.parse(JSON.stringify(rotationLocksByTarget)),
         rotations: [...rotations], circularDiskRotations: { ...circularDiskRotations },
         pontosDoTurn: { ...pontosDoTurn },
         turnMoveHistory: JSON.parse(JSON.stringify(turnMoveHistory)),
@@ -508,6 +538,23 @@
         lastRoundResult: lastRoundResult ? { ...lastRoundResult } : null,
         regionPiecesByRegion: JSON.parse(JSON.stringify(regionPiecesByRegion))
       };
+    }
+
+    function captureCampaignTurnStartSnapshot() {
+      if (!isCampaignGame()) {
+        campaignTurnStartSnapshot = null;
+        return;
+      }
+      campaignTurnStartSnapshot = createGameSaveState();
+      campaignTurnStartSnapshot.selectedRegionCode = selectedRegionCode;
+    }
+
+    function saveGame() {
+      if (!isGameStarted || isGameOver || !allRegionMasks) return;
+      const save = createGameSaveState();
+      save.campaignTurnStartSnapshot = campaignTurnStartSnapshot
+        ? JSON.parse(JSON.stringify(campaignTurnStartSnapshot))
+        : null;
       localStorage.setItem('will-of-many-save', JSON.stringify(save));
     }
 
@@ -582,8 +629,11 @@
           'await-l7-1', 'level3-recruitment-tip',
           'level4-intro', 'await-level4-l8-10', 'level4-battle-tip',
           'level4-battle-order',
-          'level5-intro', 'await-level5-l8-3', 'level5-support-tip',
-          'await-level5-l7-1', 'level5-force-tip', 'level5-turn3-tip',
+          'level5-intro', 'level5-neighbor-tip', 'await-level5-l8-10',
+          'level5-rotation-groups-tip', 'level5-rotation-passes-tip',
+          'level5-rotation-action-tip', 'await-level5-l8-2',
+          'level5-support-tip', 'await-level5-l7-1', 'level5-force-tip', 'level5-turn3-tip',
+          'level5-turn5-tip', 'level6-intro', 'level6-rank-tip',
           'level3-resource-defeat',
           'level4-resource-defeat', 'complete'
         ].includes(save.campaignGuideStep)
@@ -686,10 +736,81 @@
             blue: getTeamPieceCountFromCounts(regionPiecesByRegion[code].blue)
           };
         });
+        ['orange', 'blue'].forEach((team) => {
+          localRotationPasses[team].length = 0;
+          const savedPasses = save.localRotationPasses?.[team];
+          if (Array.isArray(savedPasses)) {
+            savedPasses.forEach((pass) => {
+              const regionCode = typeof pass?.regionCode === 'string'
+                ? mapSavedRegionCode(pass.regionCode)
+                : null;
+              const savedTargetKey = typeof pass?.targetKey === 'string'
+                ? pass.targetKey
+                : Array.isArray(pass?.targets)
+                  ? pass.targets.find((key) =>
+                    typeof key === 'string' && /^(quadrilateral:.+|circular:.+)$/.test(key))
+                  : null;
+              const legacyPathRegionCode = savedTargetKey
+                ?.match(/^quadrilateral:.+:path:(L\d+-\d+)$/)?.[1];
+              const migrationRegionCode = regionCode || legacyPathRegionCode;
+              const regionTargets = migrationRegionCode &&
+                Object.prototype.hasOwnProperty.call(regionGeometryByCode, migrationRegionCode)
+                ? getRotationTargetsForRegion(migrationRegionCode)
+                : [];
+              const matchingTarget = regionTargets.find((target) => target.key === savedTargetKey);
+              const legacyLinearTarget = savedTargetKey?.startsWith('quadrilateral:') &&
+                savedTargetKey.includes(':path:')
+                ? regionTargets.find((target) => target.rotationType === 'linear')
+                : null;
+              const targetKey = matchingTarget?.key || legacyLinearTarget?.key || savedTargetKey;
+              if (targetKey && /^(quadrilateral:.+|circular:.+)$/.test(targetKey)) {
+                localRotationPasses[team].push({
+                  regionCode: regionCode || (legacyLinearTarget ? legacyPathRegionCode : null),
+                  targetKey
+                });
+              }
+            });
+          } else {
+            Object.entries(savedPasses || {}).forEach(([key, value]) => {
+              const passes = Math.min(1000, Math.floor(Number(value)));
+              if (!/^(quadrilateral:.+|circular:.+)$/.test(key) ||
+                  !Number.isFinite(passes) || passes <= 0) return;
+              for (let index = 0; index < passes; index += 1) {
+                localRotationPasses[team].push({ regionCode: null, targetKey: key });
+              }
+            });
+          }
+        });
+        Object.keys(rotationOwnershipByRegion).forEach((code) => delete rotationOwnershipByRegion[code]);
+        Object.entries(save.rotationOwnershipByRegion || {}).forEach(([code, team]) => {
+          if (['orange', 'blue', 'free'].includes(team)) {
+            rotationOwnershipByRegion[mapSavedRegionCode(code)] = team;
+          }
+        });
+        Object.keys(rotationLocksByTarget).forEach((key) => delete rotationLocksByTarget[key]);
+        Object.entries(save.rotationLocksByTarget || {}).forEach(([key, lock]) => {
+          if ((lock?.team === 'orange' || lock?.team === 'blue') &&
+              Number.isInteger(lock.turn) && lock.turn > 0) {
+            rotationLocksByTarget[key] = { team: lock.team, turn: lock.turn };
+          }
+        });
+        initializeRotationOwnership(!save.localRotationPasses);
         recalculatePieceCounts();
         renderBoardLayers();
         isGameStarted = true;
         isGameOver = false;
+        const savedTurnStart = save.campaignTurnStartSnapshot;
+        if (gameMode === 'campaign' &&
+            savedTurnStart?.gameMode === 'campaign' &&
+            savedTurnStart.campaignLevelId === activeCampaignLevel?.id &&
+            Number(savedTurnStart.currentTurn) === currentTurn &&
+            ['orange', 'blue'].includes(savedTurnStart.currentTeam) &&
+            savedTurnStart.regionPiecesByRegion &&
+            typeof savedTurnStart.regionPiecesByRegion === 'object') {
+          campaignTurnStartSnapshot = JSON.parse(JSON.stringify(savedTurnStart));
+        } else {
+          captureCampaignTurnStartSnapshot();
+        }
         return true;
       } catch (error) {
         startMessage.textContent = `Não foi possível continuar: ${error.message}`;
@@ -733,7 +854,7 @@
         return !!getRotatableCircularDiskForRegion(regionCode);
       }
       if (geometry.shape === 'quadrilateral') {
-        return !!getRotatableQuadrilateralBlockForRegion(regionCode);
+        return getRotationTargetsForRegion(regionCode).length > 0;
       }
       return false;
     }
@@ -885,13 +1006,211 @@
           .match(/L(\d+)/)?.[1]);
     }
 
-    function canRotateQuadrilateralBlock(block) {
-      const layerNumber = getQuadrilateralBlockLayer(block);
-      if (!block || !layerNumber || (!isApplyingBluetoothAction && !isLocalPlayersTurn())) return false;
-      if (hasRotatedThisTurn) return false;
-      return !(currentTurn === rotationLockTurn &&
+    function getQuadrilateralRotationTargetsForRegion(block, region) {
+      if (!block || !region) return [];
+      const regionCode = region.code || region.name;
+      const layer = Number(region.layer ||
+        String(region.rank || regionCode).match(/L(\d+)/)?.[1]);
+      const matrix = quadrilateralBoard?.matrices?.[block.name];
+      if (!matrix) return [];
+      const groups = gameRules.getQuadrilateralMatrixRotationGroups(
+        matrix,
+        regionCode,
+        block.linearRotationEnabled === true
+      );
+      return groups.map((group) => ({
+        key: group.type === 'linear'
+          ? `quadrilateral:${block.name}:linear:${group.index}`
+          : `quadrilateral:${block.name}:ring:${group.index}`,
+        label: group.type === 'linear'
+          ? `${block.name} · linear central`
+          : `${block.name} · anel ${group.index}`,
+        layer,
+        kind: 'quadrilateral',
+        rotationType: group.type,
+        block,
+        regionCode
+      }));
+    }
+
+    function getQuadrilateralRotationTargetForRegion(block, region, targetKey = selectedRotationTargetKey) {
+      const targets = getQuadrilateralRotationTargetsForRegion(block, region);
+      return targets.find((target) => target.key === targetKey) || targets[0] || null;
+    }
+
+    function getRotationTargetForQuadrilateralBlock(block, regionCode = selectedRegionCode) {
+      const selectedRegion = block?.regions?.find((region) =>
+        (region.code || region.name) === regionCode);
+      const selectedTarget = getQuadrilateralRotationTargetForRegion(
+        block,
+        selectedRegion,
+        selectedRotationTargetKey
+      );
+      if (selectedTarget) return selectedTarget;
+      for (const region of block?.regions || []) {
+        const targets = getQuadrilateralRotationTargetsForRegion(block, region);
+        if (targets.length) return targets[0];
+      }
+      return null;
+    }
+
+    function getRotationTargetsForRegion(regionCode) {
+      const quadrilateralBlock = getRotatableQuadrilateralBlockForRegion(regionCode);
+      if (quadrilateralBlock) {
+        const region = quadrilateralBlock.regions.find((item) =>
+          (item.code || item.name) === regionCode);
+        return getQuadrilateralRotationTargetsForRegion(quadrilateralBlock, region);
+      }
+      const circularDisk = getRotatableCircularDiskForRegion(regionCode);
+      if (circularDisk) {
+        return [{
+          key: `circular:${getCircularDiskKey(circularDisk.block.name, circularDisk.disco)}`,
+          label: `disco ${circularDisk.block.name} · ${circularDisk.disco}`,
+          layer: getRegionLayer(regionCode),
+          kind: 'circular',
+          ...circularDisk
+        }];
+      }
+      return [];
+    }
+
+    function getRotationTargetForRegion(regionCode, targetKey = selectedRotationTargetKey) {
+      const targets = getRotationTargetsForRegion(regionCode);
+      return targets.find((target) => target.key === targetKey) || targets[0] || null;
+    }
+
+    function getRotationTargetForLayer(layerNumber) {
+      if (!Number.isInteger(layerNumber) || layerNumber < 1 || layerNumber > 8 ||
+          getRotationStep(layerNumber) <= 0) return null;
+      return {
+        key: `layer:${layerNumber}`,
+        label: `camada L${layerNumber}`,
+        layer: layerNumber,
+        kind: 'layer'
+      };
+    }
+
+    function getLocalRotationPassCount(team, targetKey) {
+      return localRotationPasses[team]
+        .filter((pass) => pass.targetKey === targetKey ||
+          (pass.targetKey && targetKey.startsWith(`${pass.targetKey}:`)))
+        .length;
+    }
+
+    function consumeLocalRotationPass(team, targetKey) {
+      const passIndex = localRotationPasses[team].findIndex((pass) =>
+        pass.targetKey === targetKey ||
+        (pass.targetKey && targetKey.startsWith(`${pass.targetKey}:`)));
+      if (passIndex < 0) return false;
+      localRotationPasses[team].splice(passIndex, 1);
+      return true;
+    }
+
+    function prepareRotationTargetForAction(target) {
+      if (selectedRotationTargetKey !== target.key) {
+        selectedRotationTargetKey = target.key;
+        selectedRotationPassType = 'global';
+        updateSelectedRegionPanel(selectedRegionCode);
+      }
+      if (!selectedRotationPassType) {
+        readout.textContent = `Selecione um passe Local ou Global para ${target.label}.`;
+        return false;
+      }
+      if (!canRotateTargetWithPass(target, selectedRotationPassType)) {
+        readout.textContent = `Passe ${selectedRotationPassType} indisponível para ${target.label}.`;
+        return false;
+      }
+      return true;
+    }
+
+    function canUseGlobalRotation(targetKey, layerNumber) {
+      if ((!isApplyingBluetoothAction && !isLocalPlayersTurn()) || hasRotatedThisTurn) return false;
+      const legacyBlockKey = targetKey.startsWith('quadrilateral:')
+        ? targetKey.split(':').slice(0, 2).join(':')
+        : null;
+      const lock = rotationLocksByTarget[targetKey] ||
+        (legacyBlockKey && rotationLocksByTarget[legacyBlockKey]);
+      if (lock?.turn === currentTurn && lock.team !== currentTeam) return false;
+      return Object.keys(rotationLocksByTarget).length > 0 || !!lock ||
+        !(currentTurn === rotationLockTurn &&
         lastRotatedLayer === layerNumber &&
         lastRotatedBy !== currentTeam);
+    }
+
+    function canUseLocalRotation(targetKey) {
+      return (isApplyingBluetoothAction || isLocalPlayersTurn()) &&
+        getLocalRotationPassCount(currentTeam, targetKey) > 0;
+    }
+
+    function canRotateTargetWithPass(target, passType) {
+      if (!target || !['local', 'global'].includes(passType)) return false;
+      return passType === 'local'
+        ? canUseLocalRotation(target.key)
+        : canUseGlobalRotation(target.key, target.layer);
+    }
+
+    function recordRotationOwnership(regionCode) {
+      if (!regionCode || !Object.prototype.hasOwnProperty.call(regionGeometryByCode, regionCode)) return;
+      const owner = getRegionDominador(regionCode);
+      const previousOwner = rotationOwnershipByRegion[regionCode];
+      if (owner !== previousOwner && (owner === 'orange' || owner === 'blue')) {
+        getRotationTargetsForRegion(regionCode).forEach((target) => {
+          localRotationPasses[owner].push({ regionCode, targetKey: target.key });
+        });
+      }
+      rotationOwnershipByRegion[regionCode] = owner;
+    }
+
+    function restoreRotationOwnershipAfterUndo(regionCode) {
+      const owner = getRegionDominador(regionCode);
+      const previousOwner = rotationOwnershipByRegion[regionCode];
+      if (owner !== previousOwner && (previousOwner === 'orange' || previousOwner === 'blue')) {
+        const passes = localRotationPasses[previousOwner];
+        const targetKeys = new Set(getRotationTargetsForRegion(regionCode).map((target) => target.key));
+        for (const targetKey of targetKeys) {
+          for (let index = passes.length - 1; index >= 0; index -= 1) {
+            if (passes[index].regionCode === regionCode && passes[index].targetKey === targetKey) {
+              passes.splice(index, 1);
+              break;
+            }
+          }
+        }
+      }
+      rotationOwnershipByRegion[regionCode] = owner;
+    }
+
+    function initializeRotationOwnership(awardExistingPasses) {
+      Object.keys(rotationOwnershipByRegion).forEach((regionCode) =>
+        delete rotationOwnershipByRegion[regionCode]);
+      Object.keys(regionGeometryByCode).forEach((regionCode) => {
+        const owner = getRegionDominador(regionCode);
+        rotationOwnershipByRegion[regionCode] = owner;
+        if (!awardExistingPasses || (owner !== 'orange' && owner !== 'blue')) return;
+        getRotationTargetsForRegion(regionCode).forEach((target) => {
+          localRotationPasses[owner].push({ regionCode, targetKey: target.key });
+        });
+      });
+    }
+
+    function recordRotationUse(targetKey, layerNumber, passType) {
+      if (passType === 'local') {
+        consumeLocalRotationPass(currentTeam, targetKey);
+        clearCampaignMoveUndoHistory();
+      } else {
+        hasRotatedThisTurn = true;
+      }
+      lastRotatedLayer = layerNumber;
+      lastRotatedBy = currentTeam;
+      rotationLockTurn = currentTurn + 1;
+      rotationLocksByTarget[targetKey] = { team: currentTeam, turn: currentTurn + 1 };
+    }
+
+    function canRotateQuadrilateralBlock(block, passType = 'global', targetKey = null) {
+      if (!block || (!isApplyingBluetoothAction && !isLocalPlayersTurn())) return false;
+      const target = targetKey
+        ? { key: targetKey, layer: getRegionLayer(selectedRegionCode) || getQuadrilateralBlockLayer(block) }
+        : getRotationTargetForQuadrilateralBlock(block);
+      return canRotateTargetWithPass(target, passType);
     }
 
     function getCircularDiskKey(blockName, disco) {
@@ -922,14 +1241,15 @@
         0;
     }
 
-    function canRotateCircularDisk(block, regions) {
+    function canRotateCircularDisk(block, regions, passType = 'global') {
       const layerNumber = Number(regions[0]?.layer ||
         String(regions[0]?.rank || regions[0]?.code || regions[0]?.name).match(/L(\d+)/)?.[1]);
       if (!isApplyingBluetoothAction && !isLocalPlayersTurn()) return false;
-      if (hasRotatedThisTurn || getCircularDiskRotationStep(block, regions) <= 0) return false;
-      return !(currentTurn === rotationLockTurn &&
-        lastRotatedLayer === layerNumber &&
-        lastRotatedBy !== currentTeam);
+      if (getCircularDiskRotationStep(block, regions) <= 0) return false;
+      return canRotateTargetWithPass({
+        key: `circular:${getCircularDiskKey(block.name, getRegionDiskName(regions[0]))}`,
+        layer: layerNumber
+      }, passType);
     }
 
     function initializeCircularDiskRotations(useLayerRotations = false) {
@@ -972,9 +1292,8 @@
 
     function canRotateLayer(layerNumber) {
       if (!isApplyingBluetoothAction && !isLocalPlayersTurn()) return false;
-      if (hasRotatedThisTurn) return false;
-      if (getRotationStep(layerNumber) <= 0) return false;
-      return !(currentTurn === rotationLockTurn && lastRotatedLayer === layerNumber && lastRotatedBy !== currentTeam);
+      const target = getRotationTargetForLayer(layerNumber);
+      return !!target && canUseGlobalRotation(target.key, target.layer);
     }
 
     function updateCircularRotationBlockPicker(blocks) {
@@ -1025,7 +1344,8 @@
       });
       picker.querySelectorAll('.quadrilateral-rotation-button').forEach((button) => {
         const block = blocks.find((item) => String(item.name) === button.dataset.rotationBlock);
-        const disabled = !block || !canRotateQuadrilateralBlock(block);
+        const target = getRotationTargetForQuadrilateralBlock(block);
+        const disabled = !target || !canUseGlobalRotation(target.key, target.layer);
         button.disabled = disabled;
         button.setAttribute('aria-disabled', String(disabled));
       });
@@ -1106,7 +1426,21 @@
               'aria-label',
               `Girar o bloco ${block.name} para a ${direction === 'left' ? 'esquerda' : 'direita'}`
             );
-            button.addEventListener('click', () => rotateQuadrilateralBlock(block.name, direction));
+            button.addEventListener('click', () => {
+              const target = getRotationTargetForQuadrilateralBlock(block);
+              if (!target || !canUseGlobalRotation(target.key, target.layer)) return;
+              const targetRegion = block.regions.find((region) =>
+                (region.code || region.name) === target.regionCode);
+              const targetPath = getQuadrilateralRegionRotationPath(block, targetRegion, target);
+              rotateQuadrilateralBlock(
+                block.name,
+                direction,
+                false,
+                targetPath?.linear ? targetPath.horizontal : targetPath,
+                'global',
+                target.key
+              );
+            });
             blockControls.appendChild(button);
           });
           directions.appendChild(blockControls);
@@ -1189,8 +1523,19 @@
               'aria-label',
               `Girar disco ${disco} para a ${displayedDirection === 'left' ? 'esquerda' : 'direita'}`
             );
-            button.addEventListener('click', () =>
-              rotateCircularDisk(block.name, disco, direction));
+            button.addEventListener('click', () => {
+              const target = getRotationTargetForRegion(
+                regions[0]?.code || regions[0]?.name
+              );
+              if (!target || !canUseGlobalRotation(target.key, target.layer)) return;
+              rotateCircularDisk(
+                block.name,
+                disco,
+                direction,
+                false,
+                'global'
+              );
+            });
             group.appendChild(button);
           });
           controls.appendChild(group);
@@ -1216,7 +1561,9 @@
         const block = getRotatableCircularBlocks().find((item) =>
           String(item.name) === button.dataset.rotationBlock);
         const regions = getCircularDiskRegions(block, button.dataset.disco);
-        const disabled = !block || !canRotateCircularDisk(block, regions);
+        const target = getRotationTargetForRegion(regions[0]?.code || regions[0]?.name);
+        const disabled = !block || !target ||
+          !canUseGlobalRotation(target.key, target.layer);
         button.disabled = disabled;
         button.setAttribute('aria-disabled', String(disabled));
       });
@@ -1255,7 +1602,7 @@
       turnPoints.textContent = `Moedas: ${Number(pontosDoTurn[currentTeam]).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
       campaignObjective.classList.toggle('is-hidden', !isCampaignGame());
       if (isCampaignGame()) {
-        campaignObjective.textContent = `Campanha · ${activeCampaignLevel.name}: conquiste ${campaignObjectiveRegions.join(', ') || 'as regiões azuis'}`;
+        campaignObjective.textContent = `Campanha · ${activeCampaignLevel.name}: ${activeCampaignLevel.objectiveText || `conquiste ${campaignObjectiveRegions.join(', ') || 'as regiões azuis'}`}`;
       }
       const wheatTotals = getWheatTotals(currentTeam);
       const netWheatProduction = wheatTotals.production - wheatTotals.consumption;
@@ -1324,14 +1671,37 @@
         piece.team === team && piece.source === regionCode && piece.stage === stage);
     }
 
-    function getQuadrilateralRegionRotationPath(block, region) {
-      if (region?.rotationPathAxis === 'horizontal') {
-        return gameRules.getQuadrilateralMatrixHorizontalPath(
-          quadrilateralBoard?.matrices?.[block.name],
+    function getQuadrilateralRegionRotationPath(block, region, target) {
+      const matrix = quadrilateralBoard?.matrices?.[block.name];
+      if (!matrix || !region || !target) return null;
+      if (target.rotationType === 'linear') {
+        const linearPaths = gameRules.getQuadrilateralMatrixLinearPaths(
+          matrix,
           region.code || region.name
         );
+        if (!linearPaths) return null;
+        return {
+          ...linearPaths,
+          linear: true
+        };
       }
-      return Array.isArray(region?.rotationPath) ? region.rotationPath : null;
+      const regionCode = region?.code || region?.name;
+      let position = null;
+      matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
+        if (code === regionCode && position === null) position = [rowIndex, columnIndex];
+      }));
+      if (position === null) {
+        const [row, column] = region?.positions?.[0] || [];
+        if (Number.isInteger(row) && Number.isInteger(column)) {
+          position = [row - 1, column - 1];
+        }
+      }
+      if (position === null) return null;
+      const [row, column] = position;
+      const ringPath = gameRules.getQuadrilateralMatrixRingPath(matrix, [row + 1, column + 1]);
+      const ringGroup = getQuadrilateralRotationTargetsForRegion(block, region)
+        .find((item) => item.key === target.key);
+      return ringGroup?.rotationType === 'ring' ? ringPath : null;
     }
 
     function hasDirectRecruitmentPromotionCapacity(targetLayer, team, requiredSoldiers) {
@@ -1559,12 +1929,26 @@
 
     function getCombatNeighbors(regionCode) {
       const neighbors = regionNeighborCache[regionCode];
-      if (!neighbors) return [];
-      return [...new Set([
-        ...(neighbors.superior || []),
-        ...(neighbors.inferior || []),
-        ...(neighbors.sameRank || [])
-      ])];
+      const regionNeighbors = neighbors
+        ? [
+          ...(neighbors.superior || []),
+          ...(neighbors.inferior || []),
+          ...(neighbors.sameRank || [])
+        ]
+        : [];
+      if (currentBoardData?.campaign?.warIncludesCornerContact === true) {
+        const geometry = regionGeometryByCode[regionCode];
+        if (geometry?.shape === 'quadrilateral') {
+          Object.entries(regionGeometryByCode).forEach(([candidateCode, candidate]) => {
+            if (candidateCode === regionCode || candidate.shape !== 'quadrilateral') return;
+            const cellsTouchAtCorner = geometry.cells.some((firstCell) =>
+              candidate.cells.some((secondCell) =>
+                gameRules.areAxisAlignedCellsNeighbors(firstCell, secondCell, 1, true)));
+            if (cellsTouchAtCorner) regionNeighbors.push(candidateCode);
+          });
+        }
+      }
+      return [...new Set(regionNeighbors)];
     }
 
     function getRegionFinalForceValue(regionCode) {
@@ -1736,6 +2120,7 @@
       };
       turnMoveHistory = turnMoveHistory.filter((move) =>
         move.source !== regionCode && move.target !== regionCode);
+      recordRotationOwnership(regionCode);
     }
 
     function recalculatePieceCounts() {
@@ -1796,6 +2181,21 @@
       resetCombatRegions();
       warSpotlightRegionCodes = [];
       updateBoardFocusOverlay();
+      const restoreLevelSixView = isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-06';
+      const previousStageView = restoreLevelSixView
+        ? {
+          zoom: stageZoom,
+          offset: { ...stageZoomOffset },
+          focusedRegionCode
+        }
+        : null;
+      const restoreStageView = () => {
+        if (!previousStageView) return;
+        stageZoom = previousStageView.zoom;
+        stageZoomOffset = { ...previousStageView.offset };
+        focusedRegionCode = previousStageView.focusedRegionCode;
+        updateStageZoom();
+      };
       resetStageZoom();
       const blocks = [];
       const regionOrder = gameRules.getWarRegionOrder(getRegionCalculationOrder());
@@ -1817,6 +2217,7 @@
         updateBoardFocusOverlay();
         readout.textContent = 'Guerra: nenhum bloco de confronto encontrado.';
         isWarRunning = false;
+        restoreStageView();
         updateWarAvailability();
         const centerWinner = getCenterConqueror();
         if (centerWinner && (!isOnlineGame() || onlineTeam === 'orange')) {
@@ -1832,7 +2233,7 @@
       for (const block of blocks) {
         warSpotlightRegionCodes = [...new Set([...block.alliedRegions, ...block.enemyRegions])];
         updateBoardFocusOverlay();
-        focusRegion(block.regionCode);
+        focusRegion(block.regionCode, restoreLevelSixView ? 2 : null);
         const alliedForce = block.alliedRegions.reduce((sum, code) => sum + getRegionFinalForceValue(code), 0);
         const enemyForce = block.enemyRegions.reduce((sum, code) => sum + getRegionFinalForceValue(code), 0);
         renderWarForces(block.attacker, alliedForce, enemyForce);
@@ -1870,7 +2271,8 @@
       warStatus.classList.add('is-hidden');
       warSpotlightRegionCodes = [];
       updateBoardFocusOverlay();
-      resetStageZoom();
+      if (restoreLevelSixView) restoreStageView();
+      else resetStageZoom();
       isWarRunning = false;
       updateWarAvailability();
       recalculateRegionForces();
@@ -2284,6 +2686,41 @@
       campaignMoveUndoHistory = [];
     }
 
+    function restartCampaignTurn() {
+      if (!isCampaignGame() || isGameOver || isWarRunning || !isLocalPlayersTurn()) return false;
+      if (!campaignTurnStartSnapshot?.regionPiecesByRegion) {
+        readout.textContent = 'Não foi possível reiniciar: o estado inicial deste turno não está disponível.';
+        return false;
+      }
+      const snapshot = JSON.parse(JSON.stringify(campaignTurnStartSnapshot));
+      if (!campaignGuide.classList.contains('is-hidden')) hideCampaignGuide();
+      localStorage.setItem('will-of-many-save', JSON.stringify({
+        ...snapshot,
+        campaignTurnStartSnapshot: snapshot
+      }));
+      if (!loadSavedGame()) {
+        readout.textContent = 'Não foi possível carregar o estado inicial deste turno.';
+        return false;
+      }
+      selectedRegionCode = regionGeometryByCode[snapshot.selectedRegionCode]
+        ? snapshot.selectedRegionCode
+        : null;
+      recalculateRegionForces();
+      refreshRegionVisuals();
+      updateRotationControls();
+      updateSelectedRegionPanel(selectedRegionCode);
+      resetStageZoom();
+      if (selectedRegionCode) focusRegion(selectedRegionCode);
+      else focusStrongestRegionForTeam(currentTeam);
+      updateReadout();
+      updateWarAvailability();
+      updateTurnState();
+      saveGame();
+      readout.textContent = 'Turno reiniciado. O estado inicial deste turno foi restaurado.';
+      showCampaignIntro();
+      return true;
+    }
+
     function undoLastCampaignMove() {
       if (!isCampaignGame() || isGameOver || isWarRunning || !isLocalPlayersTurn()) return;
       const undo = campaignMoveUndoHistory.pop();
@@ -2315,6 +2752,7 @@
           blue: Object.values(regionPiecesByRegion[regionCode].blue)
             .reduce((sum, value) => sum + value, 0)
         };
+        restoreRotationOwnershipAfterUndo(regionCode);
       });
       pontosDoTurn[undo.team] = undo.pointsBefore;
       turnCreatedPieces = undo.turnCreatedPiecesBefore.map((piece) => ({ ...piece }));
@@ -2402,6 +2840,7 @@
         orange: Object.values(regionPieces.orange).reduce((sum, value) => sum + value, 0),
         blue: Object.values(regionPieces.blue).reduce((sum, value) => sum + value, 0)
       };
+      recordRotationOwnership(regionCode);
     }
 
     function recyclePiece(regionCode, team, pieceStage) {
@@ -2456,11 +2895,11 @@
       maybeAdvanceLevelFourGuide();
       maybeAdvanceLevelFiveGuide();
       maybeShowCampaignResourceDefeat();
-      campaignUndoButton.disabled = !isCampaignGame() || !campaignMoveUndoHistory.length ||
+      campaignRestartTurnButton.disabled = !isCampaignGame() || !campaignTurnStartSnapshot ||
         !isLocalPlayersTurn() || isWarRunning || isGameOver || isAiTurnRunning;
-      campaignUndoButton.title = campaignUndoButton.disabled
-        ? 'Não há movimentos deste turno para desfazer'
-        : `Desfazer o último movimento (${campaignMoveUndoHistory.length} disponível)`;
+      campaignRestartTurnButton.title = campaignRestartTurnButton.disabled
+        ? 'O turno atual não pode ser reiniciado agora'
+        : 'Restaurar o estado inicial do turno atual';
     }
 
     function maybeShowCampaignResourceDefeat() {
@@ -3093,27 +3532,76 @@
       regionRotationBlockName.classList.toggle('is-hidden', !rotationBlockLabel);
       const rotatableQuadrilateralBlock = getRotatableQuadrilateralBlockForRegion(regionCode);
       const rotatableCircularDisk = getRotatableCircularDiskForRegion(regionCode);
-      const hasRotatableRegion = !!rotatableQuadrilateralBlock || !!rotatableCircularDisk;
-      const activeRotationKind = rotatableQuadrilateralBlock ? 'quadrilateral' : 'circular';
+      const rotationTargets = getRotationTargetsForRegion(regionCode);
+      const rotationTarget = rotationTargets.find((target) =>
+        target.key === selectedRotationTargetKey) || rotationTargets[0] || null;
+      const hasRotatableRegion = !!rotationTarget || !!rotatableCircularDisk;
+      const activeRotationKind = rotationTarget?.kind || 'circular';
+      if (rotationTarget?.key !== selectedRotationTargetKey) {
+        selectedRotationTargetKey = rotationTarget?.key || null;
+        selectedRotationPassType = 'global';
+      }
+      rotationTargetOptions.replaceChildren();
+      rotationTargetOptions.classList.toggle('is-hidden', rotationTargets.length < 2);
+      rotationTargets.forEach((target) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = target.rotationType === 'linear'
+          ? 'Linear'
+          : `Anel ${target.key.split(':').pop()}`;
+        button.setAttribute('aria-pressed', String(target.key === selectedRotationTargetKey));
+        button.setAttribute('aria-label', `Selecionar rotação ${target.label}`);
+        button.addEventListener('click', () => {
+          if (selectedRotationTargetKey === target.key) return;
+          selectedRotationTargetKey = target.key;
+          selectedRotationPassType = 'global';
+          updateSelectedRegionPanel(regionCode);
+        });
+        rotationTargetOptions.appendChild(button);
+      });
+      const localPassCount = rotationTarget
+        ? getLocalRotationPassCount(currentTeam, rotationTarget.key)
+        : 0;
+      const localPassAvailable = !!rotationTarget && canUseLocalRotation(rotationTarget.key);
+      const globalPassAvailable = !!rotationTarget &&
+        canUseGlobalRotation(rotationTarget.key, rotationTarget.layer);
+      if (selectedRotationPassType === 'local' && !localPassAvailable) {
+        selectedRotationPassType = 'global';
+      }
+      rotationPassPanel.classList.toggle('is-hidden', !rotationTarget);
+      rotationPassPanelTitle.textContent = rotationTarget
+        ? `${rotationTarget.label} · passes de rotação`
+        : 'Passes de rotação';
+      rotationLocalPassButton.textContent = `Local · ${localPassCount}`;
+      rotationLocalPassButton.disabled = !localPassAvailable;
+      rotationLocalPassButton.title =
+        'Consome um passe local associado a uma região deste alvo; não é limitado por rotação do oponente.';
+      rotationLocalPassButton.setAttribute('aria-pressed',
+        String(selectedRotationPassType === 'local'));
+      rotationGlobalPassButton.textContent = hasRotatedThisTurn
+        ? 'Global · usado'
+        : globalPassAvailable ? 'Global · 1 disponível' : 'Global · bloqueado';
+      rotationGlobalPassButton.disabled = !globalPassAvailable;
+      rotationGlobalPassButton.title =
+        'Consome o passe global deste turno; fica bloqueado se o oponente girou este alvo no turno anterior.';
+      rotationGlobalPassButton.setAttribute('aria-pressed',
+        String(selectedRotationPassType === 'global'));
       const isFocusedRotation = quadrilateralRotationMode &&
+        quadrilateralRotationMode.targetKey === rotationTarget?.key &&
         quadrilateralRotationMode.kind === activeRotationKind &&
         quadrilateralRotationMode.blockName ===
           (rotatableQuadrilateralBlock?.name || rotatableCircularDisk?.block.name) &&
         (activeRotationKind !== 'circular' ||
           quadrilateralRotationMode.disco === rotatableCircularDisk?.disco);
-      const selectedRotationPath = rotatableQuadrilateralBlock
+      const selectedRotationPaths = rotatableQuadrilateralBlock
         ? getQuadrilateralRegionRotationPath(
           rotatableQuadrilateralBlock,
           rotatableQuadrilateralBlock.regions.find((region) =>
-            (region.code || region.name) === regionCode)
+            (region.code || region.name) === regionCode),
+          rotationTarget
         )
         : null;
-      const canRotateSelected = rotatableQuadrilateralBlock
-        ? canRotateQuadrilateralBlock(rotatableQuadrilateralBlock)
-        : rotatableCircularDisk && canRotateCircularDisk(
-          rotatableCircularDisk.block,
-          rotatableCircularDisk.regions
-        );
+      const canRotateSelected = canRotateTargetWithPass(rotationTarget, selectedRotationPassType);
       rotateQuadrilateralBlockButton.classList.toggle('is-hidden', !hasRotatableRegion);
       rotateQuadrilateralBlockButton.disabled = hasRotatableRegion &&
         (quadrilateralRotationMode?.animating || (!isFocusedRotation && !canRotateSelected));
@@ -3128,13 +3616,20 @@
       const animatedDirectionIsClockwise = quadrilateralRotationMode?.kind === 'circular'
         ? quadrilateralRotationMode.direction === 'right'
         : quadrilateralRotationMode?.direction === 'left';
+      const linearRotationDirection = quadrilateralRotationMode?.rotationAxis === 'horizontal'
+        ? quadrilateralRotationMode.direction === 'right' ? 'para a direita' : 'para a esquerda'
+        : quadrilateralRotationMode?.direction === 'right' ? 'para baixo' : 'para cima';
       regionRotationHelp.textContent = quadrilateralRotationMode?.animating
-        ? `Girando ${quadrilateralRotationMode.kind === 'circular' ? 'o disco' : 'o bloco'} ${animatedDirectionIsClockwise ? 'no sentido horário' : 'no sentido anti-horário'}…`
+        ? quadrilateralRotationMode.linearRotationPaths
+          ? `Girando ${quadrilateralRotationMode.rotationAxis === 'horizontal' ? 'na horizontal' : 'na vertical'} ${linearRotationDirection}…`
+          : `Girando ${quadrilateralRotationMode.kind === 'circular' ? 'o disco' : 'o bloco'} ${animatedDirectionIsClockwise ? 'no sentido horário' : 'no sentido anti-horário'}…`
         : activeRotationKind === 'circular'
           ? 'Desenhe um círculo sobre o disco: sentido horário gira à direita; anti-horário gira à esquerda.'
-          : selectedRotationPath
-            ? `Rotação especial: as células M(1,${selectedRotationPath[0][1]}) → M(2,${selectedRotationPath[0][1]}) → M(3,${selectedRotationPath[0][1]}) alternam de posição. Desenhe um círculo sobre a linha destacada.`
-            : 'Desenhe um círculo sobre as células destacadas: horário gira à esquerda; anti-horário gira à direita.';
+          : selectedRotationPaths?.linear
+            ? 'Faça um traço horizontal ou vertical sobre a linha destacada, no sentido em que deseja girar as posições.'
+            : selectedRotationPaths
+            ? 'Desenhe um círculo sobre o bloco de rotação destacado.'
+            : 'Desenhe um círculo sobre as células destacadas: horário gira à direita; anti-horário gira à esquerda.';
       regionLayerOrangeForce.textContent = formatStatisticsNumber(layerFinalForces.orange);
       regionLayerBlueForce.textContent = formatStatisticsNumber(layerFinalForces.blue);
       regionPieceCounts.textContent = `Peças: ${safeCounts.orange + safeCounts.blue}`;
@@ -3714,16 +4209,22 @@
       });
     }
 
-    function rotateCircularDisk(blockName, disco, direction, keepDiskFocus = false) {
+    function rotateCircularDisk(
+      blockName,
+      disco,
+      direction,
+      keepDiskFocus = false,
+      passType = 'global'
+    ) {
       const block = getRotatableCircularBlocks().find((item) => String(item.name) === blockName);
       const regions = getCircularDiskRegions(block, disco);
       if (!block || !regions.length) return false;
-      if (!canRotateCircularDisk(block, regions)) {
+      if (!canRotateCircularDisk(block, regions, passType)) {
         const firstRegion = regions[0];
         const layer = Number(firstRegion.layer ||
           String(firstRegion.rank || firstRegion.code || firstRegion.name).match(/L(\d+)/)?.[1]);
-        readout.textContent = hasRotatedThisTurn
-          ? 'Você já girou um disco neste turn.'
+        readout.textContent = passType === 'global' && hasRotatedThisTurn
+          ? 'O passe global de rotação já foi usado neste turno.'
           : `Disco ${disco}: indisponível neste turn.`;
         if (layer >= 1 && layer <= 8) updateRotationControls();
         return false;
@@ -3739,6 +4240,9 @@
       const previousRotation = getCircularDiskRotation(blockName, disco, primaryLayer);
       const targetRotation = previousRotation + rotationDelta;
       const startingPiecePositions = captureCircularDiskPiecePositions(regionCodes);
+      const rotationTarget = getRotationTargetForRegion(
+        regionCodes.includes(selectedRegionCode) ? selectedRegionCode : regionCodes[0]
+      );
 
       controls.classList.remove('is-rotation-picker-open', 'is-selecting-rotation-block');
       app.classList.remove('is-rotation-picker-open');
@@ -3759,10 +4263,7 @@
         updateL8AttachedLayers();
       }
       rotationAnimationVersion += 1;
-      hasRotatedThisTurn = true;
-      lastRotatedLayer = primaryLayer;
-      lastRotatedBy = currentTeam;
-      rotationLockTurn = currentTurn + 1;
+      recordRotationUse(rotationTarget?.key || `circular:${diskKey}`, primaryLayer, passType);
       if (isCampaignLevelTwo() &&
           ['level2-rotate', 'level2-rotate-again'].includes(campaignGuideStep)) {
         hideCampaignGuide();
@@ -3796,7 +4297,10 @@
         layer: primaryLayer,
         block: blockName,
         disco,
-        direction
+        direction,
+        source: selectedRegionCode,
+        rotationTargetKey: rotationTarget?.key || `circular:${diskKey}`,
+        rotationPassType: passType
       });
       finishIfCenterConquered();
       return true;
@@ -4164,15 +4668,15 @@
       });
     }
 
-    function focusRegion(regionCode) {
+    function focusRegion(regionCode, focusScale = null) {
       updateBoardFocusOverlay();
       const point = getRegionFocusPoint(regionCode);
       if (!point) return;
       const layer = getRegionLayer(regionCode);
       const rect = stagePanel.getBoundingClientRect();
-      const scale = Number(currentBoardData?.regionFocusScale) || 1.8;
+      const scale = Number(focusScale) || Number(currentBoardData?.regionFocusScale) || 1.8;
       if (currentBoardData?.boardType === 'mixed' ||
-          ['tabuleiro-03', 'tabuleiro-05'].includes(currentBoardData?.campaign?.id)) {
+          ['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06'].includes(currentBoardData?.campaign?.id)) {
         stageZoom = scale;
         stageZoomOffset = {
           x: ((50 - point.x) / 100) * rect.width * scale,
@@ -4194,6 +4698,41 @@
         y: ((targetY - point.y) / 100) * rect.height * scale
       };
       focusedRegionCode = regionCode;
+      updateStageZoom();
+    }
+
+    function focusRegionGroup(regionCodes) {
+      const geometries = regionCodes.map((regionCode) => regionGeometryByCode[regionCode]);
+      if (geometries.some((geometry) =>
+        geometry?.shape !== 'quadrilateral' || !Array.isArray(geometry.cells) ||
+        !geometry.cells.length)) return;
+      const cells = geometries.flatMap((geometry) => geometry.cells);
+      const bounds = cells.reduce((result, cell) => ({
+        left: Math.min(result.left, cell.x - cell.width / 2),
+        right: Math.max(result.right, cell.x + cell.width / 2),
+        top: Math.min(result.top, cell.y - cell.height / 2),
+        bottom: Math.max(result.bottom, cell.y + cell.height / 2)
+      }), {
+        left: Number.POSITIVE_INFINITY,
+        right: Number.NEGATIVE_INFINITY,
+        top: Number.POSITIVE_INFINITY,
+        bottom: Number.NEGATIVE_INFINITY
+      });
+      const boundsWidth = bounds.right - bounds.left;
+      const boundsHeight = bounds.bottom - bounds.top;
+      if (!(boundsWidth > 0) || !(boundsHeight > 0)) return;
+      const rect = stagePanel.getBoundingClientRect();
+      stageZoom = Math.max(1, Math.min(
+        8,
+        908 * 0.76 / boundsWidth,
+        908 * 0.76 / boundsHeight
+      ));
+      stageZoomOffset = {
+        x: ((454 - (bounds.left + bounds.right) / 2) / 908) * rect.width * stageZoom,
+        y: ((454 - (bounds.top + bounds.bottom) / 2) / 908) * rect.height * stageZoom
+      };
+      focusedRegionCode = null;
+      updateBoardFocusOverlay();
       updateStageZoom();
     }
 
@@ -4285,7 +4824,7 @@
     function getSafeSlots(layerNumber, regionNumber, applyRotation = true) {
       const regionCode = `L${layerNumber}-${regionNumber}`;
       const geometry = regionGeometryByCode[regionCode];
-      if (['tabuleiro-03', 'tabuleiro-05'].includes(currentBoardData?.campaign?.id) &&
+      if (['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06'].includes(currentBoardData?.campaign?.id) &&
           geometry?.shape === 'quadrilateral' && Array.isArray(geometry.cells)) {
         return geometry.cells.flatMap((cell) => {
           const slots = [];
@@ -4601,6 +5140,7 @@
           rotationArea: block.rotationArea || null,
           rotationSteps: Number(block.rotationSteps) === 2 ? 2 : 1,
           rotationEnabled: block.rotationEnabled !== false,
+          linearRotationEnabled: block.linearRotationEnabled === true,
           regions: block.regions
         });
       });
@@ -4634,8 +5174,8 @@
               block: block.name,
               row: rowIndex + 1,
               column: columnIndex + 1,
-              x: offsetX + (block.centerX + rowIndex * block.width) * scale,
-              y: offsetY + (block.centerY + columnIndex * block.height) * scale,
+              x: offsetX + (block.centerX + columnIndex * block.width) * scale,
+              y: offsetY + (block.centerY + rowIndex * block.height) * scale,
               width: block.width * scale,
               height: block.height * scale
             });
@@ -4925,7 +5465,13 @@
       }[layer] || '#ffffff';
     }
 
-    function beginQuadrilateralRotationMode(block, kind = 'quadrilateral', disco = null) {
+    function beginQuadrilateralRotationMode(
+      block,
+      kind = 'quadrilateral',
+      disco = null,
+      passType = 'global',
+      targetKey = null
+    ) {
       if (quadrilateralRotationReturnTimeout) {
         window.clearTimeout(quadrilateralRotationReturnTimeout);
         quadrilateralRotationReturnTimeout = null;
@@ -4934,7 +5480,13 @@
         ? getQuadrilateralRegionRotationPath(
           block,
           block.regions.find((region) =>
-            (region.code || region.name) === selectedRegionCode)
+            (region.code || region.name) === selectedRegionCode),
+          getQuadrilateralRotationTargetForRegion(
+            block,
+            block.regions.find((region) =>
+              (region.code || region.name) === selectedRegionCode),
+            targetKey
+          )
         )
         : null;
       quadrilateralRotationMode = {
@@ -4942,7 +5494,14 @@
         blockName: String(block.name),
         disco,
         selectedRegionCode,
+        passType,
+        targetKey: targetKey || getRotationTargetForRegion(selectedRegionCode)?.key ||
+          (kind === 'quadrilateral'
+            ? `quadrilateral:${block.name}`
+            : `circular:${getCircularDiskKey(block.name, disco)}`),
         rotationPath,
+        linearRotationPaths: rotationPath?.linear ? rotationPath : null,
+        rotationAxis: null,
         gesture: null,
         direction: null,
         animating: false
@@ -4991,7 +5550,21 @@
           event.clientY < bounds.top - 18 || event.clientY > bounds.bottom + 18) {
         regionRotationHelp.textContent = mode.kind === 'circular'
           ? 'Faça o gesto circular dentro do disco destacado.'
-          : 'Faça o gesto circular dentro das células destacadas.';
+          : mode.linearRotationPaths
+            ? 'Faça um traço horizontal ou vertical sobre as linhas destacadas.'
+            : 'Faça o gesto circular dentro das células destacadas.';
+        return;
+      }
+      if (mode.linearRotationPaths) {
+        mode.gesture = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          currentX: event.clientX,
+          currentY: event.clientY
+        };
+        regionRotationHelp.textContent = 'Continue o traço em linha reta até o fim da fileira ou coluna.';
+        if (typeof stage.setPointerCapture === 'function') stage.setPointerCapture(event.pointerId);
         return;
       }
       const deltaX = event.clientX - bounds.centerX;
@@ -5025,6 +5598,11 @@
       if (!mode || !gesture || gesture.pointerId !== event.pointerId) return;
       event.preventDefault();
       event.stopPropagation();
+      if (mode.linearRotationPaths) {
+        gesture.currentX = event.clientX;
+        gesture.currentY = event.clientY;
+        return;
+      }
       const block = quadrilateralBoard?.blocks.find((item) =>
         String(item.name) === mode.blockName);
       const circularBlock = mode.kind === 'circular'
@@ -5054,6 +5632,45 @@
       event.preventDefault();
       event.stopPropagation();
       mode.gesture = null;
+      if (mode.linearRotationPaths) {
+        const deltaX = event.clientX - gesture.startX;
+        const deltaY = event.clientY - gesture.startY;
+        if (cancelled || Math.hypot(deltaX, deltaY) < 28 ||
+            Math.max(Math.abs(deltaX), Math.abs(deltaY)) <
+              Math.min(Math.abs(deltaX), Math.abs(deltaY)) * 1.4) {
+          regionRotationHelp.textContent = 'Traço incompleto. Desenhe uma linha horizontal ou vertical sobre a matriz.';
+          return;
+        }
+        const horizontal = Math.abs(deltaX) >= Math.abs(deltaY);
+        const routeDirection = horizontal ? Math.sign(deltaX) : Math.sign(deltaY);
+        mode.rotationAxis = horizontal ? 'horizontal' : 'vertical';
+        mode.rotationPath = horizontal
+          ? mode.rotationPath.horizontal
+          : mode.rotationPath.vertical;
+        mode.direction = routeDirection > 0 ? 'right' : 'left';
+        mode.animating = true;
+        updateBoardFocusOverlay();
+        updateSelectedRegionPanel(mode.selectedRegionCode);
+        const rotationSucceeded = rotateQuadrilateralBlock(
+          mode.blockName,
+          mode.direction,
+          true,
+          mode.rotationPath,
+          mode.passType,
+          mode.targetKey
+        );
+        if (!rotationSucceeded) {
+          mode.animating = false;
+          mode.direction = null;
+          updateBoardFocusOverlay();
+          updateSelectedRegionPanel(mode.selectedRegionCode);
+          return;
+        }
+        quadrilateralRotationReturnTimeout = window.setTimeout(() => {
+          if (quadrilateralRotationMode === mode) endQuadrilateralRotationMode(true);
+        }, 850);
+        return;
+      }
       if (cancelled || Math.abs(gesture.angleTravel) < Math.PI * 4 / 3 ||
           gesture.radiusTotal / gesture.radiusSamples < gesture.minimumRadius) {
         regionRotationHelp.textContent = 'Gesto incompleto. Desenhe ao menos 240° dentro das células destacadas.';
@@ -5063,12 +5680,19 @@
       mode.animating = true;
       mode.direction = mode.kind === 'circular'
         ? gesture.angleTravel > 0 ? 'right' : 'left'
-        : gesture.angleTravel > 0 ? 'left' : 'right';
+        : gesture.angleTravel > 0 ? 'right' : 'left';
       updateBoardFocusOverlay();
       updateSelectedRegionPanel(mode.selectedRegionCode);
       const rotationSucceeded = mode.kind === 'circular'
-        ? rotateCircularDisk(mode.blockName, mode.disco, mode.direction, true)
-        : rotateQuadrilateralBlock(mode.blockName, mode.direction, true, mode.rotationPath);
+        ? rotateCircularDisk(mode.blockName, mode.disco, mode.direction, true, mode.passType)
+        : rotateQuadrilateralBlock(
+          mode.blockName,
+          mode.direction,
+          true,
+          mode.rotationPath,
+          mode.passType,
+          mode.targetKey
+        );
       if (!rotationSucceeded) {
         mode.animating = false;
         mode.direction = null;
@@ -5081,16 +5705,30 @@
       }, mode.kind === 'circular' ? 3200 : 850);
     }
 
-    function rotateQuadrilateralBlock(blockName, direction, keepBlockFocus = false, rotationPath = null) {
+    function rotateQuadrilateralBlock(
+      blockName,
+      direction,
+      keepBlockFocus = false,
+      rotationPath = null,
+      passType = 'global',
+      targetKey = null
+    ) {
       const block = getRotatableQuadrilateralBlocks().find((item) =>
         String(item.name) === String(blockName));
-      if (!block || !canRotateQuadrilateralBlock(block)) {
+      const target = block
+        ? getRotationTargetForQuadrilateralBlock(block, selectedRegionCode)
+        : null;
+      const activeTargetKey = targetKey || target?.key;
+      const activeTarget = activeTargetKey
+        ? { key: activeTargetKey, layer: target?.layer || getQuadrilateralBlockLayer(block) }
+        : null;
+      if (!block || !canRotateQuadrilateralBlock(block, passType, activeTarget?.key)) {
         readout.textContent = hasRotatedThisTurn
-          ? 'Você já girou um disco neste turn.'
+          ? 'O passe global de rotação já foi usado neste turno.'
           : `Bloco ${blockName}: rotação indisponível neste turn.`;
         return false;
       }
-      const layerNumber = getQuadrilateralBlockLayer(block);
+      const layerNumber = activeTarget.layer;
       controls.classList.remove('is-rotation-picker-open');
       app.classList.remove('is-rotation-picker-open');
       campaignGuide.classList.remove('is-rotation-picker-open');
@@ -5103,10 +5741,7 @@
         rotationPath
       )) return false;
       rotationAnimationVersion += 1;
-      hasRotatedThisTurn = true;
-      lastRotatedLayer = layerNumber;
-      lastRotatedBy = currentTeam;
-      rotationLockTurn = currentTurn + 1;
+      recordRotationUse(activeTarget.key, layerNumber, passType);
       updateRotationControls();
       recalculateRegionForces();
       refreshRegionVisuals();
@@ -5118,7 +5753,10 @@
         team: currentTeam,
         layer: layerNumber,
         block: String(block.name),
+        source: selectedRegionCode,
+        rotationTargetKey: activeTarget.key,
         direction,
+        rotationPassType: passType,
         ...(rotationPath ? { rotationPath } : {})
       });
       finishIfCenterConquered();
@@ -5240,20 +5878,29 @@
 
     function getQuadrilateralRotationCells(block, rotationPath = null) {
       if (!quadrilateralBoard || !block) return [];
-      if (Array.isArray(rotationPath)) {
-        return rotationPath.flatMap((position) => {
+      const pathPositions = Array.isArray(rotationPath)
+        ? rotationPath
+        : rotationPath?.linear
+          ? [...rotationPath.horizontal, ...rotationPath.vertical]
+          : null;
+      if (pathPositions) {
+        const seenPositions = new Set();
+        return pathPositions.flatMap((position) => {
           if (!Array.isArray(position) || position.length !== 2 ||
               !position.every(Number.isInteger)) return [];
           const [row, column] = position;
           if (row < 1 || column < 1 || row > block.size || column > block.size) return [];
+          const key = `${row}:${column}`;
+          if (seenPositions.has(key)) return [];
+          seenPositions.add(key);
           return [{
             row,
             column,
             regionCode: quadrilateralBoard.matrices[block.name][row - 1]?.[column - 1] || null,
             x: quadrilateralBoard.offsetX +
-              (block.centerX + (row - 1) * block.width) * quadrilateralBoard.scale,
+              (block.centerX + (column - 1) * block.width) * quadrilateralBoard.scale,
             y: quadrilateralBoard.offsetY +
-              (block.centerY + (column - 1) * block.height) * quadrilateralBoard.scale,
+              (block.centerY + (row - 1) * block.height) * quadrilateralBoard.scale,
             width: block.width * quadrilateralBoard.scale,
             height: block.height * quadrilateralBoard.scale
           }];
@@ -5278,9 +5925,9 @@
             column,
             regionCode: matrix[row - 1]?.[column - 1] || null,
             x: quadrilateralBoard.offsetX +
-              (block.centerX + (row - 1) * block.width) * quadrilateralBoard.scale,
+              (block.centerX + (column - 1) * block.width) * quadrilateralBoard.scale,
             y: quadrilateralBoard.offsetY +
-              (block.centerY + (column - 1) * block.height) * quadrilateralBoard.scale,
+              (block.centerY + (row - 1) * block.height) * quadrilateralBoard.scale,
             width: block.width * quadrilateralBoard.scale,
             height: block.height * quadrilateralBoard.scale
           });
@@ -5414,7 +6061,8 @@
       const block = quadrilateralBoard.blocks.find((item) =>
         String(item.name) === quadrilateralRotationMode.blockName);
       if (!block) return;
-      const cells = getQuadrilateralRotationCells(block, quadrilateralRotationMode.rotationPath);
+      const mode = quadrilateralRotationMode;
+      const cells = getQuadrilateralRotationCells(block, mode.rotationPath);
       const bounds = getQuadrilateralRotationBounds(cells);
       if (!bounds) return;
 
@@ -5427,12 +6075,13 @@
       });
 
       const overlay = document.createElementNS(svgNamespace, 'g');
-      const animatingClass = quadrilateralRotationMode.direction
-        ? quadrilateralRotationMode.direction === 'right'
+      const animatingClass = mode.direction
+        ? mode.direction === 'right'
           ? ' is-rotating-clockwise'
           : ' is-rotating-anticlockwise'
         : '';
-      overlay.setAttribute('class', `region-rotation-overlay${animatingClass}`);
+      overlay.setAttribute('class',
+        `region-rotation-overlay${animatingClass}${mode.linearRotationPaths ? ' is-linear-rotation' : ''}`);
       cells.forEach((cell) => {
         const rect = document.createElementNS(svgNamespace, 'rect');
         rect.setAttribute('x', String(cell.x - cell.width / 2));
@@ -5445,6 +6094,38 @@
         if (cell.regionCode) rect.dataset.regionCode = cell.regionCode;
         overlay.appendChild(rect);
       });
+
+      if (mode.linearRotationPaths) {
+        const paths = mode.linearRotationPaths;
+        const routes = [
+          { path: [...paths.horizontal].reverse(), routeIndex: 0 },
+          { path: paths.horizontal, routeIndex: 1 },
+          { path: paths.vertical, routeIndex: 2 },
+          { path: [...paths.vertical].reverse(), routeIndex: 3 }
+        ];
+        const isSelectedRoute = (route) => {
+          if (!mode.direction || !Array.isArray(mode.rotationPath)) return true;
+          const selectedPath = mode.direction === 'left'
+            ? [...mode.rotationPath].reverse()
+            : mode.rotationPath;
+          const selectedKeys = selectedPath.map((position) => position.join(':')).join('|');
+          return route.path.map((position) => position.join(':')).join('|') === selectedKeys;
+        };
+        routes.filter(isSelectedRoute).forEach((route) => {
+          const routeCells = getQuadrilateralRotationCells(block, route.path);
+          if (routeCells.length < 2) return;
+          const arrow = document.createElementNS(svgNamespace, 'path');
+          arrow.setAttribute('d',
+            `M ${routeCells[0].x} ${routeCells[0].y} L ${routeCells[routeCells.length - 1].x} ${routeCells[routeCells.length - 1].y}`);
+          arrow.setAttribute('pathLength', '100');
+          arrow.setAttribute('class', 'quadrilateral-rotation-arrow is-linear-route');
+          arrow.setAttribute('style', `--route-index:${route.routeIndex}`);
+          arrow.setAttribute('marker-end', 'url(#quadrilateral-rotation-arrowhead)');
+          overlay.appendChild(arrow);
+        });
+        boardFocusOutlines.appendChild(overlay);
+        return;
+      }
 
       const centerX = (bounds.left + bounds.right) / 2;
       const centerY = (bounds.top + bounds.bottom) / 2;
@@ -5873,6 +6554,7 @@
         gameSpeed = 1;
         resetGameState();
         placeBoardInitialPieces();
+        initializeRotationOwnership(true);
         for (let layer = 1; layer <= 8; layer += 1) {
           if (allRegionMasks[layer]) recomputeNeighborCacheForLayer(layer);
         }
@@ -5966,9 +6648,11 @@
         button.setAttribute('aria-label', `Girar disco L${layerNumber} para a ${direction === 'left' ? 'esquerda' : 'direita'}`);
         button.disabled = getRotationStep(layerNumber) <= 0;
         button.addEventListener('click', () => {
+          const rotationTarget = getRotationTargetForLayer(layerNumber);
+          const passType = 'global';
           if (!canRotateLayer(layerNumber)) {
             readout.textContent = hasRotatedThisTurn
-              ? 'Você já girou um disco neste turn.'
+              ? 'Você já usou o passe global neste turno.'
               : `L${layerNumber}: disco indisponível neste turn.`;
             return;
           }
@@ -5982,10 +6666,7 @@
             playRotationSound();
             if (!rotateQuadrilateralBlocksForLayer(layerNumber, direction)) return;
             rotationAnimationVersion += 1;
-            hasRotatedThisTurn = true;
-            lastRotatedLayer = layerNumber;
-            lastRotatedBy = currentTeam;
-            rotationLockTurn = currentTurn + 1;
+            recordRotationUse(rotationTarget.key, layerNumber, passType);
             updateRotationControls();
             recalculateRegionForces();
             refreshRegionVisuals();
@@ -5996,7 +6677,10 @@
               type: 'rotate',
               team: currentTeam,
               layer: layerNumber,
-              direction
+              direction,
+              rotationPassType: passType,
+              rotationTargetKey: rotationTarget.key,
+              source: selectedRegionCode
             });
             finishIfCenterConquered();
             return;
@@ -6012,10 +6696,7 @@
             const startingPiecePositions = captureMixedCircularPiecePositions(layerNumber);
             rotations[index] += rotationDelta;
             rotationAnimationVersion += 1;
-            hasRotatedThisTurn = true;
-            lastRotatedLayer = layerNumber;
-            lastRotatedBy = currentTeam;
-            rotationLockTurn = currentTurn + 1;
+            recordRotationUse(rotationTarget.key, layerNumber, passType);
             if (isCampaignLevelTwo() &&
                 ['level2-rotate', 'level2-rotate-again'].includes(campaignGuideStep)) {
               hideCampaignGuide();
@@ -6040,7 +6721,10 @@
               type: 'rotate',
               team: currentTeam,
               layer: layerNumber,
-              direction
+              direction,
+              rotationPassType: passType,
+              rotationTargetKey: rotationTarget.key,
+              source: selectedRegionCode
             });
             finishIfCenterConquered();
             return;
@@ -6062,10 +6746,7 @@
           const previousRotation = rotations[index];
           rotations[index] += rotationDelta;
           rotationAnimationVersion += 1;
-          hasRotatedThisTurn = true;
-          lastRotatedLayer = layerNumber;
-          lastRotatedBy = currentTeam;
-          rotationLockTurn = currentTurn + 1;
+          recordRotationUse(rotationTarget.key, layerNumber, passType);
           updateRotationControls();
         syncLayerTransforms();
           if (index === 7) {
@@ -6106,6 +6787,8 @@
             team: currentTeam,
             layer: layerNumber,
             direction,
+            rotationPassType: passType,
+            rotationTargetKey: rotationTarget.key,
             source: selectedRegionCode
           });
           window.setTimeout(() => {
@@ -6286,8 +6969,15 @@
         return;
       }
       if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-05' && [
-        'level5-intro', 'level5-support-tip', 'level5-force-tip', 'level5-turn3-tip'
+        'level5-intro', 'level5-neighbor-tip', 'level5-rotation-groups-tip',
+        'level5-rotation-passes-tip', 'level5-rotation-action-tip',
+        'level5-support-tip', 'level5-force-tip', 'level5-turn3-tip', 'level5-turn5-tip'
       ].includes(campaignGuideStep)) {
+        showCampaignGuide(campaignGuideStep);
+        return;
+      }
+      if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-06' &&
+          ['level6-intro', 'level6-rank-tip'].includes(campaignGuideStep)) {
         showCampaignGuide(campaignGuideStep);
         return;
       }
@@ -6348,6 +7038,14 @@
       return [...document.querySelectorAll('g[data-region][aria-label]')].find((element) =>
         element.dataset.region === regionCode && element.getAttribute('aria-label').startsWith('Saco com')
       ) || null;
+    }
+
+    function getLevelFiveTurnFiveFocusRegions() {
+      return [...new Set([
+        'L8-2',
+        'L8-1',
+        getNeighborRegionCode('L8-2', 'left')
+      ].filter(Boolean))];
     }
 
     function getCampaignGuideTargetElements(step) {
@@ -6420,8 +7118,16 @@
           ].filter(Boolean);
         case 'level5-intro':
           return campaignObjectiveRegions.map(getCampaignRegionShape).filter(Boolean);
+        case 'level5-neighbor-tip':
+          return ['L8-10', 'L8-8'].map(getCampaignRegionShape).filter(Boolean);
+        case 'level5-rotation-groups-tip':
+          return [rotationPassPanelTitle, rotationTargetOptions].filter(Boolean);
+        case 'level5-rotation-passes-tip':
+          return [rotationLocalPassButton, rotationGlobalPassButton].filter(Boolean);
         case 'level5-turn3-tip':
           return campaignObjectiveRegions.map(getCampaignRegionShape).filter(Boolean);
+        case 'level5-turn5-tip':
+          return getLevelFiveTurnFiveFocusRegions().map(getCampaignRegionShape).filter(Boolean);
         case 'level5-support-tip':
           return [
             getCampaignRegionShape('L8-2'),
@@ -6429,8 +7135,132 @@
           ].filter(Boolean);
         case 'level5-force-tip':
           return [getCampaignRegionShape('L7-1'), regionForce, regionFinalForce].filter(Boolean);
+        case 'level6-rank-tip':
+          return [getCampaignRegionShape('L6-13')].filter(Boolean);
         default: return [];
       }
+    }
+
+    function getCampaignGuideActionTarget(step) {
+      if (step === 'purchase') {
+        return document.querySelector('#piece-controls .piece-button[data-stage="g"]');
+      }
+      if (step === 'war' || step === 'level2-final-war') {
+        return document.querySelector('#war-button');
+      }
+      if (step === 'level2-pass-turn') return passTurnButton;
+      if (['level2-rotate', 'level2-rotate-again'].includes(step)) {
+        return rotateQuadrilateralBlockButton;
+      }
+      if (['level5-rotation-groups-tip', 'level5-rotation-passes-tip'].includes(step)) {
+        return rotationPassPanel;
+      }
+      return null;
+    }
+
+    function positionCampaignGuideAwayFromAction() {
+      const actionTarget = getCampaignGuideActionTarget(campaignGuideStep);
+      if (!actionTarget?.getClientRects().length) {
+        campaignGuideCard.removeAttribute('data-position');
+        campaignGuideCard.style.left = '';
+        campaignGuideCard.style.top = '';
+        campaignGuideCard.style.bottom = '';
+        campaignGuideCard.style.width = '';
+        campaignGuideCard.style.transform = '';
+        return;
+      }
+
+      const margin = 14;
+      const gap = 12;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const safeTop = Math.max(margin, window.visualViewport?.offsetTop || 0);
+      const safeBottom = viewportHeight - margin;
+      const actionRect = actionTarget.getBoundingClientRect();
+      const cardWidth = campaignGuideCard.getBoundingClientRect().width;
+      const cardHeight = campaignGuideCard.getBoundingClientRect().height;
+      const measureCardHeight = (width) => {
+        campaignGuideCard.style.width = `${width}px`;
+        const height = campaignGuideCard.getBoundingClientRect().height;
+        campaignGuideCard.style.width = `${cardWidth}px`;
+        return height;
+      };
+      const overlapsAction = (candidate) =>
+        candidate.left < actionRect.right + 6 && candidate.right > actionRect.left - 6 &&
+        candidate.top < actionRect.bottom + 6 && candidate.bottom > actionRect.top - 6;
+      const candidates = [
+        {
+          position: 'top',
+          left: Math.max(margin, Math.min(viewportWidth - cardWidth - margin,
+            actionRect.left + actionRect.width / 2 - cardWidth / 2)),
+          top: actionRect.top - cardHeight - gap,
+          width: cardWidth
+        },
+        {
+          position: 'right',
+          left: actionRect.right + gap,
+          top: 0,
+          width: Math.min(cardWidth, Math.max(180, viewportWidth * 0.42)),
+          height: 0
+        },
+        {
+          position: 'bottom',
+          left: Math.max(margin, Math.min(viewportWidth - cardWidth - margin,
+            actionRect.left + actionRect.width / 2 - cardWidth / 2)),
+          top: actionRect.bottom + gap,
+          width: cardWidth
+        },
+        {
+          position: 'left',
+          left: 0,
+          top: 0,
+          width: Math.min(cardWidth, Math.max(180, viewportWidth * 0.42)),
+          height: 0
+        }
+      ];
+
+      candidates.forEach((candidate) => {
+        candidate.height = candidate.width === cardWidth
+          ? cardHeight
+          : measureCardHeight(candidate.width);
+        if (candidate.position === 'left') {
+          candidate.left = actionRect.left - candidate.width - gap;
+        }
+        if (candidate.position === 'right' || candidate.position === 'left') {
+          candidate.top = actionRect.top + actionRect.height / 2 - candidate.height / 2;
+        }
+      });
+      const preferredPositions = campaignGuideStep === 'level2-rotate'
+        ? ['right', 'top', 'bottom', 'left']
+        : ['top', 'right', 'bottom', 'left'];
+      const placement = preferredPositions.map((position) =>
+        candidates.find((candidate) => candidate.position === position)
+      ).find((candidate) => {
+        const rect = {
+          left: candidate.left,
+          right: candidate.left + candidate.width,
+          top: candidate.top,
+          bottom: candidate.top + candidate.height
+        };
+        return rect.left >= margin && rect.right <= viewportWidth - margin &&
+          rect.top >= safeTop && rect.bottom <= safeBottom && !overlapsAction(rect);
+      });
+      if (!placement) {
+        campaignGuideCard.dataset.position = 'top';
+        campaignGuideCard.style.left = '50%';
+        campaignGuideCard.style.top = `${safeTop}px`;
+        campaignGuideCard.style.bottom = 'auto';
+        campaignGuideCard.style.width = '';
+        campaignGuideCard.style.transform = 'translateX(-50%)';
+        return;
+      }
+
+      campaignGuideCard.dataset.position = placement.position;
+      campaignGuideCard.style.left = `${placement.left}px`;
+      campaignGuideCard.style.top = `${placement.top}px`;
+      campaignGuideCard.style.bottom = 'auto';
+      campaignGuideCard.style.width = `${placement.width}px`;
+      campaignGuideCard.style.transform = 'none';
     }
 
     function updateCampaignGuideSpotlights() {
@@ -6544,12 +7374,7 @@
         }
       }
       const targetRects = targets.map((target) => target.getBoundingClientRect());
-      const guideTop = campaignGuideCard.dataset.position === 'top';
-      if (!guideTop && targetRects.some((rect) => rect.bottom > height * 0.67)) {
-        campaignGuideCard.dataset.position = 'top';
-      } else if (guideTop && targetRects.every((rect) => rect.bottom < height * 0.6)) {
-        campaignGuideCard.removeAttribute('data-position');
-      }
+      positionCampaignGuideAwayFromAction();
     }
 
     function showCampaignGuide(step) {
@@ -6569,7 +7394,7 @@
         },
         move: {
           title: 'Avance pelo tabuleiro',
-          message: 'Toque nesta mensagem para voltar ao jogo. Depois, arraste a peça G de L8-5 para a região vizinha L8-4.',
+          message: 'Depois, arraste a peça G de L8-5 para a região vizinha L8-4.',
           dismissible: true
         },
         'bag-tip': {
@@ -6589,12 +7414,12 @@
         },
         'level2-intro': {
           title: 'Level 2: alcance L8-1',
-          message: 'Seu objetivo é conquistar a região L8-1. Você tem 5 turnos para alcançar esse objetivo. Toque nesta mensagem para voltar ao tabuleiro.',
+          message: 'Seu objetivo é conquistar a região L8-1. Você tem 5 turnos para alcançar esse objetivo.',
           dismissible: true
         },
         'level2-rotate': {
           title: 'Atravesse o disco BC03',
-          message: 'O disco BC03 gira. O ícone ↻ ao lado do nome da região indica que ela faz parte de um disco rotativo. Toque em GIRAR DISCO no painel da região e desenhe um círculo anti-horário para girar à esquerda e encontrar um caminho até o outro lado sem enfrentar os inimigos.',
+          message: 'Escolha um passe Local ou Global no painel acima e faça um gesto anti-horário sobre o disco para evitar os inimigos!',
           dismissible: false
         },
         'level2-pass-turn': {
@@ -6664,12 +7489,12 @@
         },
         'level3-resource-defeat': {
           title: 'Fim de jogo',
-          message: 'Você ficou sem moedas e não tem nenhuma peça F. O Agente deseja mais sorte na próxima tentativa. Toque para reiniciar o Level 3.',
+          message: 'Você ficou sem moedas e não tem nenhuma peça F. O Agente deseja mais sorte na próxima tentativa.',
           dismissible: true
         },
         'level4-resource-defeat': {
           title: 'Fim de jogo',
-          message: 'Você ficou sem moedas e não tem nenhuma peça F. O Agente deseja mais sorte na próxima tentativa. Toque para reiniciar o Level 4.',
+          message: 'Você ficou sem moedas e não tem nenhuma peça F. O Agente deseja mais sorte na próxima tentativa.',
           dismissible: true
         },
         'level5-intro': {
@@ -6677,9 +7502,34 @@
           message: 'Esse nível é desafiador! Você precisará usar a ordem de preferência nas batalhas para atrair forças inimigas mais fortes em batalhas menores enquanto você conquista mais aliados. O Objetivo é conquistar L8-12.',
           dismissible: true
         },
+        'level5-neighbor-tip': {
+          title: 'Comece pelas regiões vizinhas',
+          message: 'Vamos começar conquistando as duas regiões vizinhas vermelhas.',
+          dismissible: true
+        },
+        'level5-rotation-groups-tip': {
+          title: 'Escolha o tipo de rotação',
+          message: 'Alguns blocos permitem dois tipos de rotação: um em anel e outro de forma linear. Selecione cada e clique em "Girar Bloco" para ver como eles podem se mover!',
+          dismissible: true
+        },
+        'level5-rotation-passes-tip': {
+          title: 'Passes de rotação',
+          message: 'Existem dois tipos de passes que permitem rotacionar os blocos. Os passes locais são acumulativos e, sempre que você conquistar uma região naquela rota de rotação, eles aumentam em 1 unidade. Os passes globais podem rotacionar ou mover qualquer bloco, desde que ele não tenha sido movido pelo seu oponente no turno anterior; os passes globais não são acumulativos, mas você ganha um passe novo por turno.',
+          dismissible: true
+        },
+        'level5-rotation-action-tip': {
+          title: 'Aproxime-se das unidades inimigas',
+          message: 'Vamos girar o disco uma vez para ficar mais próximo das unidades inimigas!',
+          dismissible: true
+        },
         'level5-turn3-tip': {
           title: 'O maior desafio até agora',
           message: 'Uma unidade E equivale a 6 unidades do tipo F. Este mapa será o maior desafio até agora!',
+          dismissible: true
+        },
+        'level5-turn5-tip': {
+          title: 'Prepare o contra-ataque',
+          message: "Coloque uma tropa 'g' para contra L8-2! Enquanto a tropa de cima estiver ocupada lutando você poderá vencer as tropas em L8-1!",
           dismissible: true
         },
         'level5-support-tip': {
@@ -6689,7 +7539,17 @@
         },
         'level5-force-tip': {
           title: 'A força do Rank Amarelo',
-          message: 'Unidades no Rank Amarelo recebem metade da força das unidades vermelhas aliadas adjacentes, limitadas a 8 unidades vermelhas para cada amarela. Além disso elas multiplicam essa força! L7-1 também tem uma rotação especial: ela gira a linha horizontal que ocupa no momento, movendo suas três posições em sequência. Lutar usando unidades de rank superior é o que pode te trazer a vitória!',
+          message: 'Unidades no Rank Amarelo recebem metade da força das unidades vermelhas aliadas adjacentes, limitadas a 8 unidades vermelhas para cada amarela. Além disso elas multiplicam essa força! L7-1 também tem uma rotação especial: faça um traço em linha reta sobre a fileira ou coluna que passa por ela para girar as posições em qualquer sentido. Lutar usando unidades de rank superior é o que pode te trazer a vitória!',
+          dismissible: true
+        },
+        'level6-intro': {
+          title: 'Level 6: Arte da Batalha',
+          message: 'Mostre que você domina a Arte da Batalha! Domine todos os territórios inimigos, mesmo com uma força inferior.',
+          dismissible: true
+        },
+        'level6-rank-tip': {
+          title: 'Rank Amarelo',
+          message: 'Temos mais um rank após o laranja, o rank Amarelo. Para promover uma unidade a Rank Amarelo você precisa de 7 unidades no rank Laranja. O Rank Amarelo tem um bônus de batalha de 3.5x a força que recebe; cada unidade no Amarelo pode receber metade da força de até 7 unidades Laranjas.',
           dismissible: true
         }
       }[step];
@@ -6720,22 +7580,31 @@
       campaignGuideTitle.textContent = guideContent.title;
       campaignGuideMessage.textContent = guideContent.message;
       campaignGuideContinue.disabled = !guideContent.dismissible;
-      campaignGuideHint.textContent = guideContent.dismissible
-        ? 'Toque na mensagem para continuar'
+      campaignGuideFinalHint = guideContent.dismissible
+        ? ['level3-resource-defeat', 'level4-resource-defeat'].includes(step)
+          ? 'Clique para reiniciar'
+          : 'Clique para continuar'
         : step === 'purchase' ? 'Compre a unidade destacada para continuar'
           : step === 'level2-pass-turn' ? 'Passe o turno para continuar'
             : ['level2-rotate', 'level2-rotate-again'].includes(step)
-              ? 'Toque em GIRAR DISCO e faça um gesto anti-horário'
-            : step === 'level2-final-war' ? 'Toque no botão Guerra destacado'
-              : ['level3-resource-defeat', 'level4-resource-defeat'].includes(step)
-                ? 'Toque na mensagem para reiniciar'
-              : 'Toque na mensagem para continuar';
+              ? 'Clique em GIRAR DISCO e faça um gesto anti-horário'
+            : step === 'level2-final-war' ? 'Clique no botão Guerra destacado'
+              : 'Clique para continuar';
+      campaignGuideHint.textContent = campaignGuideFinalHint;
       campaignGuideCard.removeAttribute('data-position');
+      campaignGuideCard.style.left = '';
+      campaignGuideCard.style.top = '';
+      campaignGuideCard.style.bottom = '';
+      campaignGuideCard.style.width = '';
+      campaignGuideCard.style.transform = '';
       campaignGuide.classList.remove('is-hidden');
       app.classList.add('is-campaign-guiding');
       app.classList.toggle('is-rotation-guide',
         ['level2-rotate', 'level2-rotate-again'].includes(step));
       campaignGuide.setAttribute('aria-hidden', 'false');
+      campaignGuideMessagePages = getCampaignGuideMessagePages(guideContent.message);
+      campaignGuideMessagePage = 0;
+      updateCampaignGuideMessagePage();
       if (step === 'purchase') focusRegion('L8-5');
       else if (step === 'coins') focusRegion('L8-5');
       else if (step === 'bag-tip') focusRegion('L8-3');
@@ -6834,10 +7703,33 @@
         selectedRegionCode = 'L7-1';
         updateSelectedRegionPanel(selectedRegionCode);
         focusRegion('L7-1');
+      } else if (step === 'level5-neighbor-tip') {
+        selectedRegionCode = 'L8-9';
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegionGroup(['L8-10', 'L8-8']);
+      } else if (['level5-rotation-groups-tip', 'level5-rotation-passes-tip',
+        'level5-rotation-action-tip'].includes(step)) {
+        selectedRegionCode = 'L8-10';
+        const targets = getRotationTargetsForRegion(selectedRegionCode);
+        if (step === 'level5-rotation-groups-tip') {
+          selectedRotationTargetKey = targets.find((target) =>
+            target.rotationType === 'ring')?.key || targets[0]?.key || null;
+          selectedRotationPassType = 'global';
+        }
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegion(selectedRegionCode);
       } else if (step === 'level5-intro') {
         focusRegion('L8-12');
       } else if (step === 'level5-turn3-tip') {
         focusRegion('L8-12');
+      } else if (step === 'level5-turn5-tip') {
+        selectedRegionCode = 'L8-2';
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegionGroup(getLevelFiveTurnFiveFocusRegions());
+      } else if (step === 'level6-rank-tip') {
+        selectedRegionCode = 'L6-13';
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegion('L6-13');
       }
       const primaryTarget = step === 'purchase'
         ? document.querySelector('#piece-controls .piece-button[data-stage="g"]')
@@ -6869,6 +7761,52 @@
       saveGame();
     }
 
+    function getCampaignGuideMessagePages(message) {
+      const sentences = String(message).match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [String(message)];
+      const pages = [];
+      let page = '';
+      const fitsOnScreen = (text) => {
+        campaignGuideMessage.textContent = text;
+        return campaignGuideCard.scrollHeight <= campaignGuideCard.clientHeight;
+      };
+
+      sentences.map((sentence) => sentence.trim()).filter(Boolean).forEach((sentence) => {
+        const candidate = page ? `${page} ${sentence}` : sentence;
+        if (fitsOnScreen(candidate)) {
+          page = candidate;
+          return;
+        }
+        if (page) pages.push(page);
+        page = '';
+        sentence.split(/\s+/).forEach((word) => {
+          const wordCandidate = page ? `${page} ${word}` : word;
+          if (fitsOnScreen(wordCandidate)) {
+            page = wordCandidate;
+          } else {
+            if (page) pages.push(page);
+            page = word;
+          }
+        });
+      });
+      if (page) pages.push(page);
+      campaignGuideMessage.textContent = message;
+      return pages.length ? pages : [String(message)];
+    }
+
+    function updateCampaignGuideMessagePage() {
+      campaignGuideMessage.textContent = campaignGuideMessagePages[campaignGuideMessagePage] || '';
+      campaignGuideHint.textContent = campaignGuideMessagePage < campaignGuideMessagePages.length - 1
+        ? 'Clique para continuar'
+        : campaignGuideFinalHint;
+    }
+
+    function advanceCampaignGuideMessage() {
+      if (campaignGuideMessagePage >= campaignGuideMessagePages.length - 1) return false;
+      campaignGuideMessagePage += 1;
+      updateCampaignGuideMessagePage();
+      return true;
+    }
+
     function hideCampaignGuide() {
       const wasRecycleGuide = campaignGuideStep === 'level2-recycle';
       if (campaignGuideAnimationTimeout !== null) {
@@ -6898,6 +7836,7 @@
 
     function continueCampaignGuide() {
       if (!campaignGuideDismissible || campaignGuide.classList.contains('is-hidden')) return;
+      if (advanceCampaignGuideMessage()) return;
       if (['level3-resource-defeat', 'level4-resource-defeat'].includes(campaignGuideStep)) {
         hideCampaignGuide();
         restartCampaignLevel();
@@ -6923,22 +7862,34 @@
         'level3-promotion-tip': 'await-l7-1',
         'level4-intro': 'await-level4-l8-10',
         'level4-battle-tip': 'level4-battle-order',
-        'level5-intro': 'await-level5-l8-3',
+        'level5-intro': 'level5-neighbor-tip',
+        'level5-neighbor-tip': 'await-level5-l8-10',
+        'level5-rotation-groups-tip': 'level5-rotation-passes-tip',
+        'level5-rotation-passes-tip': 'level5-rotation-action-tip',
+        'level5-rotation-action-tip': 'await-level5-l8-2',
         'level5-turn3-tip': campaignGuideStepBeforeLevel5TurnThreeTip || 'complete',
+        'level5-turn5-tip': campaignGuideStepBeforeLevel5TurnThreeTip || 'complete',
         'level5-support-tip': 'await-level5-l7-1',
         'level5-force-tip': 'complete',
+        'level6-intro': 'level6-rank-tip',
+        'level6-rank-tip': 'complete',
         'level3-recruitment-tip': 'complete'
       }[campaignGuideStep] || 'complete';
-      const wasLevelFiveTurnThreeTip = campaignGuideStep === 'level5-turn3-tip';
+      const wasLevelFiveTurnTip = ['level5-turn3-tip', 'level5-turn5-tip']
+        .includes(campaignGuideStep);
       hideCampaignGuide();
       campaignGuideStep = nextStep;
-      if (wasLevelFiveTurnThreeTip) campaignGuideStepBeforeLevel5TurnThreeTip = null;
-      if (wasLevelFiveTurnThreeTip) {
+      if (wasLevelFiveTurnTip) campaignGuideStepBeforeLevel5TurnThreeTip = null;
+      if (wasLevelFiveTurnTip) {
         focusStrongestRegionForTeam('orange');
         saveGame();
         return;
       }
-      if (['level3-region-labels', 'level4-battle-order'].includes(nextStep)) {
+      if ([
+        'level3-region-labels', 'level4-battle-order',
+        'level5-neighbor-tip', 'level5-rotation-passes-tip', 'level5-rotation-action-tip',
+        'level6-rank-tip'
+      ].includes(nextStep)) {
         showCampaignGuide(nextStep);
         return;
       }
@@ -6964,6 +7915,14 @@
         focusRegion('L8-14');
       } else if (campaignGuideStep === 'await-level5-l8-3') {
         focusRegion('L8-9');
+      } else if (campaignGuideStep === 'await-level5-l8-10') {
+        selectedRegionCode = 'L8-9';
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegion('L8-9');
+      } else if (campaignGuideStep === 'await-level5-l8-2') {
+        selectedRegionCode = 'L8-10';
+        updateSelectedRegionPanel(selectedRegionCode);
+        focusRegion('L8-10');
       }
       saveGame();
       if (nextStep === 'await-army') maybeShowCampaignWarGuide();
@@ -6972,9 +7931,9 @@
     }
 
     function isCampaignGuideActionAllowed(target, eventType) {
+      if (campaignGuideDismissible) return campaignGuideContinue.contains(target);
       if ((campaignMenuButton.contains(target) || campaignRestartButton.contains(target)) &&
           (eventType === 'pointerdown' || eventType === 'click')) return true;
-      if (campaignGuideDismissible) return campaignGuideContinue.contains(target);
       if (campaignGuideStep === 'purchase') {
         const purchaseButton = document.querySelector('#piece-controls .piece-button[data-stage="g"]');
         return !!purchaseButton && purchaseButton.contains(target);
@@ -7057,7 +8016,10 @@
 
     function maybeAdvanceLevelFiveGuide() {
       if (!isCampaignGame() || activeCampaignLevel.id !== 'tabuleiro-05' || isGameOver) return;
-      if (campaignGuideStep === 'await-level5-l8-3' &&
+      if (['await-level5-l8-10', 'await-level5-l8-3'].includes(campaignGuideStep) &&
+          getRegionDominador('L8-10') === 'orange') {
+        showCampaignGuide('level5-rotation-groups-tip');
+      } else if (campaignGuideStep === 'await-level5-l8-2' &&
           getRegionDominador('L8-2') === 'orange') {
         showCampaignGuide('level5-support-tip');
       } else if (campaignGuideStep === 'await-level5-l7-1' &&
@@ -7336,6 +8298,7 @@
       updateTurnState();
       updateSelectedRegionPanel(selectedRegionCode);
       updateWarAvailability();
+      captureCampaignTurnStartSnapshot();
       saveGame();
       if (gameMode === 'bluetooth') {
         sendBluetoothMessage({
@@ -7356,6 +8319,12 @@
         campaignGuideStepBeforeLevel5TurnThreeTip = campaignGuideStep;
         showCampaignGuide('level5-turn3-tip');
       }
+      if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-05' &&
+          currentTurn === 5 && currentTeam === humanTeam &&
+          campaignGuideStep !== 'level5-turn5-tip') {
+        campaignGuideStepBeforeLevel5TurnThreeTip = campaignGuideStep;
+        showCampaignGuide('level5-turn5-tip');
+      }
       const wheatMessage = getWheatShortageMessage(wheatReport);
       if (wheatMessage) readout.textContent = wheatMessage;
       passTurnButton.disabled = !isLocalPlayersTurn();
@@ -7371,8 +8340,8 @@
     }
 
     passTurnButton.addEventListener('click', passTurnToNextPlayer);
-    campaignUndoButton.addEventListener('click', () => {
-      undoLastCampaignMove();
+    campaignRestartTurnButton.addEventListener('click', () => {
+      restartCampaignTurn();
       gameMenu.classList.add('is-hidden');
       gameMenu.setAttribute('aria-hidden', 'true');
     });
@@ -7597,6 +8566,20 @@
     openMoveButton.addEventListener('click', openMoveModal);
     openPromotionButton.addEventListener('click', openPromotionModal);
     openRelegationButton.addEventListener('click', openRelegationModal);
+    rotationLocalPassButton.addEventListener('click', () => {
+      const target = getRotationTargetForRegion(selectedRegionCode, selectedRotationTargetKey);
+      if (!target || !canUseLocalRotation(target.key)) return;
+      selectedRotationTargetKey = target.key;
+      selectedRotationPassType = 'local';
+      updateSelectedRegionPanel(selectedRegionCode);
+    });
+    rotationGlobalPassButton.addEventListener('click', () => {
+      const target = getRotationTargetForRegion(selectedRegionCode, selectedRotationTargetKey);
+      if (!target || !canUseGlobalRotation(target.key, target.layer)) return;
+      selectedRotationTargetKey = target.key;
+      selectedRotationPassType = 'global';
+      updateSelectedRegionPanel(selectedRegionCode);
+    });
     moveDirectionOptions.querySelectorAll('[data-direction]').forEach((button) => {
       button.addEventListener('click', () => renderMoveAmountOptions(button.dataset.direction));
     });
@@ -7635,23 +8618,19 @@
       }
       const block = getRotatableQuadrilateralBlockForRegion(selectedRegionCode);
       const disk = getRotatableCircularDiskForRegion(selectedRegionCode);
+      const rotationTarget = getRotationTargetForRegion(selectedRegionCode, selectedRotationTargetKey);
       if (!block && !disk) return;
-      const canRotate = block
-        ? canRotateQuadrilateralBlock(block)
-        : canRotateCircularDisk(disk.block, disk.regions);
-      if (!canRotate) {
+      if (!rotationTarget || !prepareRotationTargetForAction(rotationTarget)) {
         updateSelectedRegionPanel(selectedRegionCode);
-        readout.textContent = hasRotatedThisTurn
-          ? 'Você já girou um disco neste turn.'
-          : block
-            ? `Bloco ${block.name}: rotação indisponível neste turn.`
-            : `Disco ${disk.disco}: rotação indisponível neste turn.`;
         return;
       }
+      const passType = selectedRotationPassType;
       beginQuadrilateralRotationMode(
         block || disk.block,
         block ? 'quadrilateral' : 'circular',
-        disk?.disco || null
+        disk?.disco || null,
+        passType,
+        rotationTarget.key
       );
     });
     stage.addEventListener('pointerdown', (event) => {
@@ -8363,6 +9342,7 @@
 
       if (action.source) focusActionRegion(action.source, action.target);
       const source = action.source;
+      if (action.type === 'rotate' && source) selectedRegionCode = source;
       const rotationVersion = rotationAnimationVersion;
       isApplyingBluetoothAction = true;
       try {
@@ -8383,57 +9363,32 @@
         } else if (action.type === 'rotate' && Number.isInteger(action.layer)) {
           updateRotationControls();
           const direction = action.direction === 'left' ? 'left' : 'right';
-          if (Array.isArray(action.rotationPath) && action.block) {
-            rotateQuadrilateralBlock(action.block, direction, false, action.rotationPath);
+          if (action.block && action.disco) {
+            rotateCircularDisk(
+              action.block,
+              action.disco,
+              direction,
+              false,
+              action.rotationPassType === 'local' ? 'local' : 'global'
+            );
+          } else if (action.block) {
+            rotateQuadrilateralBlock(
+              action.block,
+              direction,
+              false,
+              Array.isArray(action.rotationPath) ? action.rotationPath : null,
+              action.rotationPassType === 'local' ? 'local' : 'global',
+              typeof action.rotationTargetKey === 'string'
+                ? action.rotationTargetKey
+                : null
+            );
           } else {
-            let button = [...controls.querySelectorAll('.layer-button[data-rotation-block]')]
-              .find((candidate) =>
-                candidate.dataset.rotationBlock === action.block &&
-                candidate.dataset.disco === action.disco &&
-                Number(candidate.dataset.layer) === action.layer &&
+            updateRotationControls();
+            const button = [...controls.querySelectorAll('.layer-button:not([data-rotation-block])')]
+              .find((candidate) => Number(candidate.dataset.layer) === action.layer &&
                 candidate.dataset.direction === direction);
-            if (!button && action.block && !action.disco) {
-              selectedQuadrilateralRotationBlock = action.block;
-              updateQuadrilateralRotationBlockPicker(getRotatableQuadrilateralBlocks());
-              button = [...controls.querySelectorAll('.quadrilateral-rotation-button')]
-                .find((candidate) =>
-                  candidate.dataset.rotationBlock === action.block &&
-                  Number(candidate.dataset.layer) === action.layer &&
-                  candidate.dataset.direction === direction);
-            }
-            let circularDisksOnLayer = 0;
-            if (!button && !action.block && !action.disco) {
-              const layerDisks = new Map();
-              getRotatableCircularBlocks().forEach((block) => {
-                (block.regions || []).forEach((region) => {
-                  const layer = Number(region.layer ||
-                    String(region.rank || region.code || region.name).match(/L(\d+)/)?.[1]);
-                  if (layer === action.layer) {
-                    layerDisks.set(getCircularDiskKey(block.name, getRegionDiskName(region)), {
-                      block: block.name,
-                      disco: getRegionDiskName(region)
-                    });
-                  }
-                });
-              });
-              circularDisksOnLayer = layerDisks.size;
-              if (layerDisks.size === 1) {
-                const [{ block, disco }] = layerDisks.values();
-                button = [...controls.querySelectorAll('.layer-button[data-rotation-block]')]
-                  .find((candidate) => candidate.dataset.rotationBlock === block &&
-                    candidate.dataset.disco === disco &&
-                    candidate.dataset.direction === direction);
-              }
-            }
-            if (!button && !action.block && !action.disco && circularDisksOnLayer === 0) {
-              button = [...controls.querySelectorAll('.layer-button:not([data-rotation-block])')]
-                .find((candidate) => Number(candidate.dataset.layer) === action.layer &&
-                  candidate.dataset.direction === direction);
-            }
-            if (!button && circularDisksOnLayer > 1) {
-              startMessage.textContent = 'A rotação recebida não identifica qual disco circular deve girar.';
-            }
             if (button) button.click();
+            else startMessage.textContent = `Não foi possível girar a camada L${action.layer}.`;
           }
         } else {
           startMessage.textContent = 'Ação Bluetooth desconhecida; atualizando o estado recebido.';
@@ -8737,6 +9692,7 @@
       localStorage.removeItem('will-of-many-save');
       resetGameState();
       placeBoardInitialPieces();
+      initializeRotationOwnership(true);
       if (isCampaignGame()) {
         campaignObjectiveRegions = [...(activeCampaignLevel.objectiveRegions || [])];
         campaignIntroPending = activeCampaignLevel.id === 'tabuleiro-01';
@@ -8745,10 +9701,11 @@
           : activeCampaignLevel.id === 'tabuleiro-02' ? 'level2-intro'
             : activeCampaignLevel.id === 'tabuleiro-03' ? 'level3-intro'
               : activeCampaignLevel.id === 'tabuleiro-04' ? 'level4-intro'
-                : activeCampaignLevel.id === 'tabuleiro-05' ? 'level5-intro' : 'complete';
+                : activeCampaignLevel.id === 'tabuleiro-05' ? 'level5-intro'
+                  : activeCampaignLevel.id === 'tabuleiro-06' ? 'level6-intro' : 'complete';
         campaignLevel2SeenSectors = [];
         if (!campaignObjectiveRegions.length) {
-          startMessage.textContent = 'O level da campanha não define regiões iniciais azuis para conquistar.';
+          startMessage.textContent = 'O level da campanha não define regiões objetivo válidas para conquistar.';
           isGameStarted = false;
           return;
         }
@@ -8771,6 +9728,7 @@
       refreshRegionVisuals();
       updateRotationControls();
       updateSelectedRegionPanel();
+      captureCampaignTurnStartSnapshot();
       saveGame();
       showGameBoard();
       const wheatMessage = getWheatShortageMessage(wheatReport);
@@ -8974,10 +9932,30 @@
     campaignGuideContinue.addEventListener('click', continueCampaignGuide);
     ['pointerdown', 'click'].forEach((eventType) => {
       document.addEventListener(eventType, (event) => {
-        if (!isCampaignGame() || campaignGuide.classList.contains('is-hidden') ||
-            isCampaignGuideActionAllowed(event.target, eventType)) return;
+        if (!campaignIntro.classList.contains('is-hidden')) {
+          if (campaignIntroDismiss.contains(event.target)) return;
+          event.stopImmediatePropagation();
+          if (eventType === 'click') {
+            event.preventDefault();
+            dismissCampaignIntro();
+          }
+          return;
+        }
+        if (!isCampaignGame() || campaignGuide.classList.contains('is-hidden')) return;
+        const hasMoreGuidePages = campaignGuideMessagePage < campaignGuideMessagePages.length - 1;
+        const clickedContinueButton = !campaignGuideContinue.disabled &&
+          campaignGuideContinue.contains(event.target);
+        if ((!hasMoreGuidePages && isCampaignGuideActionAllowed(event.target, eventType)) ||
+            (hasMoreGuidePages && clickedContinueButton)) return;
         event.preventDefault();
         event.stopImmediatePropagation();
+        if (eventType !== 'click') return;
+        if (campaignGuideMessagePage < campaignGuideMessagePages.length - 1) {
+          if (campaignGuideDismissible) continueCampaignGuide();
+          else advanceCampaignGuideMessage();
+        } else if (campaignGuideDismissible) {
+          continueCampaignGuide();
+        }
       }, true);
     });
     window.addEventListener('resize', updateCampaignGuideSpotlights);

@@ -1,0 +1,394 @@
+{
+  "boardType": "quadrilateral",
+  "version": 1,
+  "displayScale": 1,
+  "regionFocusScale": 3,
+  "coordinateSystem": {
+    "unit": "pixel",
+    "tileColumns": 226,
+    "tileRows": 226,
+    "tileSize": 4,
+    "tileCenterOffset": 2
+  },
+  "campaign": {
+    "id": "tabuleiro-06",
+    "name": "Tabuleiro 06",
+    "initialCoins": 0,
+    "coinsPerTurn": 0,
+    "preserveCoinsBetweenTurns": false,
+    "aiActionsEnabled": false,
+    "rotationEnabled": true,
+    "warIncludesCornerContact": true,
+    "objectiveRegions": [
+      "L8-1", "L8-2", "L8-3", "L8-4", "L8-5",
+      "L8-6", "L8-7", "L7-8", "L8-9", "L8-10",
+      "L8-11", "L7-12", "L6-13", "L7-14", "L8-15",
+      "L8-16", "L8-17", "L7-18", "L8-19", "L8-20",
+      "L8-21", "L8-22", "L8-23", "L8-24", "L8-25"
+    ],
+    "objectiveText": "Domine todas as regiões",
+    "objective": {
+      "type": "captureAllRegions"
+    }
+  },
+  "blocks": [
+    {
+      "name": "BQ01",
+      "type": "quadrilateral",
+      "matrixSize": 5,
+      "matrix": [
+        ["L8-1", "L8-2", "L8-3", "L8-4", "L8-5"],
+        ["L8-6", "L8-7", "L7-8", "L8-9", "L8-10"],
+        ["L8-11", "L7-12", "L6-13", "L7-14", "L8-15"],
+        ["L8-16", "L8-17", "L7-18", "L8-19", "L8-20"],
+        ["L8-21", "L8-22", "L8-23", "L8-24", "L8-25"]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 250,
+        "y": 75
+      },
+      "rotationEnabled": true,
+      "linearRotationEnabled": true,
+      "regions": [
+        {
+          "name": "L8-1",
+          "code": "L8-1",
+          "rank": "L8",
+          "layer": 8,
+          "region": 1,
+          "shape": "quadrilateral",
+          "positions": [[1, 1]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-2",
+          "code": "L8-2",
+          "rank": "L8",
+          "layer": 8,
+          "region": 2,
+          "shape": "quadrilateral",
+          "positions": [[1, 2]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-3",
+          "code": "L8-3",
+          "rank": "L8",
+          "layer": 8,
+          "region": 3,
+          "shape": "quadrilateral",
+          "positions": [[1, 3]],
+          "maxPieces": 8,
+          "initialPieces": [{"team": "blue", "stage": "e"}]
+        },
+        {
+          "name": "L8-4",
+          "code": "L8-4",
+          "rank": "L8",
+          "layer": 8,
+          "region": 4,
+          "shape": "quadrilateral",
+          "positions": [[1, 4]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-5",
+          "code": "L8-5",
+          "rank": "L8",
+          "layer": 8,
+          "region": 5,
+          "shape": "quadrilateral",
+          "positions": [[1, 5]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-6",
+          "code": "L8-6",
+          "rank": "L8",
+          "layer": 8,
+          "region": 6,
+          "shape": "quadrilateral",
+          "positions": [[2, 1]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-7",
+          "code": "L8-7",
+          "rank": "L8",
+          "layer": 8,
+          "region": 7,
+          "shape": "quadrilateral",
+          "positions": [[2, 2]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "blue", "stage": "f"},
+            {"team": "blue", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L7-8",
+          "code": "L7-8",
+          "rank": "L7",
+          "layer": 7,
+          "region": 8,
+          "shape": "quadrilateral",
+          "positions": [[2, 3]],
+          "maxPieces": 7,
+          "initialPieces": [{"team": "blue", "stage": "f"}]
+        },
+        {
+          "name": "L8-9",
+          "code": "L8-9",
+          "rank": "L8",
+          "layer": 8,
+          "region": 9,
+          "shape": "quadrilateral",
+          "positions": [[2, 4]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "blue", "stage": "f"},
+            {"team": "blue", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-10",
+          "code": "L8-10",
+          "rank": "L8",
+          "layer": 8,
+          "region": 10,
+          "shape": "quadrilateral",
+          "positions": [[2, 5]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-11",
+          "code": "L8-11",
+          "rank": "L8",
+          "layer": 8,
+          "region": 11,
+          "shape": "quadrilateral",
+          "positions": [[3, 1]],
+          "maxPieces": 8,
+          "initialPieces": [{"team": "blue", "stage": "e"}]
+        },
+        {
+          "name": "L7-12",
+          "code": "L7-12",
+          "rank": "L7",
+          "layer": 7,
+          "region": 12,
+          "shape": "quadrilateral",
+          "positions": [[3, 2]],
+          "maxPieces": 7,
+          "initialPieces": [{"team": "blue", "stage": "f"}]
+        },
+        {
+          "name": "L6-13",
+          "code": "L6-13",
+          "rank": "L6",
+          "layer": 6,
+          "region": 13,
+          "shape": "quadrilateral",
+          "positions": [[3, 3]],
+          "maxPieces": 6,
+          "initialPieces": [
+            {"team": "blue", "stage": "g"},
+            {"team": "blue", "stage": "g"},
+            {"team": "blue", "stage": "g"},
+            {"team": "blue", "stage": "g"}
+          ]
+        },
+        {
+          "name": "L7-14",
+          "code": "L7-14",
+          "rank": "L7",
+          "layer": 7,
+          "region": 14,
+          "shape": "quadrilateral",
+          "positions": [[3, 4]],
+          "maxPieces": 7,
+          "initialPieces": [{"team": "blue", "stage": "f"}]
+        },
+        {
+          "name": "L8-15",
+          "code": "L8-15",
+          "rank": "L8",
+          "layer": 8,
+          "region": 15,
+          "shape": "quadrilateral",
+          "positions": [[3, 5]],
+          "maxPieces": 8,
+          "initialPieces": [{"team": "blue", "stage": "e"}]
+        },
+        {
+          "name": "L8-16",
+          "code": "L8-16",
+          "rank": "L8",
+          "layer": 8,
+          "region": 16,
+          "shape": "quadrilateral",
+          "positions": [[4, 1]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-17",
+          "code": "L8-17",
+          "rank": "L8",
+          "layer": 8,
+          "region": 17,
+          "shape": "quadrilateral",
+          "positions": [[4, 2]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "blue", "stage": "f"},
+            {"team": "blue", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L7-18",
+          "code": "L7-18",
+          "rank": "L7",
+          "layer": 7,
+          "region": 18,
+          "shape": "quadrilateral",
+          "positions": [[4, 3]],
+          "maxPieces": 7,
+          "initialPieces": [{"team": "blue", "stage": "f"}]
+        },
+        {
+          "name": "L8-19",
+          "code": "L8-19",
+          "rank": "L8",
+          "layer": 8,
+          "region": 19,
+          "shape": "quadrilateral",
+          "positions": [[4, 4]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "blue", "stage": "f"},
+            {"team": "blue", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-20",
+          "code": "L8-20",
+          "rank": "L8",
+          "layer": 8,
+          "region": 20,
+          "shape": "quadrilateral",
+          "positions": [[4, 5]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-21",
+          "code": "L8-21",
+          "rank": "L8",
+          "layer": 8,
+          "region": 21,
+          "shape": "quadrilateral",
+          "positions": [[5, 1]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-22",
+          "code": "L8-22",
+          "rank": "L8",
+          "layer": 8,
+          "region": 22,
+          "shape": "quadrilateral",
+          "positions": [[5, 2]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-23",
+          "code": "L8-23",
+          "rank": "L8",
+          "layer": 8,
+          "region": 23,
+          "shape": "quadrilateral",
+          "positions": [[5, 3]],
+          "maxPieces": 8,
+          "initialPieces": [{"team": "blue", "stage": "e"}]
+        },
+        {
+          "name": "L8-24",
+          "code": "L8-24",
+          "rank": "L8",
+          "layer": 8,
+          "region": 24,
+          "shape": "quadrilateral",
+          "positions": [[5, 4]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        },
+        {
+          "name": "L8-25",
+          "code": "L8-25",
+          "rank": "L8",
+          "layer": 8,
+          "region": 25,
+          "shape": "quadrilateral",
+          "positions": [[5, 5]],
+          "maxPieces": 8,
+          "initialPieces": [
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"},
+            {"team": "orange", "stage": "f"}
+          ]
+        }
+      ]
+    }
+  ]
+}
