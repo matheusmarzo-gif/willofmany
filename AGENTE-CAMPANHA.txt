@@ -1,0 +1,279 @@
+GUIA: COMO CONFIGURAR O AGENTE DE CAMPANHA
+=========================================
+
+Cada tabuleiro de campanha possui a sua própria configuração em
+tabuleiro-NN.json. As falas, o foco, os destaques, as ações permitidas e as
+condições que fazem o Agente avançar ficam em campaign.guide. Assim, um nível
+pode ter um roteiro próprio sem adicionar verificações específicas daquele
+nível ao game-client.js.
+
+1. OBJETIVO DO NÍVEL
+--------------------
+
+Defina campaign.objectiveRegions com os códigos de todas as regiões que o
+jogador deve conquistar. A vitória da campanha exige que a equipe laranja
+domine todas elas.
+
+  "campaign": {
+    "objectiveRegions": ["L8-1", "L8-3"],
+    "objectiveText": "Conquiste L8-1 e L8-3."
+  }
+
+Use códigos que existam em blocks[].regions[].code (ou name, quando code não
+estiver definido). objectiveText é opcional; sem ele, o painel mostra os
+códigos da lista. Este objetivo é independente das falas do Agente.
+
+2. ESQUELETO DO ROTEIRO
+-----------------------
+
+guide.initialStep indica a primeira etapa e guide.introNext indica a próxima
+etapa após fechar a introdução. introOverlay personaliza a introdução.
+guide.steps contém as etapas do roteiro; guide.states declara estados de espera
+que não exibem uma fala até que uma transição os abandone.
+
+  "guide": {
+    "initialStep": "intro",
+    "introNext": "welcome",
+    "introOverlay": {
+      "title": "Missão",
+      "message": "Conquiste os territórios destacados.",
+      "hint": "Toque para continuar"
+    },
+    "states": ["await-capture"],
+    "steps": {
+      "intro": {
+        "next": "welcome"
+      },
+      "welcome": {
+        "title": "Avance",
+        "message": "Conquiste a região L8-4 para prosseguir.",
+        "dismissible": true,
+        "next": "await-capture",
+        "focusRegion": "L8-4",
+        "selectRegion": "L8-4",
+        "highlight": ["region:L8-4"]
+      },
+      "captured": {
+        "title": "Território conquistado",
+        "message": "Agora continue para o próximo objetivo.",
+        "dismissible": true,
+        "next": "complete"
+      }
+    },
+    "transitions": [
+      {
+        "from": "await-capture",
+        "when": {
+          "type": "regionCaptured",
+          "region": "L8-4",
+          "team": "orange"
+        },
+        "next": "captured"
+      }
+    ]
+  }
+
+Cada etapa visível deve ter uma chave única em guide.steps. next aponta para
+outra etapa, para um estado declarado em guide.states, ou para "complete".
+Uma etapa cujo next é "previous" retorna à etapa anterior do roteiro.
+
+3. QUANDO UMA FALA APARECE: transitions
+---------------------------------------
+
+Cada item de guide.transitions possui:
+
+  from: chave de uma etapa/estado de origem, lista de origens ou "*" para
+        qualquer etapa/estado atual;
+  when: condição ou evento que precisa ocorrer;
+  next: próxima etapa, estado ou "complete".
+
+O cliente avalia as transições em ordem e aplica no máximo a primeira que
+combinar em cada avaliação. Coloque condições específicas antes de condições
+mais gerais. Para avançar imediatamente ao entrar num estado, as condições de
+estado (regionOwned e soldierCount) também são verificadas sem um evento
+específico.
+
+Condições de estado:
+
+  regionOwned
+    Verifica se a equipe domina uma região ou pelo menos uma das regiões
+    listadas.
+    Campos: region ou regions, team.
+    Use region para uma única região; use regions (lista) para avançar quando
+    qualquer uma das regiões listadas pertencer à equipe.
+
+  soldierCount
+    Verifica domínio e quantidade mínima de soldados.
+    Campos: region, team, soldiersAtLeast.
+
+Exemplo: quando o estado await-army estiver ativo e houver pelo menos 8
+soldados laranja em L8-10:
+
+  {
+    "from": "await-army",
+    "when": {
+      "type": "soldierCount",
+      "region": "L8-10",
+      "team": "orange",
+      "soldiersAtLeast": 8
+    },
+    "next": "ready-to-attack"
+  }
+
+region pode ser o código fixo, por exemplo "L8-10". O alias "approach" escolhe
+a região laranja mais próxima de um dos objetivos em campaign.objectiveRegions;
+use-o em regionOwned/soldierCount quando quiser observar essa região calculada.
+Em regions, cada item pode ser um código de região ou o alias "approach".
+
+Exemplo: avançar quando o time laranja dominar qualquer setor do disco:
+
+  {
+    "from": "await-circular",
+    "when": {
+      "type": "regionOwned",
+      "regions": ["L8-6", "L8-7", "L8-8", "L8-9"],
+      "team": "orange"
+    },
+    "next": "level2-pass-turn"
+  }
+
+Eventos:
+
+  regionCaptured
+    Acontece depois de uma guerra que alterou a equipe de uma região.
+    Campos: region ou regions; team opcional para filtrar a equipe vencedora.
+
+  regionRotated
+    Acontece quando uma região participa da rotação concluída.
+    Campos: region ou regions; block opcional para filtrar o bloco, como "BC03".
+    Para observar uma região exata, prefira region em vez de testar apenas o
+    nome do bloco.
+
+  regionMoved
+    Acontece ao mover soldados entre regiões do mesmo rank.
+    Campos opcionais: team, source, target.
+
+  bagCollected
+    Acontece ao coletar um saco de moedas.
+    Campos opcionais: team, region.
+
+  actionCompleted
+    Marca uma ação do jogador. purchase, promotion e relegation são registrados
+    após a ação; war é registrado assim que uma solicitação válida inicia a
+    guerra, antes da resolução dos combates; passTurn é registrado após o início
+    do turno seguinte.
+    action aceita "purchase", "promotion", "relegation", "war" e "passTurn".
+    Campos opcionais adicionais: team, region, stage. Para compra, stage é a
+    letra da peça, por exemplo "g".
+
+  turnStarted
+    É avaliado após a transição visual do turno.
+    Campos opcionais: turn (número exibido do turno), team.
+
+Exemplo para uma rotação específica:
+
+  {
+    "from": "await-rotation",
+    "when": {
+      "type": "regionRotated",
+      "region": "L8-7",
+      "block": "BC03"
+    },
+    "next": "rotation-done"
+  }
+
+Uma rotação circular informa as regiões do disco girado; uma rotação
+quadricular informa as regiões do percurso selecionado. A transição só combina
+se a região configurada participou daquela rotação.
+
+Exemplo para uma região conquistada numa guerra:
+
+  {
+    "from": "await-target",
+    "when": {
+      "type": "regionCaptured",
+      "regions": ["L8-4", "L8-5"],
+      "team": "orange"
+    },
+    "next": "target-captured"
+  }
+
+4. FOCO, SELEÇÃO E DESTAQUES
+----------------------------
+
+Em cada etapa, focusRegion centraliza/ aproxima o tabuleiro e selectRegion
+seleciona a região no painel. focusRegions aceita uma lista de códigos e
+centraliza o grupo. Informe códigos concretos, como "L8-13", para decidir pelo
+JSON qual região mostrar.
+
+Aliases dinâmicos disponíveis para foco/seleção:
+
+  "approach"            região mais próxima entre a tropa laranja inicial e os
+                        objetivos configurados;
+  "lastCircularSector"  último setor circular conquistado (ou L8-7 se nenhum
+                        tiver sido conquistado);
+  "level5TurnFiveRegions" grupo especial de foco existente no Level 5.
+
+focusRegions também pode receber "level5TurnFiveRegions". Para um Agente
+personalizado, prefira os códigos fixos quando o nível tiver posições
+conhecidas.
+
+highlight é uma lista de descritores:
+
+  "region:L8-4"                    uma região;
+  "regions:L8-4,L8-5"              grupo de regiões;
+  "pieces:L8-4:orange"             peças de uma equipe em uma região;
+  "pieceButton:g"                  botão de compra do rank G;
+  "bag:L8-3"                       saco de moedas;
+  "ui:warButton"                   controle da interface.
+
+Chaves de interface disponíveis incluem turnPoints, warButton, passTurnButton,
+rotateQuadrilateralBlockButton, regionName, regionBlockName,
+regionRotationIndicator, regionRotationBlockName, trashDropZone,
+promotionButton, relegationButton, rotationPassPanelTitle, rotationTargetOptions,
+rotationLocalPassButton, rotationGlobalPassButton, regionForce e regionFinalForce.
+
+5. OPÇÕES DE ETAPA E VARIÁVEIS DA MENSAGEM
+------------------------------------------
+
+Campos de etapa usados pelo Agente:
+
+  title             título da fala;
+  message           texto da fala;
+  dismissible       permite continuar sem executar uma ação;
+  next              próxima etapa/estado ao continuar;
+  focusRegion       região que recebe foco;
+  focusRegions      grupo de regiões que recebe foco;
+  selectRegion      região selecionada;
+  highlight         controles, peças e regiões em evidência;
+  actionTarget      alvo visual, por exemplo "war", "passTurn",
+                    "rotateBlock" ou "purchaseG";
+  allowAction       ação autorizada enquanto a fala não é dispensável:
+                    "war", "passTurn", "rotate" ou "purchase";
+  hint              instrução curta associada ao alvo de ação;
+  autoShow          mostra a etapa automaticamente quando ela é selecionada;
+  cardPositionOrder ordem preferencial do cartão em torno da ação;
+  rotationGuide     ativa a orientação visual de rotação.
+
+As mensagens reconhecem atualmente {{orangeCoins}} e {{approachRegion}}.
+Variáveis desconhecidas são reportadas no console e permanecem no texto.
+
+6. LISTA DE VERIFICAÇÃO
+-----------------------
+
+1. Edite o tabuleiro do nível desejado, sem alterar a lógica geral do cliente.
+2. Confirme que todo código de região existe em blocks[].regions.
+3. Declare campaign.objectiveRegions para a condição de vitória; isso não cria,
+   por si só, uma fala do Agente.
+4. Declare as etapas, seus destinos e os estados em que aguardam uma ação.
+5. Adicione transições na ordem correta, com a origem, tipo de condição e
+   próximo destino.
+6. Use regionCaptured para conquistas e regionRotated com a região observada
+   para giros específicos.
+7. Valide a sintaxe JSON e execute:
+
+   node --test tests\game-rules.test.js tests\asset-entrypoints.test.js
+
+Os roteiros dos Levels 1–5 contêm exemplos de transições por compra, movimento,
+coleta, quantidade de soldados, captura, rotação e turno. Os Levels 6–7 usam
+roteiros sem estados de espera atualmente.

@@ -23,6 +23,193 @@
     "objectiveRegions": ["L8-12"],
     "objective": {
       "type": "captureInitialBlueRegions"
+    },
+    "guide": {
+      "initialStep": "level5-intro",
+      "steps": {
+        "level5-intro": {
+          "title": "Level 5: conquiste L8-12",
+          "message": "Esse nível é desafiador! Você precisará usar a ordem de preferência nas batalhas para atrair forças inimigas mais fortes em batalhas menores enquanto você conquista mais aliados. O Objetivo é conquistar L8-12.",
+          "dismissible": true,
+          "next": "level5-neighbor-tip",
+          "focusRegion": "L8-12",
+          "highlight": [
+            "regions:objectives"
+          ]
+        },
+        "level5-neighbor-tip": {
+          "title": "Comece pelas regiões vizinhas",
+          "message": "Vamos começar conquistando as duas regiões vizinhas vermelhas.",
+          "dismissible": true,
+          "next": "await-level5-l8-10",
+          "focusRegions": [
+            "L8-10",
+            "L8-8"
+          ],
+          "selectRegion": "L8-9",
+          "highlight": [
+            "regions:L8-10,L8-8"
+          ],
+          "autoShow": true
+        },
+        "level5-rotation-groups-tip": {
+          "title": "Escolha o tipo de rotação",
+          "message": "Alguns blocos permitem dois tipos de rotação: um em anel e outro de forma linear. Selecione cada e clique em \"Girar Bloco\" para ver como eles podem se mover!",
+          "dismissible": true,
+          "next": "level5-rotation-passes-tip",
+          "focusRegion": "L8-10",
+          "selectRegion": "L8-10",
+          "highlight": [
+            "ui:rotationPassPanelTitle",
+            "ui:rotationTargetOptions"
+          ],
+          "actionTarget": "rotationPassPanel",
+          "effect": "level5RotationGroups",
+          "autoShow": true,
+          "rotationType": "ring"
+        },
+        "level5-rotation-passes-tip": {
+          "title": "Passes de rotação",
+          "message": "Existem dois tipos de passes que permitem rotacionar os blocos. Os passes locais são acumulativos e, sempre que você conquistar uma região naquela rota de rotação, eles aumentam em 1 unidade. Os passes globais podem rotacionar ou mover qualquer bloco, desde que ele não tenha sido movido pelo seu oponente no turno anterior; os passes globais não são acumulativos, mas você ganha um passe novo por turno.",
+          "dismissible": true,
+          "next": "level5-rotation-action-tip",
+          "highlight": [
+            "ui:rotationLocalPassButton",
+            "ui:rotationGlobalPassButton"
+          ],
+          "autoShow": true,
+          "focusRegion": "L8-10",
+          "selectRegion": "L8-10"
+        },
+        "level5-rotation-action-tip": {
+          "title": "Aproxime-se das unidades inimigas",
+          "message": "Vamos girar o disco uma vez para ficar mais próximo das unidades inimigas!",
+          "dismissible": true,
+          "next": "await-level5-l8-2",
+          "focusRegion": "L8-10",
+          "selectRegion": "L8-10",
+          "highlight": [
+            "ui:rotationPassPanelTitle",
+            "ui:rotationTargetOptions"
+          ],
+          "actionTarget": "rotationPassPanel"
+        },
+        "level5-turn3-tip": {
+          "title": "O maior desafio até agora",
+          "message": "Uma unidade E equivale a 6 unidades do tipo F. Este mapa será o maior desafio até agora!",
+          "dismissible": true,
+          "next": "previous",
+          "focusRegion": "L8-12",
+          "highlight": [
+            "regions:objectives"
+          ],
+          "restoreFocusTeam": "orange"
+        },
+        "level5-turn5-tip": {
+          "title": "Prepare o contra-ataque",
+          "message": "Coloque uma tropa 'g' para contra L8-2! Enquanto a tropa de cima estiver ocupada lutando você poderá vencer as tropas em L8-1!",
+          "dismissible": true,
+          "next": "previous",
+          "focusRegions": "level5TurnFiveRegions",
+          "selectRegion": "L8-2",
+          "highlight": [
+            "region:turnFiveFocus"
+          ],
+          "restoreFocusTeam": "orange"
+        },
+        "level5-support-tip": {
+          "title": "Prepare o suporte para L8-9",
+          "message": "Estamos mais próximos de concluir o nível! Para que as forças em L8-9 tenham mais chances vamos colocar unidades de suporte em L7-1, que são as unidades de Rank Amarelo!",
+          "dismissible": true,
+          "next": "await-level5-l7-1",
+          "focusRegion": "L8-2",
+          "selectRegion": "L8-2",
+          "highlight": [
+            "region:L8-2",
+            "region:L7-1"
+          ]
+        },
+        "level5-force-tip": {
+          "title": "A força do Rank Amarelo",
+          "message": "Unidades no Rank Amarelo recebem metade da força das unidades vermelhas aliadas adjacentes, limitadas a 8 unidades vermelhas para cada amarela. Além disso elas multiplicam essa força! L7-1 também tem uma rotação especial: faça um traço em linha reta sobre a fileira ou coluna que passa por ela para girar as posições em qualquer sentido. Lutar usando unidades de rank superior é o que pode te trazer a vitória!",
+          "dismissible": true,
+          "next": "complete",
+          "focusRegion": "L7-1",
+          "selectRegion": "L7-1",
+          "highlight": [
+            "region:L7-1",
+            "ui:regionForce",
+            "ui:regionFinalForce"
+          ]
+        }
+      },
+      "states": [
+        "await-level5-l8-10",
+        "await-level5-l8-3",
+        "await-level5-l8-2",
+        "await-level5-l7-1"
+      ],
+      "statePresentation": {
+        "await-level5-l8-3": {
+          "focusRegion": "L8-9"
+        },
+        "await-level5-l8-10": {
+          "selectRegion": "L8-9",
+          "focusRegion": "L8-9"
+        },
+        "await-level5-l8-2": {
+          "selectRegion": "L8-10",
+          "focusRegion": "L8-10"
+        }
+      },
+      "transitions": [
+        {
+          "from": ["await-level5-l8-10", "await-level5-l8-3"],
+          "when": {
+            "type": "regionOwned",
+            "region": "L8-10",
+            "team": "orange"
+          },
+          "next": "level5-rotation-groups-tip"
+        },
+        {
+          "from": "await-level5-l8-2",
+          "when": {
+            "type": "regionOwned",
+            "region": "L8-2",
+            "team": "orange"
+          },
+          "next": "level5-support-tip"
+        },
+        {
+          "from": "await-level5-l7-1",
+          "when": {
+            "type": "soldierCount",
+            "region": "L7-1",
+            "team": "orange",
+            "soldiersAtLeast": 1
+          },
+          "next": "level5-force-tip"
+        },
+        {
+          "from": "*",
+          "when": {
+            "type": "turnStarted",
+            "turn": 3,
+            "team": "orange"
+          },
+          "next": "level5-turn3-tip"
+        },
+        {
+          "from": "*",
+          "when": {
+            "type": "turnStarted",
+            "turn": 5,
+            "team": "orange"
+          },
+          "next": "level5-turn5-tip"
+        }
+      ]
     }
   },
   "blocks": [

@@ -25,6 +25,55 @@
     "objectiveRegions": ["L8-1", "L8-3", "L8-9"],
     "objective": {
       "type": "captureInitialBlueRegions"
+    },
+    "guide": {
+      "initialStep": "level4-intro",
+      "steps": {
+        "level4-intro": {
+          "title": "A ordem das batalhas",
+          "message": "O objetivo desse mapa é conquistar todas as regiões inimigas! Vamos ter que usar a ordem com que as batalhas acontecem a nosso favor.",
+          "dismissible": true,
+          "next": "await-level4-l8-10",
+          "highlight": [
+            "regions:objectives"
+          ]
+        },
+        "level4-battle-tip": {
+          "title": "Use o círculo a seu favor",
+          "message": "Gire o círculo de forma inteligente para lutar! Se você escolher a ordem certa conseguirá conquistar todas as regiões inimigas.",
+          "dismissible": true,
+          "next": "level4-battle-order",
+          "autoShow": true
+        },
+        "level4-battle-order": {
+          "title": "Defina a ordem do combate",
+          "message": "Para definir quem luta primeiro são escolhidas as regiões de acordo com o rank (amarelo primeiro que vermelho) e do maior índice antes do menor (L8-10 primeiro que L8-7). Usando a ordem de batalha você poderá ganhar duas batalhas dessa região!",
+          "dismissible": true,
+          "next": "complete",
+          "autoShow": true
+        },
+        "level4-resource-defeat": {
+          "title": "Fim de jogo",
+          "message": "Você ficou sem moedas e não tem nenhuma peça F. O Agente deseja mais sorte na próxima tentativa.",
+          "dismissible": true,
+          "next": "complete",
+          "onDismiss": "restartLevel"
+        }
+      },
+      "states": [
+        "await-level4-l8-10"
+      ],
+      "transitions": [
+        {
+          "from": "await-level4-l8-10",
+          "when": {
+            "type": "regionOwned",
+            "region": "L8-10",
+            "team": "orange"
+          },
+          "next": "level4-battle-tip"
+        }
+      ]
     }
   },
   "blocks": [

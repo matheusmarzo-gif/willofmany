@@ -21,6 +21,135 @@
     "objectiveRegions": ["L8-16"],
     "objective": {
       "type": "captureInitialBlueRegions"
+    },
+    "guide": {
+      "initialStep": "level3-intro",
+      "steps": {
+        "level3-intro": {
+          "title": "Level 3: conquiste L8-16",
+          "message": "Seu objetivo é dominar a região L8-16. Observe o destino e o seu ponto de partida: você precisará girar as regiões com inteligência para abrir o caminho.",
+          "dismissible": true,
+          "next": "level3-region-labels",
+          "highlight": [
+            "region:level3IntroDestination"
+          ],
+          "effect": "level3Intro",
+          "focusFrom": "L8-1",
+          "focusRegion": "L8-16",
+          "focusReturn": "L8-1"
+        },
+        "level3-region-labels": {
+          "title": "Entenda as informações da região",
+          "message": "Em “L8-1 [BQ01] ↻ [B1]”, L8-1 é o nome da região; [BQ01] identifica o bloco a que ela pertence; e ↻ indica que ela pode girar. Para iniciar, toque em GIRAR BLOCO no painel da região.",
+          "dismissible": true,
+          "next": "await-l8-10",
+          "focusRegion": "L8-1",
+          "selectRegion": "L8-1",
+          "highlight": [
+            "region:L8-6",
+            "ui:regionName",
+            "ui:regionBlockName",
+            "ui:regionRotationIndicator",
+            "ui:regionRotationBlockName",
+            "ui:rotateQuadrilateralBlockButton"
+          ],
+          "effect": "level3RegionLabels",
+          "autoShow": true
+        },
+        "level3-battle-tip": {
+          "title": "Escolha onde lutar",
+          "message": "Ao girar as regiões com inteligência, você pode enfrentar um grupo de soldados por vez. As batalhas consideram forças inimigas em regiões vizinhas e as tropas de suporte das regiões adjacentes.",
+          "dismissible": true,
+          "next": "await-l8-14",
+          "focusRegion": "L8-10",
+          "selectRegion": "L8-10",
+          "highlight": [
+            "region:L8-10"
+          ]
+        },
+        "level3-promotion-tip": {
+          "title": "Avance para as regiões amarelas",
+          "message": "Regiões amarelas são de rank superior. Para promover uma unidade até uma região amarela, você precisa de 8 unidades livres nas regiões vermelhas; a promoção de uma região vermelha para uma amarela custa 3 moedas.",
+          "dismissible": true,
+          "next": "await-l7-1",
+          "focusRegion": "L7-1",
+          "selectRegion": "L7-1",
+          "highlight": [
+            "region:L8-14"
+          ]
+        },
+        "level3-recruitment-tip": {
+          "title": "Recrute e rebaixe unidades",
+          "message": "Com pelo menos 16 unidades nas regiões vermelhas, você pode recrutar uma unidade G diretamente em L7-1. Mover uma peça de uma região amarela para uma vermelha é um rebaixamento: você recebe metade do valor da peça.",
+          "dismissible": true,
+          "next": "complete",
+          "focusRegion": "L7-1",
+          "selectRegion": "L7-1",
+          "highlight": [
+            "region:L7-1",
+            "ui:promotionButton",
+            "ui:relegationButton"
+          ]
+        },
+        "level3-resource-defeat": {
+          "title": "Fim de jogo",
+          "message": "Você ficou sem moedas e não tem nenhuma peça F. O Agente deseja mais sorte na próxima tentativa.",
+          "dismissible": true,
+          "next": "complete",
+          "onDismiss": "restartLevel"
+        }
+      },
+      "states": [
+        "await-l8-8",
+        "await-l8-10",
+        "await-l8-14",
+        "await-l7-1"
+      ],
+      "statePresentation": {
+        "await-l8-10": {
+          "selectRegion": "L8-1",
+          "focusRegion": "L8-1",
+          "focusAfterFrame": true
+        },
+        "await-l8-14": {
+          "selectRegion": "L8-8",
+          "focusRegion": "L8-8"
+        },
+        "await-l7-1": {
+          "selectRegion": "L8-14",
+          "focusRegion": "L8-14"
+        }
+      },
+      "transitions": [
+        {
+          "from": "await-l8-10",
+          "when": {
+            "type": "regionOwned",
+            "region": "L8-10",
+            "team": "orange"
+          },
+          "next": "level3-battle-tip"
+        },
+        {
+          "from": "await-l8-14",
+          "when": {
+            "type": "regionOwned",
+            "region": "L8-14",
+            "team": "orange"
+          },
+          "next": "level3-promotion-tip"
+        },
+        {
+          "from": "await-l7-1",
+          "when": {
+            "type": "soldierCount",
+            "region": "L7-1",
+            "team": "orange",
+            "soldiersAtLeast": 1
+          },
+          "next": "level3-recruitment-tip"
+        }
+      ]
     }
   },
   "blocks": [

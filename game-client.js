@@ -52,6 +52,9 @@
     const campaignRestartButton = document.querySelector('#campaign-restart-button');
     const campaignIntro = document.querySelector('#campaign-intro');
     const campaignIntroDismiss = document.querySelector('#campaign-intro-dismiss');
+    const campaignIntroTitle = document.querySelector('#campaign-intro-title');
+    const campaignIntroMessage = document.querySelector('#campaign-intro-message');
+    const campaignIntroHint = document.querySelector('#campaign-intro-hint');
     const campaignDefeat = document.querySelector('#campaign-defeat');
     const campaignDefeatMessage = document.querySelector('#campaign-defeat-message');
     const campaignGuide = document.querySelector('#campaign-guide');
@@ -228,6 +231,7 @@
     let campaignGuideStepBeforeLevel5TurnThreeTip = null;
     let campaignTurnStartSnapshot = null;
     let campaignGuideDismissible = false;
+    let campaignGuideWasVisibleAtPointerDown = false;
     let campaignGuideMessagePages = [];
     let campaignGuideMessagePage = 0;
     let campaignGuideFinalHint = 'Clique para continuar';
@@ -242,7 +246,8 @@
       'tabuleiro-03': 'tabuleiro-03.json',
       'tabuleiro-04': 'tabuleiro-04.json',
       'tabuleiro-05': 'tabuleiro-05.json',
-      'tabuleiro-06': 'tabuleiro-06.json'
+      'tabuleiro-06': 'tabuleiro-06.json',
+      'tabuleiro-07': 'tabuleiro-07.json'
     };
     const levelThreeRegionCodeMigration = {
       'L8-8': 'L8-10',
@@ -617,26 +622,7 @@
         campaignObjectiveRegions = gameMode === 'campaign'
           ? (activeCampaignLevel?.objectiveRegions || [])
           : [];
-        campaignGuideStep = [
-          'intro', 'coins', 'purchase', 'move', 'await-move', 'bag-tip',
-          'await-bag', 'army-tip', 'await-army', 'war',
-          'level2-intro', 'await-l84', 'level2-rotate', 'await-circular',
-          'level2-pass-turn', 'await-next-rotation', 'level2-rotate-again',
-          'level2-final-attack', 'await-l83-army', 'level2-final-war', 'await-l83',
-          'level2-recycle', 'await-l81',
-          'level3-intro', 'level3-region-labels', 'await-l8-8', 'await-l8-10',
-          'level3-battle-tip', 'await-l8-14', 'level3-promotion-tip',
-          'await-l7-1', 'level3-recruitment-tip',
-          'level4-intro', 'await-level4-l8-10', 'level4-battle-tip',
-          'level4-battle-order',
-          'level5-intro', 'level5-neighbor-tip', 'await-level5-l8-10',
-          'level5-rotation-groups-tip', 'level5-rotation-passes-tip',
-          'level5-rotation-action-tip', 'await-level5-l8-2',
-          'level5-support-tip', 'await-level5-l7-1', 'level5-force-tip', 'level5-turn3-tip',
-          'level5-turn5-tip', 'level6-intro', 'level6-rank-tip',
-          'level3-resource-defeat',
-          'level4-resource-defeat', 'complete'
-        ].includes(save.campaignGuideStep)
+        campaignGuideStep = isCampaignGuideStateValid(save.campaignGuideStep)
           ? save.campaignGuideStep
           : 'complete';
         campaignGuideStepBeforeLevel5TurnThreeTip =
@@ -647,7 +633,8 @@
             campaignGuideStep === 'await-l8-8') {
           campaignGuideStep = 'await-l8-10';
         }
-        campaignIntroPending = gameMode === 'campaign' && campaignGuideStep === 'intro';
+        campaignIntroPending = gameMode === 'campaign' && !!activeCampaignLevel?.guide?.introOverlay &&
+          campaignGuideStep === activeCampaignLevel.guide.initialStep;
         gameSpeed = Math.max(1, Math.min(3, Number(save.gameSpeed) || 1));
         currentTeam = save.currentTeam === 'blue' ? 'blue' : 'orange';
         currentTurn = Math.max(1, Number(save.currentTurn) || 1);
@@ -2171,6 +2158,7 @@
           (!isCampaignGame() && !isAutomatic && !allowUnscheduled &&
             ![6, 13, 18, 25].includes(currentTurn))) return;
       clearCampaignMoveUndoHistory();
+      const campaignCaptures = [];
       const sessionVersion = gameSessionVersion;
       isWarRunning = true;
       if (gameMode === 'bluetooth' && bluetoothRole === 'host' && bluetoothConnected) {
@@ -2181,8 +2169,9 @@
       resetCombatRegions();
       warSpotlightRegionCodes = [];
       updateBoardFocusOverlay();
-      const restoreLevelSixView = isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-06';
-      const previousStageView = restoreLevelSixView
+      const restoreCampaignWarView = isCampaignGame() &&
+        ['tabuleiro-06', 'tabuleiro-07'].includes(activeCampaignLevel.id);
+      const previousStageView = restoreCampaignWarView
         ? {
           zoom: stageZoom,
           offset: { ...stageZoomOffset },
@@ -2233,7 +2222,7 @@
       for (const block of blocks) {
         warSpotlightRegionCodes = [...new Set([...block.alliedRegions, ...block.enemyRegions])];
         updateBoardFocusOverlay();
-        focusRegion(block.regionCode, restoreLevelSixView ? 2 : null);
+        focusRegion(block.regionCode, restoreCampaignWarView ? 2 : null);
         const alliedForce = block.alliedRegions.reduce((sum, code) => sum + getRegionFinalForceValue(code), 0);
         const enemyForce = block.enemyRegions.reduce((sum, code) => sum + getRegionFinalForceValue(code), 0);
         renderWarForces(block.attacker, alliedForce, enemyForce);
@@ -2256,6 +2245,12 @@
           const losingRegions = winner === block.attacker ? block.enemyRegions : block.alliedRegions;
           losingRegions.forEach((regionCode) => {
             setRegionTeamOwnership(regionCode, winner);
+            campaignCaptures.push({ region: regionCode, team: winner });
+            if (isCampaignLevelTwo() && winner === 'orange' &&
+                regionGeometryByCode[regionCode]?.shape === 'circular' &&
+                !campaignLevel2SeenSectors.includes(regionCode)) {
+              campaignLevel2SeenSectors.push(regionCode);
+            }
             collectCampaignBagAtRegion(regionCode, winner);
           });
           recalculatePieceCounts();
@@ -2271,7 +2266,7 @@
       warStatus.classList.add('is-hidden');
       warSpotlightRegionCodes = [];
       updateBoardFocusOverlay();
-      if (restoreLevelSixView) restoreStageView();
+      if (restoreCampaignWarView) restoreStageView();
       else resetStageZoom();
       isWarRunning = false;
       updateWarAvailability();
@@ -2280,10 +2275,13 @@
       updateSelectedRegionPanel(selectedRegionCode);
       readout.textContent = `Guerra concluída: ${blocks.length} bloco(s) de confronto.`;
       saveGame();
-      maybeAdvanceLevel2Guide();
-      maybeAdvanceLevelThreeGuide();
-      maybeAdvanceLevelFourGuide();
-      maybeAdvanceLevelFiveGuide();
+      if (campaignCaptures.length) {
+        evaluateCampaignGuideTransitions({
+          type: 'regionCaptured',
+          captures: campaignCaptures
+        });
+      }
+      evaluateCampaignGuideTransitions();
       const centerWinner = getCenterConqueror();
       if (centerWinner && (!isOnlineGame() || onlineTeam === 'orange')) {
         finishGame(centerWinner, 'center');
@@ -2890,10 +2888,7 @@
       renderPiecePurchaseButtons();
       passTurnButton.disabled = !isLocalPlayersTurn() || isWarRunning || isGameOver || isAiTurnRunning;
       updateTurnPointsDisplay();
-      maybeAdvanceLevel2Guide();
-      maybeAdvanceLevelThreeGuide();
-      maybeAdvanceLevelFourGuide();
-      maybeAdvanceLevelFiveGuide();
+      evaluateCampaignGuideTransitions();
       maybeShowCampaignResourceDefeat();
       campaignRestartTurnButton.disabled = !isCampaignGame() || !campaignTurnStartSnapshot ||
         !isLocalPlayersTurn() || isWarRunning || isGameOver || isAiTurnRunning;
@@ -4264,11 +4259,6 @@
       }
       rotationAnimationVersion += 1;
       recordRotationUse(rotationTarget?.key || `circular:${diskKey}`, primaryLayer, passType);
-      if (isCampaignLevelTwo() &&
-          ['level2-rotate', 'level2-rotate-again'].includes(campaignGuideStep)) {
-        hideCampaignGuide();
-        campaignGuideStep = 'await-circular';
-      }
       updateRotationControls();
       recalculateRegionForces();
       refreshRegionVisuals();
@@ -4301,6 +4291,11 @@
         source: selectedRegionCode,
         rotationTargetKey: rotationTarget?.key || `circular:${diskKey}`,
         rotationPassType: passType
+      });
+      evaluateCampaignGuideTransitions({
+        type: 'regionRotated',
+        block: blockName,
+        regions: regionCodes
       });
       finishIfCenterConquered();
       return true;
@@ -4379,12 +4374,13 @@
         stage
       });
       finishIfCenterConquered();
-      if (isCampaignGame() && campaignGuideStep === 'purchase' &&
-          team === 'orange' && regionReference === 'L8-5' && stage === 'g') {
-        showCampaignGuide('move');
-      } else {
-        maybeShowCampaignWarGuide();
-      }
+      evaluateCampaignGuideTransitions({
+        type: 'actionCompleted',
+        action: 'purchase',
+        team,
+        region: regionReference,
+        stage
+      });
     }
 
     function getRegionRotationCenter(regionCode) {
@@ -4676,7 +4672,8 @@
       const rect = stagePanel.getBoundingClientRect();
       const scale = Number(focusScale) || Number(currentBoardData?.regionFocusScale) || 1.8;
       if (currentBoardData?.boardType === 'mixed' ||
-          ['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06'].includes(currentBoardData?.campaign?.id)) {
+          ['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07']
+            .includes(currentBoardData?.campaign?.id)) {
         stageZoom = scale;
         stageZoomOffset = {
           x: ((50 - point.x) / 100) * rect.width * scale,
@@ -4824,7 +4821,8 @@
     function getSafeSlots(layerNumber, regionNumber, applyRotation = true) {
       const regionCode = `L${layerNumber}-${regionNumber}`;
       const geometry = regionGeometryByCode[regionCode];
-      if (['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06'].includes(currentBoardData?.campaign?.id) &&
+      if (['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07']
+        .includes(currentBoardData?.campaign?.id) &&
           geometry?.shape === 'quadrilateral' && Array.isArray(geometry.cells)) {
         return geometry.cells.flatMap((cell) => {
           const slots = [];
@@ -5728,6 +5726,9 @@
           : `Bloco ${blockName}: rotação indisponível neste turn.`;
         return false;
       }
+      const rotatedRegionCodes = getQuadrilateralRotationCells(block, rotationPath)
+        .map((cell) => cell.regionCode)
+        .filter(Boolean);
       const layerNumber = activeTarget.layer;
       controls.classList.remove('is-rotation-picker-open');
       app.classList.remove('is-rotation-picker-open');
@@ -5758,6 +5759,11 @@
         direction,
         rotationPassType: passType,
         ...(rotationPath ? { rotationPath } : {})
+      });
+      evaluateCampaignGuideTransitions({
+        type: 'regionRotated',
+        block: String(block.name),
+        regions: rotatedRegionCodes
       });
       finishIfCenterConquered();
       return true;
@@ -6700,7 +6706,9 @@
             if (isCampaignLevelTwo() &&
                 ['level2-rotate', 'level2-rotate-again'].includes(campaignGuideStep)) {
               hideCampaignGuide();
-              campaignGuideStep = 'await-circular';
+              campaignGuideStep = campaignGuideStep === 'level2-rotate-again'
+                ? 'await-final-approach'
+                : 'await-circular';
             }
             updateRotationControls();
             recomputeNeighborCacheForLayer(layerNumber);
@@ -6950,57 +6958,27 @@
     function showCampaignIntro() {
       if (campaignIntroPending) {
         campaignIntroPending = false;
+        const intro = activeCampaignLevel?.guide?.introOverlay;
+        campaignIntroTitle.textContent = intro?.title || '';
+        campaignIntroMessage.textContent = intro?.message || '';
+        campaignIntroHint.textContent = intro?.hint || '';
         campaignIntro.classList.remove('is-hidden');
         campaignIntro.setAttribute('aria-hidden', 'false');
         campaignIntroDismiss.focus({ preventScroll: true });
         return;
       }
-      if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-03' && [
-        'level3-intro', 'level3-region-labels', 'level3-battle-tip',
-        'level3-promotion-tip', 'level3-recruitment-tip'
-      ].includes(campaignGuideStep)) {
-        showCampaignGuide(campaignGuideStep);
-        return;
-      }
-      if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-04' && [
-        'level4-intro', 'level4-battle-tip', 'level4-battle-order'
-      ].includes(campaignGuideStep)) {
-        showCampaignGuide(campaignGuideStep);
-        return;
-      }
-      if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-05' && [
-        'level5-intro', 'level5-neighbor-tip', 'level5-rotation-groups-tip',
-        'level5-rotation-passes-tip', 'level5-rotation-action-tip',
-        'level5-support-tip', 'level5-force-tip', 'level5-turn3-tip', 'level5-turn5-tip'
-      ].includes(campaignGuideStep)) {
-        showCampaignGuide(campaignGuideStep);
-        return;
-      }
-      if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-06' &&
-          ['level6-intro', 'level6-rank-tip'].includes(campaignGuideStep)) {
-        showCampaignGuide(campaignGuideStep);
-        return;
-      }
-      if (isCampaignLevelTwo() && [
-        'level2-intro', 'level2-rotate', 'level2-pass-turn',
-        'level2-rotate-again', 'level2-final-attack', 'level2-final-war',
-        'level2-recycle'
-      ].includes(campaignGuideStep)) {
-        showCampaignGuide(campaignGuideStep);
-        return;
-      }
-      if (isCampaignGame() && [
-        'coins', 'purchase', 'move', 'bag-tip', 'army-tip', 'war'
-      ].includes(campaignGuideStep)) showCampaignGuide(campaignGuideStep);
+      if (getCampaignGuideStep(campaignGuideStep)) showCampaignGuide(campaignGuideStep);
     }
 
     function dismissCampaignIntro() {
       const shouldContinueGuide = !campaignIntro.classList.contains('is-hidden') &&
-        isCampaignGame() && isGameStarted && campaignGuideStep === 'intro';
+        isCampaignGame() && isGameStarted &&
+        campaignGuideStep === activeCampaignLevel?.guide?.initialStep;
       campaignIntro.classList.add('is-hidden');
       campaignIntro.setAttribute('aria-hidden', 'true');
       campaignIntroDismiss.blur();
-      if (shouldContinueGuide) showCampaignGuide('coins');
+      const nextStep = activeCampaignLevel?.guide?.introNext;
+      if (shouldContinueGuide && nextStep) showCampaignGuide(nextStep);
     }
 
     function getCampaignApproachRegion() {
@@ -7049,113 +7027,259 @@
     }
 
     function getCampaignGuideTargetElements(step) {
+      const piecesInRegion = (regionCode, team) => [...pieces.querySelectorAll('.piece')]
+        .filter((piece) => piece.dataset.region === regionCode && piece.dataset.team === team);
+      const guideRegionTargets = {
+        approach: () => [getCampaignApproachRegion()],
+        level3IntroDestination: () => [
+          campaignGuideIntroReturnToStart ? 'L8-1' : 'L8-16'
+        ],
+        turnFiveFocus: () => getLevelFiveTurnFiveFocusRegions()
+      };
+      const resolveRegionTargets = (value) => {
+        if (value === 'objectives') return [...campaignObjectiveRegions];
+        if (Object.prototype.hasOwnProperty.call(guideRegionTargets, value)) {
+          return guideRegionTargets[value]();
+        }
+        return [value];
+      };
+      const uiTargets = {
+        turnPoints,
+        warButton,
+        passTurnButton,
+        rotateQuadrilateralBlockButton,
+        regionName,
+        regionBlockName,
+        regionRotationIndicator,
+        regionRotationBlockName,
+        trashDropZone,
+        promotionButton: openPromotionButton,
+        relegationButton: openRelegationButton,
+        rotationPassPanelTitle,
+        rotationTargetOptions,
+        rotationLocalPassButton,
+        rotationGlobalPassButton,
+        regionForce,
+        regionFinalForce
+      };
+      const targetResolvers = {
+        region: (value) => resolveRegionTargets(value).map(getCampaignRegionShape),
+        regions: (value) => resolveRegionTargets(value).map(getCampaignRegionShape),
+        pieceButton: (stage) => [
+          document.querySelector(`#piece-controls .piece-button[data-stage="${stage}"]`)
+        ],
+        pieces: (code, team) => piecesInRegion(code, team),
+        bag: (code) => [getCampaignBagIcon(code)],
+        ui: (key) => [uiTargets[key]]
+      };
+      const configuredTargets = activeCampaignLevel?.guide?.steps?.[step]?.highlight || [];
+      return configuredTargets.flatMap((target) => {
+        const [kind, ...parts] = String(target).split(':');
+        const resolver = targetResolvers[kind];
+        if (!resolver) {
+          console.error(`Alvo de destaque desconhecido no guia da campanha: ${target}`);
+          return [];
+        }
+        let resolvedTargets;
+        if (kind === 'region') {
+          resolvedTargets = resolver(parts.join(':'));
+        } else if (kind === 'regions') {
+          resolvedTargets = resolver(parts.join(':').split(','));
+        } else if (kind === 'pieceButton' || kind === 'bag') {
+          resolvedTargets = resolver(parts[0]);
+        } else if (kind === 'pieces') {
+          resolvedTargets = resolver(parts[0], parts[1] || 'orange');
+        }
+        if (kind === 'ui') {
+          if (!Object.prototype.hasOwnProperty.call(uiTargets, parts[0])) {
+            console.error(`Controle de destaque desconhecido no guia da campanha: ${target}`);
+            return [];
+          }
+          resolvedTargets = resolver(parts[0]);
+        }
+        resolvedTargets = resolvedTargets || resolver();
+        if (resolvedTargets.some((resolvedTarget) => !resolvedTarget)) {
+          console.error(`Alvo de destaque não encontrado no guia da campanha: ${target}`);
+        }
+        return resolvedTargets;
+      }).filter(Boolean);
+    }
+
+    function getCampaignGuideStep(step) {
+      return activeCampaignLevel?.guide?.steps?.[step] || null;
+    }
+
+    function isCampaignGuideStateValid(step) {
+      const guide = activeCampaignLevel?.guide;
+      return step === 'complete' ||
+        Object.prototype.hasOwnProperty.call(guide?.steps || {}, step) ||
+        (guide?.states || []).includes(step);
+    }
+
+    function getCampaignGuideMessage(guideStep) {
       const approachRegion = getCampaignApproachRegion();
-      const piecesInRegion = (regionCode) => [...pieces.querySelectorAll('.piece')]
-        .filter((piece) => piece.dataset.region === regionCode && piece.dataset.team === 'orange');
-      switch (step) {
-        case 'coins': return [turnPoints];
-        case 'purchase':
-          return [
-            document.querySelector('#piece-controls .piece-button[data-stage="g"]'),
-            getCampaignRegionShape('L8-5')
-          ];
-        case 'move':
-          return [...piecesInRegion('L8-5'), getCampaignRegionShape('L8-4')].filter(Boolean);
-        case 'bag-tip':
-          return [turnPoints, getCampaignBagIcon('L8-3')].filter(Boolean);
-        case 'army-tip': return [getCampaignRegionShape(approachRegion)].filter(Boolean);
-        case 'war':
-          return [
-            document.querySelector('#war-button'),
-            getCampaignRegionShape(approachRegion),
-            ...campaignObjectiveRegions.map(getCampaignRegionShape)
-          ].filter(Boolean);
-        case 'level2-rotate':
-          return [
-            ...['L8-6', 'L8-7', 'L8-8', 'L8-9'].map(getCampaignRegionShape),
-            regionName,
-            rotateQuadrilateralBlockButton,
-          ].filter(Boolean);
-        case 'level2-pass-turn':
-          return [passTurnButton];
-        case 'level2-rotate-again':
-          return [rotateQuadrilateralBlockButton];
-        case 'level2-final-attack':
-          return [
-            getCampaignRegionShape('L8-3'),
-            getCampaignRegionShape('L8-10')
-          ].filter(Boolean);
-        case 'level2-final-war':
-          return [document.querySelector('#war-button')].filter(Boolean);
-        case 'level2-recycle':
-          return [
-            getCampaignRegionShape('L8-3'),
-            getCampaignRegionShape('L8-10'),
-            trashDropZone
-          ].filter(Boolean);
-        case 'level3-intro':
-          return [getCampaignRegionShape(
-            campaignGuideIntroReturnToStart ? 'L8-1' : 'L8-16'
-          )].filter(Boolean);
-        case 'level3-region-labels':
-          return [
-            getCampaignRegionShape('L8-6'),
-            regionName,
-            regionBlockName,
-            regionRotationIndicator,
-            regionRotationBlockName,
-            rotateQuadrilateralBlockButton
-          ].filter(Boolean);
-        case 'level3-battle-tip':
-          return [getCampaignRegionShape('L8-10')].filter(Boolean);
-        case 'level3-promotion-tip':
-          return [getCampaignRegionShape('L8-14')].filter(Boolean);
-        case 'level3-recruitment-tip':
-          return [
-            getCampaignRegionShape('L7-1'),
-            openPromotionButton,
-            openRelegationButton
-          ].filter(Boolean);
-        case 'level5-intro':
-          return campaignObjectiveRegions.map(getCampaignRegionShape).filter(Boolean);
-        case 'level5-neighbor-tip':
-          return ['L8-10', 'L8-8'].map(getCampaignRegionShape).filter(Boolean);
-        case 'level5-rotation-groups-tip':
-          return [rotationPassPanelTitle, rotationTargetOptions].filter(Boolean);
-        case 'level5-rotation-passes-tip':
-          return [rotationLocalPassButton, rotationGlobalPassButton].filter(Boolean);
-        case 'level5-turn3-tip':
-          return campaignObjectiveRegions.map(getCampaignRegionShape).filter(Boolean);
-        case 'level5-turn5-tip':
-          return getLevelFiveTurnFiveFocusRegions().map(getCampaignRegionShape).filter(Boolean);
-        case 'level5-support-tip':
-          return [
-            getCampaignRegionShape('L8-2'),
-            getCampaignRegionShape('L7-1')
-          ].filter(Boolean);
-        case 'level5-force-tip':
-          return [getCampaignRegionShape('L7-1'), regionForce, regionFinalForce].filter(Boolean);
-        case 'level6-rank-tip':
-          return [getCampaignRegionShape('L6-13')].filter(Boolean);
-        default: return [];
+      const values = {
+        orangeCoins: Number(pontosDoTurn.orange).toLocaleString('pt-BR', {
+          maximumFractionDigits: 2
+        }),
+        approachRegion: approachRegion || 'L8-2'
+      };
+      return String(guideStep.message || '').replace(/\{\{([a-zA-Z]+)\}\}/g, (token, key) => {
+        if (!Object.prototype.hasOwnProperty.call(values, key)) {
+          console.error(`Variável desconhecida no guia da campanha: ${token}`);
+          return token;
+        }
+        return values[key];
+      });
+    }
+
+    function resolveCampaignGuideFocus(value) {
+      if (value === 'approach') return getCampaignApproachRegion();
+      if (value === 'lastCircularSector') {
+        return campaignLevel2SeenSectors[campaignLevel2SeenSectors.length - 1] || 'L8-7';
+      }
+      return value || null;
+    }
+
+    function resolveCampaignGuideRegionList(value) {
+      if (Array.isArray(value)) return value.map(resolveCampaignGuideFocus).filter(Boolean);
+      if (value === 'level5TurnFiveRegions') return getLevelFiveTurnFiveFocusRegions();
+      const region = resolveCampaignGuideFocus(value);
+      return region ? [region] : [];
+    }
+
+    function applyCampaignGuideStatePresentation(state) {
+      const presentation = activeCampaignLevel?.guide?.statePresentation?.[state];
+      if (!presentation) return;
+      if (presentation.resetZoom) resetStageZoom();
+      if (presentation.focusStrongestTeam) {
+        focusStrongestRegionForTeam(presentation.focusStrongestTeam);
+      }
+      if (presentation.selectRegion) {
+        selectedRegionCode = resolveCampaignGuideFocus(presentation.selectRegion);
+        if (selectedRegionCode) updateSelectedRegionPanel(selectedRegionCode);
+      }
+      const focus = () => {
+        if (!isCampaignGame() || campaignGuideStep !== state) return;
+        if (presentation.focusRegion) {
+          focusRegion(resolveCampaignGuideFocus(presentation.focusRegion));
+        } else if (presentation.focusRegions) {
+          const regions = resolveCampaignGuideRegionList(presentation.focusRegions);
+          if (regions.length) focusRegionGroup(regions);
+        }
+        updateCampaignGuideSpotlights();
+      };
+      if (presentation.focusAfterFrame) {
+        window.requestAnimationFrame(focus);
+      } else {
+        focus();
       }
     }
 
+    function campaignGuideTransitionMatches(transition, event) {
+      const sources = Array.isArray(transition.from) ? transition.from : [transition.from];
+      if (!sources.includes('*') && !sources.includes(campaignGuideStep)) return false;
+      const when = transition.when;
+      if (!when?.type) {
+        console.error('Transição sem tipo de condição no guia da campanha.', transition);
+        return false;
+      }
+      if (when.type === 'regionOwned') {
+        const regions = Array.isArray(when.regions) ? when.regions : [when.region];
+        return regions.some((candidate) => {
+          const region = candidate === 'approach'
+            ? getCampaignApproachRegion()
+            : candidate;
+          return !!region && getRegionDominador(region) === when.team;
+        });
+      }
+      if (when.type === 'soldierCount') {
+        const region = when.region === 'approach'
+          ? getCampaignApproachRegion()
+          : when.region;
+        if (!region || getRegionDominador(region) !== when.team) return false;
+        const requiredSoldiers = Number(when.soldiersAtLeast);
+        return !Number.isFinite(requiredSoldiers) ||
+          getTeamSoldierCount(region, when.team) >= requiredSoldiers;
+      }
+      if (when.type === 'bagCollected') {
+        if (event) {
+          return event.type === 'bagCollected' &&
+            (!when.team || when.team === event.team) &&
+            (!when.region || when.region === event.region);
+        }
+        const region = when.region;
+        return !!region && campaignCollectedBags.includes(region) &&
+          (!when.team || getRegionDominador(region) === when.team);
+      }
+      if (!event || event.type !== when.type) return false;
+      if (when.type === 'regionCaptured') {
+        const regions = when.regions || [when.region];
+        return (event.captures || []).some((capture) =>
+          (!when.team || capture.team === when.team) && regions.includes(capture.region));
+      }
+      if (when.type === 'regionRotated') {
+        const regions = when.regions || [when.region];
+        return regions.some((region) => (event.regions || []).includes(region)) &&
+          (!when.block || when.block === event.block);
+      }
+      if (when.type === 'regionMoved') {
+        return (!when.team || when.team === event.team) &&
+          (!when.source || when.source === event.source) &&
+          (!when.target || when.target === event.target);
+      }
+      if (when.type === 'actionCompleted') {
+        return when.action === event.action &&
+          (!when.team || when.team === event.team) &&
+          (!when.region || when.region === event.region) &&
+          (!when.stage || when.stage === event.stage);
+      }
+      if (when.type === 'turnStarted') {
+        return (!Number.isFinite(Number(when.turn)) || Number(when.turn) === event.turn) &&
+          (!when.team || when.team === event.team);
+      }
+      console.error(`Condição desconhecida no guia da campanha: ${when.type}`);
+      return false;
+    }
+
+    function evaluateCampaignGuideTransitions(event = null) {
+      if (!isCampaignGame() || isGameOver) return false;
+      const transitions = activeCampaignLevel?.guide?.transitions || [];
+      const transition = transitions.find((candidate) =>
+        campaignGuideTransitionMatches(candidate, event));
+      if (!transition) return false;
+      const next = transition.next;
+      if (!isCampaignGuideStateValid(next)) {
+        console.error(`Destino inválido no guia da campanha: ${next}`);
+        return false;
+      }
+      const previousStep = campaignGuideStep;
+      if (getCampaignGuideStep(next)) {
+        if (getCampaignGuideStep(next).next === 'previous') {
+          campaignGuideStepBeforeLevel5TurnThreeTip = previousStep;
+        }
+        showCampaignGuide(next);
+        return true;
+      }
+      if (!campaignGuide.classList.contains('is-hidden')) hideCampaignGuide();
+      campaignGuideStep = next;
+      applyCampaignGuideStatePresentation(next);
+      saveGame();
+      return true;
+    }
+
     function getCampaignGuideActionTarget(step) {
-      if (step === 'purchase') {
+      const target = getCampaignGuideStep(step)?.actionTarget;
+      if (target === 'purchaseG') {
         return document.querySelector('#piece-controls .piece-button[data-stage="g"]');
       }
-      if (step === 'war' || step === 'level2-final-war') {
-        return document.querySelector('#war-button');
-      }
-      if (step === 'level2-pass-turn') return passTurnButton;
-      if (['level2-rotate', 'level2-rotate-again'].includes(step)) {
-        return rotateQuadrilateralBlockButton;
-      }
-      if (['level5-rotation-groups-tip', 'level5-rotation-passes-tip'].includes(step)) {
-        return rotationPassPanel;
-      }
-      return null;
+      if (target === 'war') return document.querySelector('#war-button');
+      if (target === 'passTurn') return passTurnButton;
+      if (target === 'rotateBlock') return rotateQuadrilateralBlockButton;
+      if (target === 'rotationPassPanel') return rotationPassPanel;
+      return target
+        ? (console.error(`Alvo de ação desconhecido no guia da campanha: ${target}`), null)
+        : null;
     }
 
     function positionCampaignGuideAwayFromAction() {
@@ -7230,9 +7354,8 @@
           candidate.top = actionRect.top + actionRect.height / 2 - candidate.height / 2;
         }
       });
-      const preferredPositions = campaignGuideStep === 'level2-rotate'
-        ? ['right', 'top', 'bottom', 'left']
-        : ['top', 'right', 'bottom', 'left'];
+      const preferredPositions = getCampaignGuideStep(campaignGuideStep)?.cardPositionOrder ||
+        ['top', 'right', 'bottom', 'left'];
       const placement = preferredPositions.map((position) =>
         candidates.find((candidate) => candidate.position === position)
       ).find((candidate) => {
@@ -7361,235 +7484,46 @@
         campaignGuideRegionOutlines.appendChild(outline);
       });
       campaignGuideShadePath.setAttribute('d', `M0 0H${width}V${height}H0Z`);
-      if (campaignGuideStep === 'bag-tip') {
-        const regionShape = getCampaignRegionShape('L8-3');
-        const matrix = regionShape?.getScreenCTM();
-        const pathData = regionShape?.getAttribute('d');
-        if (matrix && pathData) {
-          const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          outline.classList.add('campaign-guide-region-outline');
-          outline.setAttribute('d', pathData);
-          outline.setAttribute('transform', `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})`);
-          campaignGuideRegionOutlines.appendChild(outline);
-        }
-      }
       const targetRects = targets.map((target) => target.getBoundingClientRect());
       positionCampaignGuideAwayFromAction();
     }
 
     function showCampaignGuide(step) {
-      if (!isCampaignGame() || !isGameStarted ||
-          (isGameOver && !['level3-resource-defeat', 'level4-resource-defeat'].includes(step))) return;
-      const approachRegion = getCampaignApproachRegion();
-      const guideContent = {
-        coins: {
-          title: 'Suas moedas neste turno',
-          message: `Você tem ${Number(pontosDoTurn.orange).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} moedas disponíveis para comprar unidades ou movê-las. As moedas não acumulam de um turno para o outro.`,
-          dismissible: true
-        },
-        purchase: {
-          title: 'Compre sua primeira unidade',
-          message: 'Você controla L8-5. Toque no ícone da peça G para comprar uma unidade; ela custa 1 moeda.',
-          dismissible: false
-        },
-        move: {
-          title: 'Avance pelo tabuleiro',
-          message: 'Depois, arraste a peça G de L8-5 para a região vizinha L8-4.',
-          dismissible: true
-        },
-        'bag-tip': {
-          title: 'Encontre mais moedas',
-          message: 'Suas moedas estão acabando. Compre uma unidade G em L8-4 (1 moeda) e avance com uma das duas até L8-3 para pegar o saco com 3 moedas.',
-          dismissible: true
-        },
-        'army-tip': {
-          title: 'Prepare o avanço final',
-          message: `Parabéns! Você encontrou as moedas. Faltam apenas duas regiões: reúna o máximo possível de soldados em ${approachRegion || 'L8-2'}, ao lado do inimigo.`,
-          dismissible: true
-        },
-        war: {
-          title: 'Declare Guerra',
-          message: `Você tem pelo menos dois soldados em ${approachRegion || 'L8-2'}. Toque em Guerra para atacar os territórios inimigos vizinhos; vença com mais força para conquistá-los.`,
-          dismissible: false
-        },
-        'level2-intro': {
-          title: 'Level 2: alcance L8-1',
-          message: 'Seu objetivo é conquistar a região L8-1. Você tem 5 turnos para alcançar esse objetivo.',
-          dismissible: true
-        },
-        'level2-rotate': {
-          title: 'Atravesse o disco BC03',
-          message: 'Escolha um passe Local ou Global no painel acima e faça um gesto anti-horário sobre o disco para evitar os inimigos!',
-          dismissible: false
-        },
-        'level2-pass-turn': {
-          title: 'Gire novamente no próximo turno',
-          message: 'Você já conquistou uma região do disco. Passe o turno para liberar outra rotação e continuar abrindo caminho.',
-          dismissible: false
-        },
-        'level2-rotate-again': {
-          title: 'Continue pelo disco',
-          message: 'Agora você pode girar o BC03 novamente. Toque em GIRAR DISCO no painel da região e desenhe um círculo anti-horário para girar à esquerda e alinhar o caminho com a próxima região.',
-          dismissible: false
-        },
-        'level2-final-attack': {
-          title: 'Prepare para a conquista',
-          message: 'Seu oponente tem uma peça F! Uma peça F vale 7 unidades G. Para dominar aquela região construa primeiro mais 7 peças na sua região.',
-          dismissible: true
-        },
-        'level2-final-war': {
-          title: 'Declare Guerra',
-          message: 'Você já reuniu unidades G suficientes para enfrentar a peça F. Declare Guerra para conquistar L8-3.',
-          dismissible: false
-        },
-        'level2-recycle': {
-          title: 'Recicle peças para avançar',
-          message: 'Ao arrastar uma peça para a lixeira, você recebe de volta metade do custo dela. Use essa estratégia entre L8-3 e L8-10 para reunir recursos e conquistar a região principal L8-1.',
-          dismissible: true
-        },
-        'level3-intro': {
-          title: 'Level 3: conquiste L8-16',
-          message: 'Seu objetivo é dominar a região L8-16. Observe o destino e o seu ponto de partida: você precisará girar as regiões com inteligência para abrir o caminho.',
-          dismissible: true
-        },
-        'level3-region-labels': {
-          title: 'Entenda as informações da região',
-          message: 'Em “L8-1 [BQ01] ↻ [B1]”, L8-1 é o nome da região; [BQ01] identifica o bloco a que ela pertence; e ↻ indica que ela pode girar. Para iniciar, toque em GIRAR BLOCO no painel da região.',
-          dismissible: true
-        },
-        'level3-battle-tip': {
-          title: 'Escolha onde lutar',
-          message: 'Ao girar as regiões com inteligência, você pode enfrentar um grupo de soldados por vez. As batalhas consideram forças inimigas em regiões vizinhas e as tropas de suporte das regiões adjacentes.',
-          dismissible: true
-        },
-        'level3-promotion-tip': {
-          title: 'Avance para as regiões amarelas',
-          message: 'Regiões amarelas são de rank superior. Para promover uma unidade até uma região amarela, você precisa de 8 unidades livres nas regiões vermelhas; a promoção de uma região vermelha para uma amarela custa 3 moedas.',
-          dismissible: true
-        },
-        'level3-recruitment-tip': {
-          title: 'Recrute e rebaixe unidades',
-          message: 'Com pelo menos 16 unidades nas regiões vermelhas, você pode recrutar uma unidade G diretamente em L7-1. Mover uma peça de uma região amarela para uma vermelha é um rebaixamento: você recebe metade do valor da peça.',
-          dismissible: true
-        },
-        'level4-intro': {
-          title: 'A ordem das batalhas',
-          message: 'O objetivo desse mapa é conquistar todas as regiões inimigas! Vamos ter que usar a ordem com que as batalhas acontecem a nosso favor.',
-          dismissible: true
-        },
-        'level4-battle-tip': {
-          title: 'Use o círculo a seu favor',
-          message: 'Gire o círculo de forma inteligente para lutar! Se você escolher a ordem certa conseguirá conquistar todas as regiões inimigas.',
-          dismissible: true
-        },
-        'level4-battle-order': {
-          title: 'Defina a ordem do combate',
-          message: 'Para definir quem luta primeiro são escolhidas as regiões de acordo com o rank (amarelo primeiro que vermelho) e do maior índice antes do menor (L8-10 primeiro que L8-7). Usando a ordem de batalha você poderá ganhar duas batalhas dessa região!',
-          dismissible: true
-        },
-        'level3-resource-defeat': {
-          title: 'Fim de jogo',
-          message: 'Você ficou sem moedas e não tem nenhuma peça F. O Agente deseja mais sorte na próxima tentativa.',
-          dismissible: true
-        },
-        'level4-resource-defeat': {
-          title: 'Fim de jogo',
-          message: 'Você ficou sem moedas e não tem nenhuma peça F. O Agente deseja mais sorte na próxima tentativa.',
-          dismissible: true
-        },
-        'level5-intro': {
-          title: 'Level 5: conquiste L8-12',
-          message: 'Esse nível é desafiador! Você precisará usar a ordem de preferência nas batalhas para atrair forças inimigas mais fortes em batalhas menores enquanto você conquista mais aliados. O Objetivo é conquistar L8-12.',
-          dismissible: true
-        },
-        'level5-neighbor-tip': {
-          title: 'Comece pelas regiões vizinhas',
-          message: 'Vamos começar conquistando as duas regiões vizinhas vermelhas.',
-          dismissible: true
-        },
-        'level5-rotation-groups-tip': {
-          title: 'Escolha o tipo de rotação',
-          message: 'Alguns blocos permitem dois tipos de rotação: um em anel e outro de forma linear. Selecione cada e clique em "Girar Bloco" para ver como eles podem se mover!',
-          dismissible: true
-        },
-        'level5-rotation-passes-tip': {
-          title: 'Passes de rotação',
-          message: 'Existem dois tipos de passes que permitem rotacionar os blocos. Os passes locais são acumulativos e, sempre que você conquistar uma região naquela rota de rotação, eles aumentam em 1 unidade. Os passes globais podem rotacionar ou mover qualquer bloco, desde que ele não tenha sido movido pelo seu oponente no turno anterior; os passes globais não são acumulativos, mas você ganha um passe novo por turno.',
-          dismissible: true
-        },
-        'level5-rotation-action-tip': {
-          title: 'Aproxime-se das unidades inimigas',
-          message: 'Vamos girar o disco uma vez para ficar mais próximo das unidades inimigas!',
-          dismissible: true
-        },
-        'level5-turn3-tip': {
-          title: 'O maior desafio até agora',
-          message: 'Uma unidade E equivale a 6 unidades do tipo F. Este mapa será o maior desafio até agora!',
-          dismissible: true
-        },
-        'level5-turn5-tip': {
-          title: 'Prepare o contra-ataque',
-          message: "Coloque uma tropa 'g' para contra L8-2! Enquanto a tropa de cima estiver ocupada lutando você poderá vencer as tropas em L8-1!",
-          dismissible: true
-        },
-        'level5-support-tip': {
-          title: 'Prepare o suporte para L8-9',
-          message: 'Estamos mais próximos de concluir o nível! Para que as forças em L8-9 tenham mais chances vamos colocar unidades de suporte em L7-1, que são as unidades de Rank Amarelo!',
-          dismissible: true
-        },
-        'level5-force-tip': {
-          title: 'A força do Rank Amarelo',
-          message: 'Unidades no Rank Amarelo recebem metade da força das unidades vermelhas aliadas adjacentes, limitadas a 8 unidades vermelhas para cada amarela. Além disso elas multiplicam essa força! L7-1 também tem uma rotação especial: faça um traço em linha reta sobre a fileira ou coluna que passa por ela para girar as posições em qualquer sentido. Lutar usando unidades de rank superior é o que pode te trazer a vitória!',
-          dismissible: true
-        },
-        'level6-intro': {
-          title: 'Level 6: Arte da Batalha',
-          message: 'Mostre que você domina a Arte da Batalha! Domine todos os territórios inimigos, mesmo com uma força inferior.',
-          dismissible: true
-        },
-        'level6-rank-tip': {
-          title: 'Rank Amarelo',
-          message: 'Temos mais um rank após o laranja, o rank Amarelo. Para promover uma unidade a Rank Amarelo você precisa de 7 unidades no rank Laranja. O Rank Amarelo tem um bônus de batalha de 3.5x a força que recebe; cada unidade no Amarelo pode receber metade da força de até 7 unidades Laranjas.',
-          dismissible: true
-        }
-      }[step];
-      if (!guideContent) return;
+      const guideContent = getCampaignGuideStep(step);
+      if (!isCampaignGame() || !isGameStarted || !guideContent ||
+          (isGameOver && guideContent.onDismiss !== 'restartLevel')) return;
       if (campaignGuideAnimationTimeout !== null) {
         window.clearTimeout(campaignGuideAnimationTimeout);
         campaignGuideAnimationTimeout = null;
       }
-      if (step !== 'level3-intro') {
+      const effect = guideContent.effect;
+      if (effect !== 'level3Intro') {
         stage.classList.remove(
           'is-level-three-intro-setup',
           'is-level-three-intro-pan',
           'is-level-three-intro-return'
         );
       }
-      if (['level3-intro', 'level3-region-labels'].includes(step)) {
+      if (['level3Intro', 'level3RegionLabels'].includes(effect)) {
         stagePanel.scrollLeft = 0;
         stagePanel.scrollTop = 0;
       }
       campaignGuideIntroReturnToStart = false;
       campaignGuideStep = step;
-      campaignGuideDismissible = guideContent.dismissible;
-      if (step === 'level2-recycle') {
+      campaignGuideDismissible = guideContent.dismissible !== false;
+      if (guideContent.showTrash) {
         trashDropZone.classList.remove('is-hidden');
         trashDropZone.classList.add('is-guide-visible');
       }
-      turnPoints.classList.toggle('is-guide-pinned', step === 'bag-tip');
-      campaignGuideTitle.textContent = guideContent.title;
-      campaignGuideMessage.textContent = guideContent.message;
-      campaignGuideContinue.disabled = !guideContent.dismissible;
-      campaignGuideFinalHint = guideContent.dismissible
-        ? ['level3-resource-defeat', 'level4-resource-defeat'].includes(step)
+      turnPoints.classList.toggle('is-guide-pinned', !!guideContent.pinTurnPoints);
+      const guideMessage = getCampaignGuideMessage(guideContent);
+      campaignGuideTitle.textContent = guideContent.title || '';
+      campaignGuideMessage.textContent = guideMessage;
+      campaignGuideContinue.disabled = !campaignGuideDismissible;
+      campaignGuideFinalHint = guideContent.hint ||
+        (guideContent.onDismiss === 'restartLevel'
           ? 'Clique para reiniciar'
-          : 'Clique para continuar'
-        : step === 'purchase' ? 'Compre a unidade destacada para continuar'
-          : step === 'level2-pass-turn' ? 'Passe o turno para continuar'
-            : ['level2-rotate', 'level2-rotate-again'].includes(step)
-              ? 'Clique em GIRAR DISCO e faça um gesto anti-horário'
-            : step === 'level2-final-war' ? 'Clique no botão Guerra destacado'
-              : 'Clique para continuar';
+          : 'Clique para continuar');
       campaignGuideHint.textContent = campaignGuideFinalHint;
       campaignGuideCard.removeAttribute('data-position');
       campaignGuideCard.style.left = '';
@@ -7599,63 +7533,39 @@
       campaignGuideCard.style.transform = '';
       campaignGuide.classList.remove('is-hidden');
       app.classList.add('is-campaign-guiding');
-      app.classList.toggle('is-rotation-guide',
-        ['level2-rotate', 'level2-rotate-again'].includes(step));
+      app.classList.toggle('is-rotation-guide', !!guideContent.rotationGuide);
       campaignGuide.setAttribute('aria-hidden', 'false');
-      campaignGuideMessagePages = getCampaignGuideMessagePages(guideContent.message);
+      campaignGuideMessagePages = getCampaignGuideMessagePages(guideMessage);
       campaignGuideMessagePage = 0;
       updateCampaignGuideMessagePage();
-      if (step === 'purchase') focusRegion('L8-5');
-      else if (step === 'coins') focusRegion('L8-5');
-      else if (step === 'bag-tip') focusRegion('L8-3');
-      else if (step === 'army-tip' && approachRegion) focusRegion(approachRegion);
-      else if (step === 'level2-rotate') {
-        selectedRegionCode = 'L8-7';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L8-7');
-      }
-      else if (step === 'level2-rotate-again') {
-        selectedRegionCode = campaignLevel2SeenSectors[campaignLevel2SeenSectors.length - 1] || 'L8-7';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion(selectedRegionCode);
-      }
-      else if (step === 'level2-final-attack') {
-        selectedRegionCode = 'L8-10';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion(selectedRegionCode);
-      }
-      else if (step === 'level2-recycle') {
-        selectedRegionCode = 'L8-3';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L8-3');
-      } else if (step === 'level3-intro') {
+
+      if (effect === 'level3Intro') {
+        const startRegion = guideContent.focusFrom;
+        const destinationRegion = guideContent.focusRegion;
+        const returnRegion = guideContent.focusReturn;
         stage.classList.add('is-level-three-intro-setup');
-        focusRegion('L8-1');
+        focusRegion(startRegion);
         stage.getBoundingClientRect();
         stage.classList.remove('is-level-three-intro-setup');
         window.requestAnimationFrame(() => {
-          if (campaignGuide.classList.contains('is-hidden') ||
-              campaignGuideStep !== 'level3-intro') return;
+          if (campaignGuide.classList.contains('is-hidden') || campaignGuideStep !== step) return;
           campaignGuideAnimationTimeout = window.setTimeout(() => {
             campaignGuideAnimationTimeout = null;
-            if (campaignGuide.classList.contains('is-hidden') ||
-                campaignGuideStep !== 'level3-intro') return;
+            if (campaignGuide.classList.contains('is-hidden') || campaignGuideStep !== step) return;
             stage.classList.add('is-level-three-intro-pan');
-            focusRegion('L8-16');
+            focusRegion(destinationRegion);
             campaignGuideAnimationTimeout = window.setTimeout(() => {
               campaignGuideAnimationTimeout = null;
-              if (campaignGuide.classList.contains('is-hidden') ||
-                  campaignGuideStep !== 'level3-intro') return;
+              if (campaignGuide.classList.contains('is-hidden') || campaignGuideStep !== step) return;
               updateCampaignGuideSpotlights();
               campaignGuideAnimationTimeout = window.setTimeout(() => {
                 campaignGuideAnimationTimeout = null;
-                if (campaignGuide.classList.contains('is-hidden') ||
-                    campaignGuideStep !== 'level3-intro') return;
+                if (campaignGuide.classList.contains('is-hidden') || campaignGuideStep !== step) return;
                 campaignGuideIntroReturnToStart = true;
                 stage.classList.add('is-level-three-intro-return');
-                selectedRegionCode = 'L8-1';
+                selectedRegionCode = returnRegion;
                 updateSelectedRegionPanel(selectedRegionCode);
-                focusRegion('L8-1');
+                focusRegion(returnRegion);
                 updateCampaignGuideSpotlights();
                 campaignGuideAnimationTimeout = window.setTimeout(() => {
                   campaignGuideAnimationTimeout = null;
@@ -7669,78 +7579,43 @@
             }, 3000);
           }, 0);
         });
-      } else if (step === 'level3-region-labels') {
-        selectedRegionCode = 'L8-1';
-        updateSelectedRegionPanel(selectedRegionCode);
-        stagePanel.scrollLeft = 0;
-        stagePanel.scrollTop = 0;
-        stage.classList.add('is-level-three-guide-focus');
-        focusRegion('L8-1');
-        renderBoardLayers();
-        updateBoardFocusOverlay();
-        window.requestAnimationFrame(() => {
-          stage.classList.remove('is-level-three-guide-focus');
-          updateBoardFocusOverlay();
-          updateCampaignGuideSpotlights();
-        });
-      } else if (step === 'level3-battle-tip') {
-        selectedRegionCode = 'L8-10';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L8-10');
-      } else if (step === 'level3-promotion-tip') {
-        selectedRegionCode = 'L8-14';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L8-14');
-      } else if (step === 'level3-recruitment-tip') {
-        selectedRegionCode = 'L7-1';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L7-1');
-      } else if (step === 'level5-support-tip') {
-        selectedRegionCode = 'L8-2';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L8-2');
-      } else if (step === 'level5-force-tip') {
-        selectedRegionCode = 'L7-1';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L7-1');
-      } else if (step === 'level5-neighbor-tip') {
-        selectedRegionCode = 'L8-9';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegionGroup(['L8-10', 'L8-8']);
-      } else if (['level5-rotation-groups-tip', 'level5-rotation-passes-tip',
-        'level5-rotation-action-tip'].includes(step)) {
-        selectedRegionCode = 'L8-10';
-        const targets = getRotationTargetsForRegion(selectedRegionCode);
-        if (step === 'level5-rotation-groups-tip') {
-          selectedRotationTargetKey = targets.find((target) =>
-            target.rotationType === 'ring')?.key || targets[0]?.key || null;
-          selectedRotationPassType = 'global';
+      } else {
+        if (guideContent.selectRegion) {
+          selectedRegionCode = resolveCampaignGuideFocus(guideContent.selectRegion);
+          if (selectedRegionCode) updateSelectedRegionPanel(selectedRegionCode);
         }
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion(selectedRegionCode);
-      } else if (step === 'level5-intro') {
-        focusRegion('L8-12');
-      } else if (step === 'level5-turn3-tip') {
-        focusRegion('L8-12');
-      } else if (step === 'level5-turn5-tip') {
-        selectedRegionCode = 'L8-2';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegionGroup(getLevelFiveTurnFiveFocusRegions());
-      } else if (step === 'level6-rank-tip') {
-        selectedRegionCode = 'L6-13';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L6-13');
+        if (guideContent.focusRegion) {
+          const regionCode = resolveCampaignGuideFocus(guideContent.focusRegion);
+          if (regionCode) focusRegion(regionCode);
+        }
+        if (guideContent.focusRegions) {
+          const regions = resolveCampaignGuideRegionList(guideContent.focusRegions);
+          if (regions.length) focusRegionGroup(regions);
+        }
+        if (effect === 'level3RegionLabels') {
+          stage.classList.add('is-level-three-guide-focus');
+          renderBoardLayers();
+          updateBoardFocusOverlay();
+          window.requestAnimationFrame(() => {
+            stage.classList.remove('is-level-three-guide-focus');
+            updateBoardFocusOverlay();
+            updateCampaignGuideSpotlights();
+          });
+        }
+        if (effect === 'level5RotationGroups' && selectedRegionCode) {
+          const targets = getRotationTargetsForRegion(selectedRegionCode);
+          selectedRotationTargetKey = targets.find((target) =>
+            target.rotationType === guideContent.rotationType)?.key || targets[0]?.key || null;
+          selectedRotationPassType = 'global';
+          updateSelectedRegionPanel(selectedRegionCode);
+        }
       }
-      const primaryTarget = step === 'purchase'
-        ? document.querySelector('#piece-controls .piece-button[data-stage="g"]')
-        : step === 'coins' ? turnPoints
-          : step === 'bag-tip' ? getCampaignBagIcon('L8-3')
-            : step === 'war' ? document.querySelector('#war-button')
-              : getCampaignGuideTargetElements(step)[0];
+
+      const primaryTarget = getCampaignGuideActionTarget(step) ||
+        getCampaignGuideTargetElements(step)[0] || null;
       const guideTargets = getCampaignGuideTargetElements(step)
         .filter((target) => target && target.getClientRects().length);
-      if (guideTargets.length &&
-          !['level3-intro', 'level3-region-labels'].includes(step)) {
+      if (guideTargets.length && !['level3Intro', 'level3RegionLabels'].includes(effect)) {
         const rects = guideTargets.map((target) => target.getBoundingClientRect());
         const bounds = {
           top: Math.min(...rects.map((rect) => rect.top)),
@@ -7751,11 +7626,13 @@
           const center = (bounds.top + bounds.bottom) / 2;
           window.scrollTo(0, Math.max(0, Math.min(maxScroll,
             window.scrollY + center - window.innerHeight / 2)));
-        } else if (primaryTarget) primaryTarget.scrollIntoView({ block: 'center', inline: 'nearest' });
+        } else if (primaryTarget) {
+          primaryTarget.scrollIntoView({ block: 'center', inline: 'nearest' });
+        }
       }
       window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
         updateCampaignGuideSpotlights();
-        const focusTarget = guideContent.dismissible ? campaignGuideContinue : primaryTarget;
+        const focusTarget = campaignGuideDismissible ? campaignGuideContinue : primaryTarget;
         focusTarget?.focus?.({ preventScroll: true });
       }));
       saveGame();
@@ -7808,7 +7685,7 @@
     }
 
     function hideCampaignGuide() {
-      const wasRecycleGuide = campaignGuideStep === 'level2-recycle';
+      const wasRecycleGuide = !!getCampaignGuideStep(campaignGuideStep)?.showTrash;
       if (campaignGuideAnimationTimeout !== null) {
         window.clearTimeout(campaignGuideAnimationTimeout);
         campaignGuideAnimationTimeout = null;
@@ -7837,195 +7714,52 @@
     function continueCampaignGuide() {
       if (!campaignGuideDismissible || campaignGuide.classList.contains('is-hidden')) return;
       if (advanceCampaignGuideMessage()) return;
-      if (['level3-resource-defeat', 'level4-resource-defeat'].includes(campaignGuideStep)) {
+      const currentGuideStep = getCampaignGuideStep(campaignGuideStep);
+      if (currentGuideStep?.onDismiss === 'restartLevel') {
         hideCampaignGuide();
         restartCampaignLevel();
         return;
       }
-      if (campaignGuideStep === 'coins') {
-        showCampaignGuide('purchase');
-        return;
-      }
-      const nextStep = {
-        move: 'await-move',
-        'bag-tip': 'await-bag',
-        'army-tip': 'await-army',
-        'level2-intro': 'await-l84',
-        'level2-rotate': 'await-circular',
-        'level2-rotate-again': 'await-circular',
-        'level2-final-attack': 'await-l83-army',
-        'level2-final-war': 'await-l83',
-        'level2-recycle': 'await-l81',
-        'level3-intro': 'level3-region-labels',
-        'level3-region-labels': 'await-l8-10',
-        'level3-battle-tip': 'await-l8-14',
-        'level3-promotion-tip': 'await-l7-1',
-        'level4-intro': 'await-level4-l8-10',
-        'level4-battle-tip': 'level4-battle-order',
-        'level5-intro': 'level5-neighbor-tip',
-        'level5-neighbor-tip': 'await-level5-l8-10',
-        'level5-rotation-groups-tip': 'level5-rotation-passes-tip',
-        'level5-rotation-passes-tip': 'level5-rotation-action-tip',
-        'level5-rotation-action-tip': 'await-level5-l8-2',
-        'level5-turn3-tip': campaignGuideStepBeforeLevel5TurnThreeTip || 'complete',
-        'level5-turn5-tip': campaignGuideStepBeforeLevel5TurnThreeTip || 'complete',
-        'level5-support-tip': 'await-level5-l7-1',
-        'level5-force-tip': 'complete',
-        'level6-intro': 'level6-rank-tip',
-        'level6-rank-tip': 'complete',
-        'level3-recruitment-tip': 'complete'
-      }[campaignGuideStep] || 'complete';
-      const wasLevelFiveTurnTip = ['level5-turn3-tip', 'level5-turn5-tip']
-        .includes(campaignGuideStep);
+      const nextStep = currentGuideStep?.next === 'previous'
+        ? campaignGuideStepBeforeLevel5TurnThreeTip || 'complete'
+        : currentGuideStep?.next || 'complete';
+      const restoreFocusTeam = currentGuideStep?.restoreFocusTeam;
       hideCampaignGuide();
       campaignGuideStep = nextStep;
-      if (wasLevelFiveTurnTip) campaignGuideStepBeforeLevel5TurnThreeTip = null;
-      if (wasLevelFiveTurnTip) {
-        focusStrongestRegionForTeam('orange');
-        saveGame();
-        return;
+      if (restoreFocusTeam) focusStrongestRegionForTeam(restoreFocusTeam);
+      if (currentGuideStep?.next === 'previous') {
+        campaignGuideStepBeforeLevel5TurnThreeTip = null;
       }
-      if ([
-        'level3-region-labels', 'level4-battle-order',
-        'level5-neighbor-tip', 'level5-rotation-passes-tip', 'level5-rotation-action-tip',
-        'level6-rank-tip'
-      ].includes(nextStep)) {
+      if (getCampaignGuideStep(nextStep)?.autoShow) {
         showCampaignGuide(nextStep);
         return;
       }
-      if (campaignGuideStep === 'await-l84') {
-        resetStageZoom();
-        focusStrongestRegionForTeam('orange');
-      } else if (campaignGuideStep === 'await-l8-10') {
-        selectedRegionCode = 'L8-1';
-        updateSelectedRegionPanel(selectedRegionCode);
-        window.requestAnimationFrame(() => {
-          if (!isCampaignGame() || activeCampaignLevel.id !== 'tabuleiro-03' ||
-              campaignGuideStep !== 'await-l8-10') return;
-          focusRegion('L8-1');
-          updateCampaignGuideSpotlights();
-        });
-      } else if (campaignGuideStep === 'await-l8-14') {
-        selectedRegionCode = 'L8-8';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L8-8');
-      } else if (campaignGuideStep === 'await-l7-1') {
-        selectedRegionCode = 'L8-14';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L8-14');
-      } else if (campaignGuideStep === 'await-level5-l8-3') {
-        focusRegion('L8-9');
-      } else if (campaignGuideStep === 'await-level5-l8-10') {
-        selectedRegionCode = 'L8-9';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L8-9');
-      } else if (campaignGuideStep === 'await-level5-l8-2') {
-        selectedRegionCode = 'L8-10';
-        updateSelectedRegionPanel(selectedRegionCode);
-        focusRegion('L8-10');
-      }
+      applyCampaignGuideStatePresentation(nextStep);
       saveGame();
-      if (nextStep === 'await-army') maybeShowCampaignWarGuide();
-      if (isCampaignLevelTwo()) maybeAdvanceLevel2Guide();
-      maybeAdvanceLevelFiveGuide();
+      evaluateCampaignGuideTransitions();
     }
 
     function isCampaignGuideActionAllowed(target, eventType) {
       if (campaignGuideDismissible) return campaignGuideContinue.contains(target);
       if ((campaignMenuButton.contains(target) || campaignRestartButton.contains(target)) &&
           (eventType === 'pointerdown' || eventType === 'click')) return true;
-      if (campaignGuideStep === 'purchase') {
-        const purchaseButton = document.querySelector('#piece-controls .piece-button[data-stage="g"]');
-        return !!purchaseButton && purchaseButton.contains(target);
+      const action = getCampaignGuideStep(campaignGuideStep)?.allowAction;
+      if (action === 'purchase') {
+        const actionTarget = getCampaignGuideActionTarget(campaignGuideStep);
+        return !!actionTarget && actionTarget.contains(target);
       }
-      if (campaignGuideStep === 'level2-pass-turn') {
-        return passTurnButton.contains(target) &&
-          (eventType === 'pointerdown' || eventType === 'click');
-      }
-      if (['level2-rotate', 'level2-rotate-again'].includes(campaignGuideStep)) {
-        if (eventType !== 'pointerdown' && eventType !== 'click') return false;
-        return rotateQuadrilateralBlockButton.contains(target) ||
+      if (eventType !== 'pointerdown' && eventType !== 'click') return false;
+      if (action === 'passTurn') return passTurnButton.contains(target);
+      if (action === 'rotate') {
+        const actionTarget = getCampaignGuideActionTarget(campaignGuideStep);
+        return (!!actionTarget && actionTarget.contains(target)) ||
           (quadrilateralRotationMode && stage.contains(target));
       }
-      return ['war', 'level2-final-war'].includes(campaignGuideStep) &&
-        warButton.contains(target) &&
-        (eventType === 'pointerdown' || eventType === 'click');
-    }
-
-    function maybeShowCampaignWarGuide() {
-      if (!isCampaignGame() || campaignGuideStep !== 'await-army') return;
-      const approachRegion = getCampaignApproachRegion();
-      if (!approachRegion || getRegionDominador(approachRegion) !== 'orange' ||
-          getTeamSoldierCount(approachRegion, 'orange') < 2) return;
-      showCampaignGuide('war');
-    }
-
-    function maybeAdvanceLevel2Guide() {
-      if (!isCampaignLevelTwo() || isGameOver) return;
-      const orangeOwns = (code) => getRegionDominador(code) === 'orange';
-      if (campaignGuideStep === 'await-l84' && orangeOwns('L8-4')) {
-        showCampaignGuide('level2-rotate');
-        return;
+      if (action === 'war') return warButton.contains(target);
+      if (action) {
+        console.error(`Ação desconhecida no guia da campanha: ${action}`);
       }
-      if (campaignGuideStep === 'await-circular') {
-        const newlyConqueredSector = Object.entries(regionGeometryByCode)
-          .filter(([, geometry]) => geometry.shape === 'circular')
-          .map(([code]) => code)
-          .filter((code) => orangeOwns(code) && !campaignLevel2SeenSectors.includes(code));
-        if (newlyConqueredSector.length) {
-          campaignLevel2SeenSectors.push(...newlyConqueredSector);
-          showCampaignGuide('level2-pass-turn');
-          return;
-        }
-      }
-      if (campaignGuideStep === 'await-circular' && orangeOwns('L8-10')) {
-        showCampaignGuide('level2-final-attack');
-        return;
-      }
-      if (campaignGuideStep === 'await-l83-army' && orangeOwns('L8-10') &&
-          getTeamSoldierCount('L8-10', 'orange') >= 8) {
-        showCampaignGuide('level2-final-war');
-        return;
-      }
-      if (campaignGuideStep === 'await-l83' && orangeOwns('L8-3')) {
-        showCampaignGuide('level2-recycle');
-      }
-    }
-
-    function maybeAdvanceLevelThreeGuide() {
-      if (!isCampaignGame() || activeCampaignLevel.id !== 'tabuleiro-03' || isGameOver) return;
-      if (campaignGuideStep === 'await-l8-10' &&
-          getRegionDominador('L8-10') === 'orange') {
-        showCampaignGuide('level3-battle-tip');
-      } else if (campaignGuideStep === 'await-l8-14' &&
-          getRegionDominador('L8-14') === 'orange') {
-        showCampaignGuide('level3-promotion-tip');
-      } else if (campaignGuideStep === 'await-l7-1' &&
-          getTeamSoldierCount('L7-1', 'orange') > 0) {
-        showCampaignGuide('level3-recruitment-tip');
-      }
-    }
-
-    function maybeAdvanceLevelFourGuide() {
-      if (!isCampaignGame() || activeCampaignLevel.id !== 'tabuleiro-04' || isGameOver) return;
-      if (campaignGuideStep === 'await-level4-l8-10' &&
-          getRegionDominador('L8-10') === 'orange') {
-        showCampaignGuide('level4-battle-tip');
-      }
-    }
-
-    function maybeAdvanceLevelFiveGuide() {
-      if (!isCampaignGame() || activeCampaignLevel.id !== 'tabuleiro-05' || isGameOver) return;
-      if (['await-level5-l8-10', 'await-level5-l8-3'].includes(campaignGuideStep) &&
-          getRegionDominador('L8-10') === 'orange') {
-        showCampaignGuide('level5-rotation-groups-tip');
-      } else if (campaignGuideStep === 'await-level5-l8-2' &&
-          getRegionDominador('L8-2') === 'orange') {
-        showCampaignGuide('level5-support-tip');
-      } else if (campaignGuideStep === 'await-level5-l7-1' &&
-          getTeamSoldierCount('L7-1', 'orange') > 0) {
-        showCampaignGuide('level5-force-tip');
-      }
+      return false;
     }
 
     function returnCampaignToMenu() {
@@ -8246,12 +7980,6 @@
 
     async function passTurnToNextPlayer() {
       if (isWarRunning || isGameOver || isAiTurnRunning || !isLocalPlayersTurn()) return;
-      if (isCampaignLevelTwo() && campaignGuideStep === 'level2-pass-turn' &&
-          !campaignGuide.classList.contains('is-hidden')) {
-        hideCampaignGuide();
-        campaignGuideStep = 'await-next-rotation';
-        saveGame();
-      }
       passTurnButton.disabled = true;
       const roundResult = scoreCurrentRound();
       if (finishIfCenterConquered()) return;
@@ -8313,18 +8041,16 @@
         });
       }
       await showTurnTransition(roundResult);
-      if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-05' &&
-          currentTurn === 3 && currentTeam === humanTeam &&
-          campaignGuideStep !== 'level5-turn3-tip') {
-        campaignGuideStepBeforeLevel5TurnThreeTip = campaignGuideStep;
-        showCampaignGuide('level5-turn3-tip');
-      }
-      if (isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-05' &&
-          currentTurn === 5 && currentTeam === humanTeam &&
-          campaignGuideStep !== 'level5-turn5-tip') {
-        campaignGuideStepBeforeLevel5TurnThreeTip = campaignGuideStep;
-        showCampaignGuide('level5-turn5-tip');
-      }
+      evaluateCampaignGuideTransitions({
+        type: 'actionCompleted',
+        action: 'passTurn',
+        team: currentTeam
+      });
+      evaluateCampaignGuideTransitions({
+        type: 'turnStarted',
+        turn: currentTurn,
+        team: currentTeam
+      });
       const wheatMessage = getWheatShortageMessage(wheatReport);
       if (wheatMessage) readout.textContent = wheatMessage;
       passTurnButton.disabled = !isLocalPlayersTurn();
@@ -8333,10 +8059,6 @@
         return;
       }
       if ((gameMode === 'ai' || isCampaignGame()) && currentTeam === aiTeam) scheduleAiTurn();
-      if (isCampaignLevelTwo() && currentTeam === humanTeam &&
-          campaignGuideStep === 'await-next-rotation') {
-        showCampaignGuide('level2-rotate-again');
-      }
     }
 
     passTurnButton.addEventListener('click', passTurnToNextPlayer);
@@ -8346,15 +8068,6 @@
       gameMenu.setAttribute('aria-hidden', 'true');
     });
     warButton.addEventListener('click', () => {
-      if (isCampaignGame() && campaignGuideStep === 'war') {
-        hideCampaignGuide();
-        campaignGuideStep = 'complete';
-        saveGame();
-      } else if (isCampaignLevelTwo() && campaignGuideStep === 'level2-final-war') {
-        hideCampaignGuide();
-        campaignGuideStep = 'await-l83';
-        saveGame();
-      }
       if (gameMode === 'bluetooth' && bluetoothRole === 'guest') {
         sendBluetoothMessage({ type: 'war_request' });
         startMessage.textContent = 'Solicitação de guerra enviada ao anfitrião.';
@@ -8367,6 +8080,11 @@
         return;
       }
       if (!isLocalPlayersTurn()) return;
+      evaluateCampaignGuideTransitions({
+        type: 'actionCompleted',
+        action: 'war',
+        team: currentTeam
+      });
       startWar(false);
     });
     function performPromotion(targetCode, amount) {
@@ -8408,6 +8126,12 @@
         amount
       });
       finishIfCenterConquered();
+      evaluateCampaignGuideTransitions({
+        type: 'actionCompleted',
+        action: 'promotion',
+        team: currentTeam,
+        region: targetCode
+      });
     }
 
     function performRelegation(targetCode, stage) {
@@ -8457,6 +8181,13 @@
         stage
       });
       finishIfCenterConquered();
+      evaluateCampaignGuideTransitions({
+        type: 'actionCompleted',
+        action: 'relegation',
+        team: currentTeam,
+        region: targetCode,
+        stage
+      });
     }
 
     function collectCampaignBagAtRegion(regionCode, team) {
@@ -8470,9 +8201,11 @@
       showActionFeedback(regionCode, coins, 'bag', '+');
       readout.textContent = `${team === 'orange' ? 'Laranja' : 'Azul'} encontrou um saco com ${coins} moedas em ${regionCode}.`;
       updateTurnState();
-      if (team === 'orange' && campaignGuideStep === 'await-bag' && regionCode === 'L8-3') {
-        showCampaignGuide('army-tip');
-      }
+      evaluateCampaignGuideTransitions({
+        type: 'bagCollected',
+        team,
+        region: regionCode
+      });
       return coins;
     }
 
@@ -8552,13 +8285,12 @@
         amount
       });
       finishIfCenterConquered();
-      maybeAdvanceLevel2Guide();
-      if (isCampaignGame() && currentTeam === 'orange' &&
-          campaignGuideStep === 'await-move' && sourceCode === 'L8-5' && neighbor === 'L8-4') {
-        showCampaignGuide('bag-tip');
-      } else {
-        maybeShowCampaignWarGuide();
-      }
+      evaluateCampaignGuideTransitions({
+        type: 'regionMoved',
+        team: currentTeam,
+        source: sourceCode,
+        target: neighbor
+      });
       updateTurnState();
       saveGame();
     }
@@ -9695,14 +9427,8 @@
       initializeRotationOwnership(true);
       if (isCampaignGame()) {
         campaignObjectiveRegions = [...(activeCampaignLevel.objectiveRegions || [])];
-        campaignIntroPending = activeCampaignLevel.id === 'tabuleiro-01';
-        campaignGuideStep = campaignIntroPending
-          ? 'intro'
-          : activeCampaignLevel.id === 'tabuleiro-02' ? 'level2-intro'
-            : activeCampaignLevel.id === 'tabuleiro-03' ? 'level3-intro'
-              : activeCampaignLevel.id === 'tabuleiro-04' ? 'level4-intro'
-                : activeCampaignLevel.id === 'tabuleiro-05' ? 'level5-intro'
-                  : activeCampaignLevel.id === 'tabuleiro-06' ? 'level6-intro' : 'complete';
+        campaignIntroPending = !!activeCampaignLevel.guide?.introOverlay;
+        campaignGuideStep = activeCampaignLevel.guide?.initialStep || 'complete';
         campaignLevel2SeenSectors = [];
         if (!campaignObjectiveRegions.length) {
           startMessage.textContent = 'O level da campanha não define regiões objetivo válidas para conquistar.';
@@ -9929,9 +9655,23 @@
     campaignMenuButton.addEventListener('click', returnCampaignToMenu);
     campaignRestartButton.addEventListener('click', restartCampaignLevel);
     campaignIntroDismiss.addEventListener('click', dismissCampaignIntro);
-    campaignGuideContinue.addEventListener('click', continueCampaignGuide);
+    campaignGuideContinue.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      continueCampaignGuide();
+    });
     ['pointerdown', 'click'].forEach((eventType) => {
       document.addEventListener(eventType, (event) => {
+        if (eventType === 'pointerdown') {
+          campaignGuideWasVisibleAtPointerDown = isCampaignGame() &&
+            !campaignGuide.classList.contains('is-hidden');
+        } else {
+          const clickStartedWithGuideVisible = campaignGuideWasVisibleAtPointerDown;
+          campaignGuideWasVisibleAtPointerDown = false;
+          if (event.detail > 0 && !clickStartedWithGuideVisible &&
+              campaignIntro.classList.contains('is-hidden') &&
+              !campaignGuide.classList.contains('is-hidden')) return;
+        }
         if (!campaignIntro.classList.contains('is-hidden')) {
           if (campaignIntroDismiss.contains(event.target)) return;
           event.stopImmediatePropagation();

@@ -187,7 +187,8 @@ public final class MainActivity extends Activity {
                 !"tabuleiro-03.json".equals(fileName) &&
                 !"tabuleiro-04.json".equals(fileName) &&
                 !"tabuleiro-05.json".equals(fileName) &&
-                !"tabuleiro-06.json".equals(fileName)) {
+                !"tabuleiro-06.json".equals(fileName) &&
+                !"tabuleiro-07.json".equals(fileName)) {
                 Log.w(TAG, "Rejeitando arquivo de tabuleiro não permitido: " + fileName);
                 return "";
             }

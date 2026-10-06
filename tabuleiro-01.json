@@ -15,8 +15,159 @@
     "coinsPerTurn": 4,
     "turnLimit": 1,
     "rotationEnabled": false,
+    "objectiveRegions": ["L8-1"],
     "objective": {
       "type": "captureInitialBlueRegions"
+    },
+    "guide": {
+      "initialStep": "intro",
+      "introNext": "coins",
+      "introOverlay": {
+        "title": "Level 1: conquiste o território inimigo",
+        "message": "Seu objetivo é dominar todas as regiões do oponente. Construa unidades e avance até a região mais próxima do inimigo. Para tomá-la, você precisa ter ao menos 2 unidades nessa região e declarar Guerra. Ao vencer o combate e conquistar o território, você vence o level.",
+        "hint": "Clique para começar"
+      },
+      "steps": {
+        "intro": {
+          "next": "coins"
+        },
+        "coins": {
+          "title": "Suas moedas neste turno",
+          "message": "Você tem {{orangeCoins}} moedas disponíveis para comprar unidades ou movê-las. As moedas não acumulam de um turno para o outro.",
+          "dismissible": true,
+          "next": "purchase",
+          "focusRegion": "L8-5",
+          "highlight": [
+            "ui:turnPoints"
+          ],
+          "pinTurnPoints": true
+        },
+        "purchase": {
+          "title": "Compre sua primeira unidade",
+          "message": "Você controla L8-5. Toque no ícone da peça G para comprar uma unidade; ela custa 1 moeda.",
+          "dismissible": false,
+          "next": "move",
+          "focusRegion": "L8-5",
+          "selectRegion": "L8-5",
+          "highlight": [
+            "pieceButton:g",
+            "region:L8-5"
+          ],
+          "actionTarget": "purchaseG",
+          "allowAction": "purchase",
+          "autoShow": true,
+          "hint": "Compre a unidade destacada para continuar"
+        },
+        "move": {
+          "title": "Avance pelo tabuleiro",
+          "message": "Depois, arraste a peça G de L8-5 para a região vizinha L8-4.",
+          "dismissible": true,
+          "next": "await-move",
+          "highlight": [
+            "pieces:L8-5:orange",
+            "region:L8-4"
+          ]
+        },
+        "bag-tip": {
+          "title": "Encontre mais moedas",
+          "message": "Suas moedas estão acabando. Compre uma unidade G em L8-4 (1 moeda) e avance com uma das duas até L8-3 para pegar o saco com 3 moedas.",
+          "dismissible": true,
+          "next": "await-bag",
+          "focusRegion": "L8-3",
+          "highlight": [
+            "ui:turnPoints",
+            "bag:L8-3"
+          ]
+        },
+        "army-tip": {
+          "title": "Prepare o avanço final",
+          "message": "Parabéns! Você encontrou as moedas. Faltam apenas duas regiões: reúna o máximo possível de soldados em {{approachRegion}}, ao lado do inimigo.",
+          "dismissible": true,
+          "next": "await-army",
+          "focusRegion": "approach",
+          "highlight": [
+            "region:approach"
+          ]
+        },
+        "war": {
+          "title": "Declare Guerra",
+          "message": "Você tem pelo menos dois soldados em {{approachRegion}}. Toque em Guerra para atacar os territórios inimigos vizinhos; vença com mais força para conquistá-los.",
+          "dismissible": false,
+          "next": "complete",
+          "highlight": [
+            "ui:warButton",
+            "region:approach",
+            "regions:objectives"
+          ],
+          "actionTarget": "war",
+          "allowAction": "war",
+          "hint": "Clique no bot?o Guerra destacado"
+        }
+      },
+      "states": [
+        "await-move",
+        "await-bag",
+        "await-army"
+      ],
+      "transitions": [
+        {
+          "from": "purchase",
+          "when": {
+            "type": "actionCompleted",
+            "action": "purchase",
+            "team": "orange",
+            "region": "L8-5",
+            "stage": "g"
+          },
+          "next": "move"
+        },
+        {
+          "from": "await-move",
+          "when": {
+            "type": "regionCaptured",
+            "region": "L8-4",
+            "team": "orange"
+          },
+          "next": "bag-tip"
+        },
+        {
+          "from": "await-move",
+          "when": {
+            "type": "regionOwned",
+            "team": "orange",
+            "region": "L8-4"
+          },
+          "next": "bag-tip"
+        },
+        {
+          "from": "await-bag",
+          "when": {
+            "type": "bagCollected",
+            "team": "orange",
+            "region": "L8-3"
+          },
+          "next": "army-tip"
+        },
+        {
+          "from": "await-army",
+          "when": {
+            "type": "soldierCount",
+            "team": "orange",
+            "region": "L8-2",
+            "soldiersAtLeast": 2
+          },
+          "next": "war"
+        },
+        {
+          "from": "war",
+          "when": {
+            "type": "actionCompleted",
+            "action": "war",
+            "team": "orange"
+          },
+          "next": "complete"
+        }
+      ]
     }
   },
   "blocks": [

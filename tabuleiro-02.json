@@ -25,6 +25,218 @@
     "objectiveRegions": ["L8-1"],
     "objective": {
       "type": "captureInitialBlueRegions"
+    },
+    "guide": {
+      "initialStep": "level2-intro",
+      "steps": {
+        "level2-intro": {
+          "title": "Level 2: alcance L8-1",
+          "message": "Seu objetivo é conquistar a região L8-1. Você tem 5 turnos para alcançar esse objetivo.",
+          "dismissible": true,
+          "next": "await-l84"
+        },
+        "level2-rotate": {
+          "title": "Atravesse o disco BC03",
+          "message": "Escolha um passe Local ou Global no painel acima e faça um gesto anti-horário sobre o disco para evitar os inimigos!",
+          "dismissible": false,
+          "next": "await-circular",
+          "focusRegion": "L8-7",
+          "selectRegion": "L8-7",
+          "highlight": [
+            "regions:L8-6,L8-7,L8-8,L8-9",
+            "ui:regionName",
+            "ui:rotateQuadrilateralBlockButton"
+          ],
+          "actionTarget": "rotateBlock",
+          "allowAction": "rotate",
+          "hint": "Clique em GIRAR DISCO e faça um gesto anti-horário",
+          "rotationGuide": true,
+          "cardPositionOrder": [
+            "right",
+            "top",
+            "bottom",
+            "left"
+          ]
+        },
+        "level2-pass-turn": {
+          "title": "Gire novamente no próximo turno",
+          "message": "Você já conquistou uma região do disco. Passe o turno para liberar outra rotação e continuar abrindo caminho.",
+          "dismissible": false,
+          "next": "await-next-rotation",
+          "highlight": [
+            "ui:passTurnButton"
+          ],
+          "actionTarget": "passTurn",
+          "allowAction": "passTurn",
+          "hint": "Passe o turno para continuar"
+        },
+        "level2-rotate-again": {
+          "title": "Continue pelo disco",
+          "message": "Agora você pode girar o BC03 novamente. Toque em GIRAR DISCO no painel da região e desenhe um círculo anti-horário para girar à esquerda e alinhar o caminho com a próxima região.",
+          "dismissible": false,
+          "next": "await-circular",
+          "focusRegion": "lastCircularSector",
+          "selectRegion": "lastCircularSector",
+          "highlight": [
+            "ui:rotateQuadrilateralBlockButton"
+          ],
+          "actionTarget": "rotateBlock",
+          "allowAction": "rotate",
+          "hint": "Clique em GIRAR DISCO e faça um gesto anti-horário",
+          "rotationGuide": true
+        },
+        "level2-final-attack": {
+          "title": "Prepare para a conquista",
+          "message": "Seu oponente tem uma peça F! Uma peça F vale 7 unidades G. Para dominar aquela região construa primeiro mais 7 peças na sua região.",
+          "dismissible": true,
+          "next": "await-l83-army",
+          "focusRegion": "L8-10",
+          "selectRegion": "L8-10",
+          "highlight": [
+            "region:L8-3",
+            "region:L8-10"
+          ]
+        },
+        "level2-final-war": {
+          "title": "Declare Guerra",
+          "message": "Você já reuniu unidades G suficientes para enfrentar a peça F. Declare Guerra para conquistar L8-3.",
+          "dismissible": false,
+          "next": "await-l83",
+          "highlight": [
+            "ui:warButton"
+          ],
+          "actionTarget": "war",
+          "allowAction": "war",
+          "hint": "Clique no botão Guerra destacado"
+        },
+        "level2-recycle": {
+          "title": "Recicle peças para avançar",
+          "message": "Ao arrastar uma peça para a lixeira, você recebe de volta metade do custo dela. Use essa estratégia entre L8-3 e L8-10 para reunir recursos e conquistar a região principal L8-1.",
+          "dismissible": true,
+          "next": "await-l81",
+          "focusRegion": "L8-3",
+          "selectRegion": "L8-3",
+          "highlight": [
+            "region:L8-3",
+            "region:L8-10",
+            "ui:trashDropZone"
+          ],
+          "showTrash": true
+        }
+      },
+      "states": [
+        "await-l84",
+        "await-circular",
+        "await-next-rotation",
+        "await-final-approach",
+        "await-l83-army",
+        "await-l83",
+        "await-l81"
+      ],
+      "statePresentation": {
+        "await-l84": {
+          "resetZoom": true,
+          "focusStrongestTeam": "orange"
+        }
+      },
+      "transitions": [
+        {
+          "from": "await-l84",
+          "when": {
+            "type": "regionOwned",
+            "region": "L8-4",
+            "team": "orange"
+          },
+          "next": "level2-rotate"
+        },
+        {
+          "from": "level2-rotate",
+          "when": {
+            "type": "regionRotated",
+            "region": "L8-7"
+          },
+          "next": "await-circular"
+        },
+        {
+          "from": "await-circular",
+          "when": {
+            "type": "regionOwned",
+            "regions": ["L8-6", "L8-7", "L8-8", "L8-9"],
+            "team": "orange"
+          },
+          "next": "level2-pass-turn"
+        },
+        {
+          "from": "await-circular",
+          "when": {
+            "type": "regionOwned",
+            "region": "L8-10",
+            "team": "orange"
+          },
+          "next": "level2-final-attack"
+        },
+        {
+          "from": "await-l83-army",
+          "when": {
+            "type": "soldierCount",
+            "region": "L8-10",
+            "team": "orange",
+            "soldiersAtLeast": 8
+          },
+          "next": "level2-final-war"
+        },
+        {
+          "from": "level2-pass-turn",
+          "when": {
+            "type": "actionCompleted",
+            "action": "passTurn"
+          },
+          "next": "await-next-rotation"
+        },
+        {
+          "from": "level2-final-war",
+          "when": {
+            "type": "actionCompleted",
+            "action": "war",
+            "team": "orange"
+          },
+          "next": "await-l83"
+        },
+        {
+          "from": "await-next-rotation",
+          "when": {
+            "type": "turnStarted",
+            "team": "orange"
+          },
+          "next": "level2-rotate-again"
+        },
+        {
+          "from": "level2-rotate-again",
+          "when": {
+            "type": "regionRotated",
+            "region": "L8-7"
+          },
+          "next": "await-final-approach"
+        },
+        {
+          "from": "await-final-approach",
+          "when": {
+            "type": "regionOwned",
+            "region": "L8-10",
+            "team": "orange"
+          },
+          "next": "level2-final-attack"
+        },
+        {
+          "from": "await-l83",
+          "when": {
+            "type": "regionCaptured",
+            "region": "L8-3",
+            "team": "orange"
+          },
+          "next": "level2-recycle"
+        }
+      ]
     }
   },
   "blocks": [
