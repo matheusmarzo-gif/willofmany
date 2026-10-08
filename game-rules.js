@@ -20,6 +20,13 @@
   const stageOrder = Object.freeze(['a', 'b', 'c', 'd', 'e', 'f', 'g']);
   const ascendingStages = Object.freeze(['g', 'f', 'e', 'd', 'c', 'b', 'a']);
   const mergeThresholds = Object.freeze({ g: 7, f: 6, e: 5, d: 4, c: 3, b: 2 });
+  const farmProductionByLevel = Object.freeze({
+    1: 250,
+    2: 1000,
+    3: 4000,
+    4: 16000,
+    5: 50000
+  });
   const promotionCostBySourceLayer = Object.freeze({
     8: 3,
     7: 9,
@@ -357,9 +364,27 @@
     return Math.floor(cost / 2);
   }
 
+  function getAnnularSectorCentroid({ centerX, centerY, innerRadius, outerRadius, startAngle, endAngle }) {
+    if (![centerX, centerY, innerRadius, outerRadius, startAngle, endAngle].every(Number.isFinite) ||
+        innerRadius < 0 || outerRadius <= innerRadius ||
+        endAngle <= startAngle || endAngle - startAngle > 360) {
+      throw new RangeError('Invalid annular sector geometry.');
+    }
+    const angleSpan = (endAngle - startAngle) * Math.PI / 180;
+    const midpointAngle = (startAngle + endAngle) / 2 * Math.PI / 180;
+    const centroidRadius = (4 * Math.sin(angleSpan / 2) / (3 * angleSpan)) *
+      ((outerRadius ** 3 - innerRadius ** 3) /
+        (outerRadius ** 2 - innerRadius ** 2));
+    return {
+      x: centerX + centroidRadius * Math.cos(midpointAngle),
+      y: centerY + centroidRadius * Math.sin(midpointAngle)
+    };
+  }
+
   return Object.freeze({
     soldierWeights,
     stageOrder,
+    farmProductionByLevel,
     promotionCostBySourceLayer,
     mergeTeamCounts,
     getFinalPieceCountForTeam,
@@ -378,6 +403,7 @@
     buildWarConflicts,
     getRecruitmentCost,
     getRelegationRefund,
-    getRecycleRefund
+    getRecycleRefund,
+    getAnnularSectorCentroid
   });
 });

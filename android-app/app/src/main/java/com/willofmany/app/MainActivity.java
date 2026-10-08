@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.Toast;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -40,6 +41,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -54,7 +56,9 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_ENABLE_BLUETOOTH = 1001;
     private static final int REQUEST_DISCOVERABLE = 1002 ;
     private static final int REQUEST_BLUETOOTH_PERMISSIONS = 1003;
+    private static final int REQUEST_SAVE_REPLAY = 1004;
     private static final int MAX_MESSAGE_LENGTH = 1_000_000;
+    private static final int MAX_REPLAY_LENGTH = 4_000_000;
     private static final UUID GAME_UUID = UUID.fromString("a81656dc-c28f-4c8a-a2b7-2a180a5f47d1");
 
     private final Object connectionLock = new Object();
@@ -68,6 +72,7 @@ public final class MainActivity extends Activity {
     private BufferedWriter bluetoothWriter;
     private String pendingBluetoothAction;
     private String pendingDeviceAddress;
+    private String pendingReplayJson;
     private boolean discoveryReceiverRegistered;
     private volatile boolean destroyed;
     private volatile boolean bluetoothRoomRequested;
@@ -188,7 +193,8 @@ public final class MainActivity extends Activity {
                 !"tabuleiro-04.json".equals(fileName) &&
                 !"tabuleiro-05.json".equals(fileName) &&
                 !"tabuleiro-06.json".equals(fileName) &&
-                !"tabuleiro-07.json".equals(fileName)) {
+                !"tabuleiro-07.json".equals(fileName) &&
+                !"tabuleiro-08.json".equals(fileName)) {
                 Log.w(TAG, "Rejeitando arquivo de tabuleiro não permitido: " + fileName);
                 return "";
             }
@@ -230,6 +236,40 @@ public final class MainActivity extends Activity {
                 return;
             }
             bluetoothSendExecutor.execute(() -> writeMessage(message));
+        }
+
+        @JavascriptInterface
+        public void saveReplay(String fileName, String replayJson) {
+            if (replayJson == null || replayJson.isEmpty() ||
+                replayJson.length() > MAX_REPLAY_LENGTH) {
+                runOnUiThread(() -> emitError("O backup da partida está vazio ou excede o tamanho permitido."));
+                return;
+            }
+            String safeFileName = fileName == null
+                ? "will-of-many-level-8-replay.json"
+                : fileName.replaceAll("[^A-Za-z0-9._-]", "_");
+            if (safeFileName.length() > 100 || !safeFileName.endsWith(".json")) {
+                safeFileName = "will-of-many-level-8-replay.json";
+            }
+            String documentTitle = safeFileName;
+            runOnUiThread(() -> {
+                if (pendingReplayJson != null) {
+                    emitError("Já existe uma exportação de backup em andamento.");
+                    return;
+                }
+                pendingReplayJson = replayJson;
+                Intent createDocument = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                createDocument.addCategory(Intent.CATEGORY_OPENABLE);
+                createDocument.setType("application/json");
+                createDocument.putExtra(Intent.EXTRA_TITLE, documentTitle);
+                try {
+                    startActivityForResult(createDocument, REQUEST_SAVE_REPLAY);
+                } catch (RuntimeException error) {
+                    pendingReplayJson = null;
+                    Log.e(TAG, "Could not open the Android file picker for a replay backup", error);
+                    emitError("Não foi possível abrir o seletor para salvar o backup.");
+                }
+            });
         }
 
         @JavascriptInterface
@@ -411,7 +451,23 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_ENABLE_BLUETOOTH) {
+        if (requestCode == REQUEST_SAVE_REPLAY) {
+            String replayJson = pendingReplayJson;
+            pendingReplayJson = null;
+            if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) return;
+            if (replayJson == null) {
+                emitError("O conteúdo do backup não está mais disponível.");
+                return;
+            }
+            try (OutputStream output = getContentResolver().openOutputStream(data.getData())) {
+                if (output == null) throw new IOException("O destino não abriu um fluxo de gravação.");
+                output.write(replayJson.getBytes(StandardCharsets.UTF_8));
+                Toast.makeText(this, "Backup do Level 8 salvo.", Toast.LENGTH_LONG).show();
+            } catch (IOException | SecurityException error) {
+                Log.e(TAG, "Could not write the Level 8 replay backup", error);
+                emitError("Não foi possível gravar o backup selecionado: " + error.getMessage());
+            }
+        } else if (requestCode == REQUEST_ENABLE_BLUETOOTH) {
             if (resultCode == Activity.RESULT_OK) {
                 continueBluetoothAction();
             } else {

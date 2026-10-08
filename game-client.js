@@ -41,11 +41,20 @@
     const campaignVictoryModal = document.querySelector('#campaign-victory-modal');
     const campaignVictoryMessage = document.querySelector('#campaign-victory-message');
     const campaignNextLevelButton = document.querySelector('#campaign-next-level-button');
+    const campaignVictoryReplayButton = document.querySelector('#campaign-victory-replay-button');
     const campaignVictoryMenuButton = document.querySelector('#campaign-victory-menu-button');
     const finalMenuButton = document.querySelector('#final-menu-button');
     const gameMenuTrigger = document.querySelector('#game-menu-trigger');
     const gameMenu = document.querySelector('#game-menu');
     const gameMenuResignButton = document.querySelector('#game-menu-resign-button');
+    const levelEightReplayButton = document.querySelector('#level-eight-replay-button');
+    const levelEightDebugActions = document.querySelector('#level-eight-debug-actions');
+    const levelEightAiToggle = document.querySelector('#level-eight-ai-toggle');
+    const levelEightViewDataButton = document.querySelector('#level-eight-view-data');
+    const levelEightDataModal = document.querySelector('#level-eight-data-modal');
+    const levelEightDataSummary = document.querySelector('#level-eight-data-summary');
+    const levelEightRankingTableContainer = document.querySelector('#level-eight-ranking-table-container');
+    const levelEightDistanceTableContainer = document.querySelector('#level-eight-distance-table-container');
     const campaignActions = document.querySelector('#campaign-actions');
     const campaignRestartTurnButton = document.querySelector('#campaign-restart-turn-button');
     const campaignMenuButton = document.querySelector('#campaign-menu-button');
@@ -230,6 +239,7 @@
     let campaignGuideStep = 'complete';
     let campaignGuideStepBeforeLevel5TurnThreeTip = null;
     let campaignTurnStartSnapshot = null;
+    let levelEightReplay = null;
     let campaignGuideDismissible = false;
     let campaignGuideWasVisibleAtPointerDown = false;
     let campaignGuideMessagePages = [];
@@ -247,7 +257,8 @@
       'tabuleiro-04': 'tabuleiro-04.json',
       'tabuleiro-05': 'tabuleiro-05.json',
       'tabuleiro-06': 'tabuleiro-06.json',
-      'tabuleiro-07': 'tabuleiro-07.json'
+      'tabuleiro-07': 'tabuleiro-07.json',
+      'tabuleiro-08': 'tabuleiro-08.json'
     };
     const levelThreeRegionCodeMigration = {
       'L8-8': 'L8-10',
@@ -257,6 +268,7 @@
     };
     const defaultNonCampaignBoardFile = 'regioes-will-of-many-circular.json';
     const campaignProgressStorageKey = 'will-of-many-campaign-unlocked-level';
+    const campaignAllLevelsUnlockedForTesting = true;
     const boardLayerElements = new Map();
     const probeBoxSize = 30;
     let debugZoom = 1;
@@ -271,6 +283,7 @@
     let stageZoomOffset = { x: 0, y: 0 };
     let currentTeam = 'orange';
     let currentTurn = 1;
+    let aiTurnStartingPoints = null;
     let humanTeam = 'orange';
     let aiTeam = 'blue';
     let gameSpeed = 1;
@@ -294,7 +307,9 @@
     let googleScriptPromise = null;
     let onlineSessionLoading = false;
     let isApplyingBluetoothAction = false;
+    let isApplyingAiAction = false;
     let isAiTurnRunning = false;
+    let levelEightAiEnabled = true;
     let selectedCircularRotationBlock = null;
     let rotationAnimationVersion = 0;
     let hasRotatedThisTurn = false;
@@ -372,7 +387,9 @@
 
     function renderCampaignTrail() {
       const levels = getCampaignLevelOrder();
-      const unlockedThrough = levels.indexOf(getUnlockedCampaignLevelId());
+      const unlockedThrough = campaignAllLevelsUnlockedForTesting
+        ? levels.length - 1
+        : levels.indexOf(getUnlockedCampaignLevelId());
       campaignTrailLevels.replaceChildren();
       levels.forEach((levelId, index) => {
         const button = document.createElement('button');
@@ -471,15 +488,19 @@
       stageZoomOffset = { x: 0, y: 0 };
       pontosDoTurn.orange = getTurnPointIncome(1);
       pontosDoTurn.blue = getTurnPointIncome(1);
+      aiTurnStartingPoints = currentTeam === aiTeam ? pontosDoTurn[currentTeam] : null;
       isGameOver = false;
       isGameStarted = true;
+      isApplyingAiAction = false;
       isAiTurnRunning = false;
+      levelEightAiEnabled = true;
       isWarRunning = false;
       warStatus.classList.add('is-hidden');
       turnMoveHistory = [];
       campaignMoveUndoHistory = [];
       turnRecycledPieces = [];
       turnCreatedPieces = [];
+      levelEightReplay = null;
       victoryPoints = { orange: 0, blue: 0 };
       lastRoundResult = null;
       campaignTurnStartSnapshot = null;
@@ -520,6 +541,7 @@
     function createGameSaveState() {
       return {
         gameMode, humanTeam, aiTeam, gameSpeed, currentTeam, currentTurn,
+        aiTurnStartingPoints,
         campaignLevelId: activeCampaignLevel?.id || null,
         levelThreeRegionMapVersion: activeCampaignLevel?.id === 'tabuleiro-03' ? 1 : 0,
         boardRotationConfigVersion: 4,
@@ -541,8 +563,158 @@
         wheatBalances: { ...wheatBalances },
         lastWheatTurnReport: lastWheatTurnReport ? { ...lastWheatTurnReport } : null,
         lastRoundResult: lastRoundResult ? { ...lastRoundResult } : null,
+        levelEightReplay: levelEightReplay ? JSON.parse(JSON.stringify(levelEightReplay)) : null,
         regionPiecesByRegion: JSON.parse(JSON.stringify(regionPiecesByRegion))
       };
+    }
+
+    function isLevelEightCampaign() {
+      return isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-08';
+    }
+
+    function isCircularBoardDebugMode() {
+      return !isCampaignGame() && currentBoardData?.boardType === 'circular';
+    }
+
+    function isLevelEightAiEnabled() {
+      return !isLevelEightCampaign() || levelEightAiEnabled;
+    }
+
+    function getLevelEightReplayState(includePieceComposition = false) {
+      const regions = {};
+      const teams = {};
+      const teamStages = Object.keys(soldierWeights);
+      ['orange', 'blue'].forEach((team) => {
+        teams[team] = {
+          controlledRegions: 0,
+          totalForce: 0,
+          piecesByStage: Object.fromEntries(teamStages.map((stage) => [stage, 0])),
+          wheatBalance: Number(wheatBalances[team]) || 0,
+          wheat: getWheatTotals(team)
+        };
+      });
+
+      getRegionCalculationOrder().forEach((code) => {
+        const owner = getRegionDominador(code);
+        const savedPieces = regionPiecesByRegion[code] || {};
+        const pieces = includePieceComposition ? {} : null;
+        const force = {};
+        ['orange', 'blue'].forEach((team) => {
+          if (includePieceComposition) {
+            pieces[team] = Object.fromEntries(teamStages.map((stage) => [
+              stage,
+              Number(savedPieces[team]?.[stage]) || 0
+            ]));
+          }
+          force[team] = getTeamSoldierCount(code, team);
+          teams[team].totalForce += force[team];
+          if (owner === team) teams[team].controlledRegions += 1;
+          teamStages.forEach((stage) => {
+            teams[team].piecesByStage[stage] += Number(savedPieces[team]?.[stage]) || 0;
+          });
+        });
+        regions[code] = {
+          layer: getRegionLayer(code),
+          owner,
+          force,
+          farmProductionPerTurn: Math.max(
+            0,
+            Number(regionGeometryByCode[code]?.farmProductionPerTurn) || 0
+          )
+        };
+        if (includePieceComposition) regions[code].pieces = pieces;
+      });
+
+      return {
+        turn: currentTurn,
+        teamToAct: currentTeam,
+        coins: { ...pontosDoTurn },
+        teams,
+        regions,
+        rotationsByLayer: [...rotations],
+        circularDiskRotations: { ...circularDiskRotations },
+        wheatEnabled: isWheatEnabled()
+      };
+    }
+
+    function createLevelEightReplay(coverage = 'complete') {
+      return {
+        schemaVersion: 1,
+        game: {
+          levelId: activeCampaignLevel?.id || 'tabuleiro-08',
+          levelName: activeCampaignLevel?.name || 'Level 8',
+          boardVersion: currentBoardData?.version || null,
+          humanTeam,
+          aiTeam,
+          startedAt: new Date().toISOString(),
+          coverage
+        },
+        initialState: getLevelEightReplayState(true),
+        actions: []
+      };
+    }
+
+    function recordLevelEightReplayAction(type, details = {}) {
+      if (!isLevelEightCampaign() || !levelEightReplay) return;
+      const team = details.team || currentTeam;
+      levelEightReplay.actions.push({
+        sequence: levelEightReplay.actions.length + 1,
+        at: new Date().toISOString(),
+        turn: currentTurn,
+        team,
+        actor: team === aiTeam ? 'ai' : 'human',
+        type,
+        details: { ...details, team: undefined },
+        [type === 'aiDecision' ? 'stateAtDecision' : 'stateAfter']: getLevelEightReplayState()
+      });
+    }
+
+    function createLevelEightReplayExport() {
+      if (!isLevelEightCampaign() || !levelEightReplay) return null;
+      const actions = levelEightReplay.actions;
+      const actionCounts = {};
+      const actionsByTeam = { orange: 0, blue: 0 };
+      actions.forEach((action) => {
+        actionCounts[action.type] = (actionCounts[action.type] || 0) + 1;
+        if (action.team === 'orange' || action.team === 'blue') {
+          actionsByTeam[action.team] += 1;
+        }
+      });
+      return {
+        ...levelEightReplay,
+        exportedAt: new Date().toISOString(),
+        finalState: getLevelEightReplayState(),
+        summary: {
+          recordedActions: actions.length,
+          actionCounts,
+          actionsByTeam,
+          initialMetrics: levelEightReplay.initialState.teams,
+          finalMetrics: getLevelEightReplayState().teams
+        }
+      };
+    }
+
+    function exportLevelEightReplay() {
+      const replay = createLevelEightReplayExport();
+      if (!replay) {
+        readout.textContent = 'Não há backup do Level 8 disponível nesta partida.';
+        return;
+      }
+      const contents = JSON.stringify(replay, null, 2);
+      const fileName = `will-of-many-level-8-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      if (typeof window.AndroidBluetooth?.saveReplay === 'function') {
+        window.AndroidBluetooth.saveReplay(fileName, contents);
+        readout.textContent = 'Escolha onde salvar o backup JSON do Level 8.';
+        return;
+      }
+      const blob = new Blob([contents], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      readout.textContent = 'Backup JSON do Level 8 baixado.';
     }
 
     function captureCampaignTurnStartSnapshot() {
@@ -551,6 +723,11 @@
         return;
       }
       campaignTurnStartSnapshot = createGameSaveState();
+      if (campaignTurnStartSnapshot.levelEightReplay) {
+        campaignTurnStartSnapshot.levelEightReplayActionCount =
+          campaignTurnStartSnapshot.levelEightReplay.actions.length;
+        delete campaignTurnStartSnapshot.levelEightReplay;
+      }
       campaignTurnStartSnapshot.selectedRegionCode = selectedRegionCode;
     }
 
@@ -568,7 +745,9 @@
         const save = JSON.parse(localStorage.getItem('will-of-many-save') || 'null');
         if (!save || !save.regionPiecesByRegion) return false;
         gameMode = ['ai', 'campaign', 'local', 'bluetooth', 'online'].includes(save.gameMode) ? save.gameMode : 'ai';
-        humanTeam = save.humanTeam === 'blue' ? 'blue' : 'orange';
+        humanTeam = gameMode === 'campaign'
+          ? 'orange'
+          : save.humanTeam === 'blue' ? 'blue' : 'orange';
         aiTeam = gameMode === 'ai' ? (humanTeam === 'orange' ? 'blue' : 'orange')
           : gameMode === 'campaign' ? 'blue' : null;
         activeCampaignLevel = gameMode === 'campaign' ? campaignBoardConfig : null;
@@ -666,6 +845,12 @@
         const savedBluePoints = Number(save.pontosDoTurn?.blue);
         pontosDoTurn.orange = Number.isFinite(savedOrangePoints) ? savedOrangePoints : getTurnPointIncome(currentTurn);
         pontosDoTurn.blue = Number.isFinite(savedBluePoints) ? savedBluePoints : getTurnPointIncome(currentTurn);
+        const savedAiTurnStartingPoints = Number(save.aiTurnStartingPoints);
+        aiTurnStartingPoints = currentTeam === aiTeam
+          ? Number.isFinite(savedAiTurnStartingPoints)
+            ? savedAiTurnStartingPoints
+            : pontosDoTurn[currentTeam]
+          : null;
         turnMoveHistory = Array.isArray(save.turnMoveHistory)
           ? save.turnMoveHistory.filter((move) =>
             move && (move.team === 'orange' || move.team === 'blue') &&
@@ -786,6 +971,17 @@
         renderBoardLayers();
         isGameStarted = true;
         isGameOver = false;
+        recalculateRegionForces();
+        if (isLevelEightCampaign()) {
+          const savedReplay = save.levelEightReplay;
+          levelEightReplay = savedReplay?.schemaVersion === 1 &&
+            savedReplay.game?.levelId === 'tabuleiro-08' &&
+            Array.isArray(savedReplay.actions)
+            ? JSON.parse(JSON.stringify(savedReplay))
+            : createLevelEightReplay('partial-resume');
+        } else {
+          levelEightReplay = null;
+        }
         const savedTurnStart = save.campaignTurnStartSnapshot;
         if (gameMode === 'campaign' &&
             savedTurnStart?.gameMode === 'campaign' &&
@@ -795,6 +991,11 @@
             savedTurnStart.regionPiecesByRegion &&
             typeof savedTurnStart.regionPiecesByRegion === 'object') {
           campaignTurnStartSnapshot = JSON.parse(JSON.stringify(savedTurnStart));
+          if (campaignTurnStartSnapshot.levelEightReplay) {
+            campaignTurnStartSnapshot.levelEightReplayActionCount =
+              campaignTurnStartSnapshot.levelEightReplay.actions.length;
+            delete campaignTurnStartSnapshot.levelEightReplay;
+          }
         } else {
           captureCampaignTurnStartSnapshot();
         }
@@ -804,9 +1005,12 @@
         return false;
       }
     }
-
     function isCampaignGame() {
       return gameMode === 'campaign' && !!activeCampaignLevel;
+    }
+
+    function isWheatEnabled() {
+      return !isCampaignGame() || activeCampaignLevel.wheatEnabled === true;
     }
 
     function isCampaignLevelTwo() {
@@ -857,9 +1061,11 @@
     function getGameSnapshot() {
       const regions = {};
       const regionPieceLimits = {};
+      const rotationTargetsByRegion = {};
       Object.keys(allRegionMasks || {}).forEach((layer) => {
         Object.keys(allRegionMasks[layer] || {}).forEach((region) => {
           const code = `L${layer}-${region}`;
+          const geometry = regionGeometryByCode[code] || {};
           regionPieceLimits[code] = getRegionPieceLimit(code);
           regions[code] = {
             layer: Number(layer),
@@ -867,14 +1073,37 @@
             blue: getTeamSoldierCount(code, 'blue'),
             orangeForce: getTeamSoldierCount(code, 'orange'),
             blueForce: getTeamSoldierCount(code, 'blue'),
+            farmProductionPerTurn: Math.max(
+              0,
+              Number(regionGeometryByCode[code]?.farmProductionPerTurn) || 0
+            ),
+            centerX: Number(geometry.desirabilityCenterX ?? geometry.centerX),
+            centerY: Number(geometry.desirabilityCenterY ?? geometry.centerY),
+            farmLevel: Number(geometry.farmLevel) || 0,
             dominator: getRegionDominador(code)
           };
+          rotationTargetsByRegion[code] = getRotationTargetsForRegion(code).map((target) => ({
+            key: target.key,
+            layer: target.layer,
+            kind: target.kind,
+            blockName: target.block?.name || target.block?.blockName || null,
+            disco: target.disco,
+            localAvailable: canRotateTargetWithPass(target, 'local'),
+            globalAvailable: canRotateTargetWithPass(target, 'global')
+          }));
         });
       });
       return {
         currentTeam, humanTeam, aiTeam, currentTurn, gameSpeed, hasRotatedThisTurn,
         points: pontosDoTurn[aiTeam],
+        aiTurnStartingPoints,
+        campaignLevelId: activeCampaignLevel?.id || null,
         pontosDoTurn: { ...pontosDoTurn },
+        wheatEnabled: isWheatEnabled(),
+        wheatTotalsByTeam: {
+          orange: getWheatTotals('orange'),
+          blue: getWheatTotals('blue')
+        },
         wheatBalances: { ...wheatBalances },
         blockedMoves: turnMoveHistory
           .filter((move) => move.team === aiTeam)
@@ -887,6 +1116,7 @@
           .map(({ source, stage }) => ({ source, stage })),
         regions,
         regionPieceLimits,
+        rotationTargetsByRegion,
         regionForceStats: JSON.parse(JSON.stringify(regionForceStats)),
         regionForceBonusFactors: { ...regionForceBonusFactors },
         regionPiecesByRegion: JSON.parse(JSON.stringify(regionPiecesByRegion)),
@@ -1111,7 +1341,7 @@
     }
 
     function canUseGlobalRotation(targetKey, layerNumber) {
-      if ((!isApplyingBluetoothAction && !isLocalPlayersTurn()) || hasRotatedThisTurn) return false;
+      if (!isCurrentTurnActionAllowed() || hasRotatedThisTurn) return false;
       const legacyBlockKey = targetKey.startsWith('quadrilateral:')
         ? targetKey.split(':').slice(0, 2).join(':')
         : null;
@@ -1125,7 +1355,7 @@
     }
 
     function canUseLocalRotation(targetKey) {
-      return (isApplyingBluetoothAction || isLocalPlayersTurn()) &&
+      return isCurrentTurnActionAllowed() &&
         getLocalRotationPassCount(currentTeam, targetKey) > 0;
     }
 
@@ -1193,7 +1423,7 @@
     }
 
     function canRotateQuadrilateralBlock(block, passType = 'global', targetKey = null) {
-      if (!block || (!isApplyingBluetoothAction && !isLocalPlayersTurn())) return false;
+      if (!block || !isCurrentTurnActionAllowed()) return false;
       const target = targetKey
         ? { key: targetKey, layer: getRegionLayer(selectedRegionCode) || getQuadrilateralBlockLayer(block) }
         : getRotationTargetForQuadrilateralBlock(block);
@@ -1231,7 +1461,7 @@
     function canRotateCircularDisk(block, regions, passType = 'global') {
       const layerNumber = Number(regions[0]?.layer ||
         String(regions[0]?.rank || regions[0]?.code || regions[0]?.name).match(/L(\d+)/)?.[1]);
-      if (!isApplyingBluetoothAction && !isLocalPlayersTurn()) return false;
+      if (!isCurrentTurnActionAllowed()) return false;
       if (getCircularDiskRotationStep(block, regions) <= 0) return false;
       return canRotateTargetWithPass({
         key: `circular:${getCircularDiskKey(block.name, getRegionDiskName(regions[0]))}`,
@@ -1278,7 +1508,7 @@
     }
 
     function canRotateLayer(layerNumber) {
-      if (!isApplyingBluetoothAction && !isLocalPlayersTurn()) return false;
+      if (!isCurrentTurnActionAllowed()) return false;
       const target = getRotationTargetForLayer(layerNumber);
       return !!target && canUseGlobalRotation(target.key, target.layer);
     }
@@ -1585,16 +1815,23 @@
     function updateTurnPointsDisplay() {
       const teamLabel = currentTeam === 'orange' ? 'laranja' : 'azul';
       turnNumber.textContent = `Turn ${currentTurn}`;
-      turnPlayer.textContent = `Vez: ${teamLabel}`;
+      const turnActor = currentTeam === aiTeam && (gameMode === 'ai' || isCampaignGame())
+        ? isLevelEightCampaign() && !levelEightAiEnabled
+          ? ' · controle manual'
+          : ' · IA'
+        : '';
+      turnPlayer.textContent = `Vez: ${teamLabel}${turnActor}`;
       turnPoints.textContent = `Moedas: ${Number(pontosDoTurn[currentTeam]).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
       campaignObjective.classList.toggle('is-hidden', !isCampaignGame());
       if (isCampaignGame()) {
         campaignObjective.textContent = `Campanha · ${activeCampaignLevel.name}: ${activeCampaignLevel.objectiveText || `conquiste ${campaignObjectiveRegions.join(', ') || 'as regiões azuis'}`}`;
       }
       const wheatTotals = getWheatTotals(currentTeam);
+      const wheatEnabled = isWheatEnabled();
       const netWheatProduction = wheatTotals.production - wheatTotals.consumption;
       const netWheatSign = netWheatProduction >= 0 ? '+' : '';
       turnWheatValue.textContent = `Trigo: ${formatStatisticsNumber(wheatBalances[currentTeam])} · ${netWheatSign}${formatStatisticsNumber(netWheatProduction)}/turno`;
+      turnWheatValue.classList.toggle('is-hidden', !wheatEnabled);
       const shortageReport = lastWheatTurnReport?.team === currentTeam &&
         lastWheatTurnReport.turn === currentTurn &&
         lastWheatTurnReport.shortage > 0
@@ -1603,7 +1840,7 @@
       wheatFeedback.textContent = shortageReport
         ? `Faltaram ${formatStatisticsNumber(shortageReport.shortage)} de trigo · ${formatStatisticsNumber(shortageReport.lossRate * 100)}% de perda · ${shortageReport.piecesLost} peça(s) perdida(s)`
         : '';
-      wheatFeedback.classList.toggle('is-hidden', !shortageReport);
+      wheatFeedback.classList.toggle('is-hidden', !wheatEnabled || !shortageReport);
     }
 
     function renderPiecePurchaseButtons() {
@@ -2170,7 +2407,7 @@
       warSpotlightRegionCodes = [];
       updateBoardFocusOverlay();
       const restoreCampaignWarView = isCampaignGame() &&
-        ['tabuleiro-06', 'tabuleiro-07'].includes(activeCampaignLevel.id);
+        ['tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'].includes(activeCampaignLevel.id);
       const previousStageView = restoreCampaignWarView
         ? {
           zoom: stageZoom,
@@ -2238,6 +2475,7 @@
         await waitForWarAnimation(2200);
         if (sessionVersion !== gameSessionVersion) return;
 
+        const battleCaptures = [];
         if (winner) {
           pieces.classList.remove('war-flash');
           void pieces.offsetWidth;
@@ -2246,6 +2484,7 @@
           losingRegions.forEach((regionCode) => {
             setRegionTeamOwnership(regionCode, winner);
             campaignCaptures.push({ region: regionCode, team: winner });
+            battleCaptures.push(regionCode);
             if (isCampaignLevelTwo() && winner === 'orange' &&
                 regionGeometryByCode[regionCode]?.shape === 'circular' &&
                 !campaignLevel2SeenSectors.includes(regionCode)) {
@@ -2261,6 +2500,17 @@
           await waitForWarAnimation(1000);
           if (sessionVersion !== gameSessionVersion) return;
         }
+        recordLevelEightReplayAction('battle', {
+          team: currentTeam,
+          region: block.regionCode,
+          attacker: block.attacker,
+          alliedRegions: block.alliedRegions,
+          enemyRegions: block.enemyRegions,
+          alliedForce,
+          enemyForce,
+          winner,
+          capturedRegions: battleCaptures
+        });
       }
 
       warStatus.classList.add('is-hidden');
@@ -2274,6 +2524,11 @@
       refreshRegionVisuals();
       updateSelectedRegionPanel(selectedRegionCode);
       readout.textContent = `Guerra concluída: ${blocks.length} bloco(s) de confronto.`;
+      recordLevelEightReplayAction('warCompleted', {
+        team: currentTeam,
+        conflictBlocks: blocks.length,
+        captures: campaignCaptures
+      });
       saveGame();
       if (campaignCaptures.length) {
         evaluateCampaignGuideTransitions({
@@ -2691,6 +2946,14 @@
         return false;
       }
       const snapshot = JSON.parse(JSON.stringify(campaignTurnStartSnapshot));
+      const replayActionCount = Number(snapshot.levelEightReplayActionCount);
+      if (levelEightReplay && Number.isInteger(replayActionCount)) {
+        snapshot.levelEightReplay = {
+          ...levelEightReplay,
+          actions: levelEightReplay.actions.slice(0, replayActionCount)
+        };
+      }
+      delete snapshot.levelEightReplayActionCount;
       if (!campaignGuide.classList.contains('is-hidden')) hideCampaignGuide();
       localStorage.setItem('will-of-many-save', JSON.stringify({
         ...snapshot,
@@ -2713,6 +2976,12 @@
       updateReadout();
       updateWarAvailability();
       updateTurnState();
+      recordLevelEightReplayAction('undoMove', {
+        team: undo.team,
+        source: undo.source,
+        target: undo.target,
+        amount: undo.amount
+      });
       saveGame();
       readout.textContent = 'Turno reiniciado. O estado inicial deste turno foi restaurado.';
       showCampaignIntro();
@@ -2842,7 +3111,7 @@
     }
 
     function recyclePiece(regionCode, team, pieceStage) {
-      if ((!isApplyingBluetoothAction && !isLocalPlayersTurn()) || team !== currentTeam ||
+      if (!isCurrentTurnActionAllowed() || team !== currentTeam ||
           !Object.prototype.hasOwnProperty.call(soldierWeights, pieceStage)) return false;
       if (team === aiTeam && !isCampaignLevelTwo() &&
           wasPieceCreatedThisTurn(regionCode, team, pieceStage)) {
@@ -2880,12 +3149,20 @@
         source: regionCode,
         stage: pieceStage
       });
+      recordLevelEightReplayAction('recycle', {
+        team,
+        source: regionCode,
+        stage: pieceStage,
+        refund
+      });
+      saveGame();
       return true;
     }
 
     function updateTurnState() {
       if (finishCampaignIfObjectiveMet()) return;
       renderPiecePurchaseButtons();
+      updateLevelEightDebugControls();
       passTurnButton.disabled = !isLocalPlayersTurn() || isWarRunning || isGameOver || isAiTurnRunning;
       updateTurnPointsDisplay();
       evaluateCampaignGuideTransitions();
@@ -2895,6 +3172,163 @@
       campaignRestartTurnButton.title = campaignRestartTurnButton.disabled
         ? 'O turno atual não pode ser reiniciado agora'
         : 'Restaurar o estado inicial do turno atual';
+    }
+
+    function updateLevelEightDebugControls() {
+      const showAiToggle = isLevelEightCampaign();
+      const showDesirabilityData = showAiToggle || isCircularBoardDebugMode();
+      levelEightDebugActions.classList.toggle('is-hidden', !showDesirabilityData);
+      levelEightDebugActions.classList.toggle('is-single-action', !showAiToggle);
+      levelEightAiToggle.classList.toggle('is-hidden', !showAiToggle);
+      levelEightAiToggle.textContent = levelEightAiEnabled ? 'Desativar IA' : 'Ativar IA';
+      levelEightAiToggle.setAttribute('aria-pressed', String(levelEightAiEnabled));
+      levelEightViewDataButton.disabled = !selectedRegionCode;
+    }
+
+    function renderLevelEightDesirabilityData() {
+      const snapshot = getGameSnapshot();
+      const ai = window.WillOfManyAI;
+      const config = ai?.getConfig?.();
+      const analysis = ai?.calculateCurrentDesirability
+        ? ai.calculateCurrentDesirability(snapshot, config?.desirability)
+        : ai?.calculateDesirability?.(snapshot, config?.desirability);
+      const selectedScore = analysis?.regions?.[selectedRegionCode];
+      levelEightDataSummary.replaceChildren();
+      levelEightRankingTableContainer.replaceChildren();
+      levelEightDistanceTableContainer.replaceChildren();
+
+      if (!selectedRegionCode || !selectedScore || !analysis) {
+        levelEightDataSummary.textContent = 'Selecione uma região válida para consultar os dados.';
+        return;
+      }
+
+      const summaryItems = [
+        ['Região', selectedRegionCode],
+        ['Desejabilidade interna', formatStatisticsNumber(selectedScore.internal)],
+        ['Desejabilidade externa', formatStatisticsNumber(selectedScore.external)],
+        ['Desejabilidade total', formatStatisticsNumber(selectedScore.total)],
+        ['Maior distância do tabuleiro', formatStatisticsNumber(analysis.maxDistance)]
+      ];
+      summaryItems.forEach(([label, value]) => {
+        const item = document.createElement('div');
+        item.className = 'level-eight-data-metric';
+        const metric = document.createElement('span');
+        metric.textContent = `${label}: ${value}`;
+        item.appendChild(metric);
+        if (label === 'Desejabilidade interna') {
+          const factors = document.createElement('ul');
+          factors.className = 'level-eight-internal-factors';
+          (selectedScore.internalBreakdown || []).forEach(({ label: factorLabel, description, value: factorValue }) => {
+            const factor = document.createElement('li');
+            const sign = factorValue > 0 ? '+' : '';
+            factor.textContent = `${factorLabel}: ${sign}${formatStatisticsNumber(factorValue)}` +
+              (description ? ` — ${description}` : '');
+            factors.appendChild(factor);
+          });
+          if (!factors.childElementCount) {
+            const factor = document.createElement('li');
+            factor.textContent = 'Nenhum fator registrado.';
+            factors.appendChild(factor);
+          }
+          item.appendChild(factors);
+        }
+        levelEightDataSummary.appendChild(item);
+      });
+
+      const rankingTable = document.createElement('table');
+      rankingTable.className = 'level-eight-ranking-table';
+      const rankingHead = document.createElement('thead');
+      const rankingHeadingRow = document.createElement('tr');
+      ['Posição', 'Região', 'Desejabilidade total'].forEach((label) => {
+        const heading = document.createElement('th');
+        heading.scope = 'col';
+        heading.textContent = label;
+        rankingHeadingRow.appendChild(heading);
+      });
+      rankingHead.appendChild(rankingHeadingRow);
+      rankingTable.appendChild(rankingHead);
+      const rankingBody = document.createElement('tbody');
+      Object.values(analysis.regions)
+        .sort((first, second) =>
+          second.total - first.total || first.code.localeCompare(second.code))
+        .forEach((score, index) => {
+          const row = document.createElement('tr');
+          const positionCell = document.createElement('td');
+          const regionCell = document.createElement('td');
+          const desirabilityCell = document.createElement('td');
+          positionCell.textContent = String(index + 1);
+          regionCell.textContent = score.code;
+          desirabilityCell.textContent = formatStatisticsNumber(score.total);
+          row.append(positionCell, regionCell, desirabilityCell);
+          rankingBody.appendChild(row);
+        });
+      rankingTable.appendChild(rankingBody);
+      levelEightRankingTableContainer.appendChild(rankingTable);
+
+      const selectedRegion = snapshot.regions[selectedRegionCode];
+      const selectedX = Number(selectedRegion?.centerX);
+      const selectedY = Number(selectedRegion?.centerY);
+      const distances = Object.entries(snapshot.regions)
+        .filter(([code]) => code !== selectedRegionCode)
+        .map(([code, region]) => {
+          const x = Number(region.centerX);
+          const y = Number(region.centerY);
+          return {
+            code,
+            distance: Number.isFinite(selectedX) && Number.isFinite(selectedY) &&
+              Number.isFinite(x) && Number.isFinite(y)
+              ? Math.hypot(selectedX - x, selectedY - y)
+              : null
+          };
+        })
+        .sort((first, second) => {
+          if (first.distance === null) return second.distance === null
+            ? first.code.localeCompare(second.code)
+            : 1;
+          if (second.distance === null) return -1;
+          return first.distance - second.distance || first.code.localeCompare(second.code);
+        });
+
+      const table = document.createElement('table');
+      table.className = 'level-eight-distance-table';
+      const head = document.createElement('thead');
+      const headingRow = document.createElement('tr');
+      [
+        'Região',
+        'Distância euclidiana',
+        'Contribuição à desejabilidade externa',
+        'Desejabilidade interna'
+      ].forEach((label) => {
+        const heading = document.createElement('th');
+        heading.scope = 'col';
+        heading.textContent = label;
+        headingRow.appendChild(heading);
+      });
+      head.appendChild(headingRow);
+      table.appendChild(head);
+
+      const body = document.createElement('tbody');
+      distances.forEach(({ code, distance }) => {
+        const row = document.createElement('tr');
+        const regionCell = document.createElement('td');
+        const distanceCell = document.createElement('td');
+        const externalContributionCell = document.createElement('td');
+        const internalDesirabilityCell = document.createElement('td');
+        const regionScore = analysis.regions[code];
+        const externalContribution = selectedScore.externalContributions?.[code] || 0;
+        regionCell.textContent = code;
+        distanceCell.textContent = distance === null
+          ? 'Indisponível'
+          : formatStatisticsNumber(distance);
+        externalContributionCell.textContent = formatStatisticsNumber(externalContribution);
+        internalDesirabilityCell.textContent = regionScore
+          ? formatStatisticsNumber(regionScore.internal)
+          : 'Indisponível';
+        row.append(regionCell, distanceCell, externalContributionCell, internalDesirabilityCell);
+        body.appendChild(row);
+      });
+      table.appendChild(body);
+      levelEightDistanceTableContainer.appendChild(table);
     }
 
     function maybeShowCampaignResourceDefeat() {
@@ -3328,6 +3762,7 @@
 
     function closeModal(modal) {
       modal.classList.add('is-hidden');
+      if (modal.hasAttribute('aria-hidden')) modal.setAttribute('aria-hidden', 'true');
     }
 
     function getMoveAmountOptions(target) {
@@ -4280,6 +4715,15 @@
         drawRegionDebug();
         updateDebugCanvasRotation();
       }
+      recordLevelEightReplayAction('rotate', {
+        team: currentTeam,
+        source: selectedRegionCode,
+        block: blockName,
+        disk: disco,
+        direction,
+        rotationPassType: passType,
+        regions: regionCodes
+      });
       saveGame();
       publishBluetoothAction({
         type: 'rotate',
@@ -4302,7 +4746,7 @@
     }
 
     function addPiece(team, stage) {
-      if ((!isApplyingBluetoothAction && !isLocalPlayersTurn()) || team !== currentTeam) return;
+      if (!isCurrentTurnActionAllowed() || team !== currentTeam) return;
       const selectedRegion = selectedRegionCode || pieceTargets[team].code;
       const regionReference = selectedRegion;
       if (!regionReference || !Object.prototype.hasOwnProperty.call(soldierWeights, stage)) return;
@@ -4362,6 +4806,13 @@
       pieceCounts[team] += 1;
       mergeRegionTeam(regionReference, team);
       recalculateRegionForces();
+      recordLevelEightReplayAction('buy', {
+        team,
+        source: regionReference,
+        stage,
+        cost
+      });
+      saveGame();
       refreshRegionVisuals();
       showActionFeedback(regionReference, cost, 'buy');
       if (selectedRegionCode === regionReference) updateSelectedRegionPanel(regionReference);
@@ -4672,7 +5123,7 @@
       const rect = stagePanel.getBoundingClientRect();
       const scale = Number(focusScale) || Number(currentBoardData?.regionFocusScale) || 1.8;
       if (currentBoardData?.boardType === 'mixed' ||
-          ['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07']
+          ['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08']
             .includes(currentBoardData?.campaign?.id)) {
         stageZoom = scale;
         stageZoomOffset = {
@@ -4821,7 +5272,7 @@
     function getSafeSlots(layerNumber, regionNumber, applyRotation = true) {
       const regionCode = `L${layerNumber}-${regionNumber}`;
       const geometry = regionGeometryByCode[regionCode];
-      if (['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07']
+      if (['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08']
         .includes(currentBoardData?.campaign?.id) &&
           geometry?.shape === 'quadrilateral' && Array.isArray(geometry.cells)) {
         return geometry.cells.flatMap((cell) => {
@@ -5432,8 +5883,20 @@
             throw new Error(`metadados geométricos inválidos para ${code}`);
           }
 
+          const desirabilityCenter = regionGeometry.shape === 'circular'
+            ? gameRules.getAnnularSectorCentroid({
+              centerX: regionGeometry.centerX,
+              centerY: regionGeometry.centerY,
+              innerRadius: regionGeometry.innerRadius,
+              outerRadius: regionGeometry.outerRadius,
+              startAngle: regionGeometry.startAngle,
+              endAngle: regionGeometry.endAngle
+            })
+            : { x: regionGeometry.centerX, y: regionGeometry.centerY };
           normalized[code] = {
             ...regionGeometry,
+            desirabilityCenterX: desirabilityCenter.x,
+            desirabilityCenterY: desirabilityCenter.y,
             farmProductionPerTurn: Number(region.farmProductionPerTurn) || 0,
             bagCoins: Math.max(0, Number(region.bagCoins) || 0),
             initialPieces: Array.isArray(region.initialPieces) ? region.initialPieces.map((piece) => {
@@ -5748,6 +6211,16 @@
       refreshRegionVisuals();
       updateSelectedRegionPanel(selectedRegionCode);
       updateReadout();
+      recordLevelEightReplayAction('rotate', {
+        team: currentTeam,
+        source: selectedRegionCode,
+        block: String(block.name),
+        targetKey: activeTarget.key,
+        direction,
+        rotationPassType: passType,
+        rotationPath,
+        regions: rotatedRegionCodes
+      });
       saveGame();
       publishBluetoothAction({
         type: 'rotate',
@@ -6339,9 +6812,72 @@
       layerElement.appendChild(icon);
     }
 
+    function appendCampaignFarmIcon(layerElement, code, geometry, svgNamespace, iconScale, farmTiers) {
+      const production = Math.max(0, Number(geometry.farmProductionPerTurn) || 0);
+      if (!production) return;
+      const tierIndex = farmTiers.findIndex((value) => production <= value);
+      const tier = tierIndex === -1 ? farmTiers.length : tierIndex + 1;
+      const angle = ((geometry.startAngle + geometry.endAngle) / 2) * Math.PI / 180;
+      const radius = (geometry.innerRadius + geometry.outerRadius) / 2;
+      const centerX = geometry.shape === 'circular'
+        ? geometry.centerX + radius * Math.cos(angle)
+        : geometry.centerX;
+      const centerY = geometry.shape === 'circular'
+        ? geometry.centerY - radius * Math.sin(angle)
+        : geometry.centerY;
+      const icon = document.createElementNS(svgNamespace, 'g');
+      icon.setAttribute('transform', `translate(${centerX} ${centerY}) scale(${iconScale})`);
+      icon.setAttribute('aria-label', `Fazenda: ${formatStatisticsNumber(production)} trigo por turno`);
+      icon.setAttribute('pointer-events', 'none');
+      icon.dataset.region = code;
+
+      const background = document.createElementNS(svgNamespace, 'circle');
+      background.setAttribute('r', '15');
+      background.setAttribute('fill', ['#fff2bf', '#f7e8a4', '#eed77d', '#e8c44e', '#dcad2c'][tier - 1]);
+      background.setAttribute('stroke', '#634c1d');
+      background.setAttribute('stroke-width', '1.5');
+      icon.appendChild(background);
+
+      const field = document.createElementNS(svgNamespace, 'path');
+      field.setAttribute('d', 'M-10 9 Q0 5 10 9');
+      field.setAttribute('fill', 'none');
+      field.setAttribute('stroke', '#546b35');
+      field.setAttribute('stroke-width', '1.7');
+      field.setAttribute('stroke-linecap', 'round');
+      icon.appendChild(field);
+
+      const stalkXs = [-7, -3.5, 0, 3.5, 7].slice(0, tier);
+      stalkXs.forEach((x, index) => {
+        const topY = -8 + Math.abs(index - (tier - 1) / 2) * 1.2;
+        const stalk = document.createElementNS(svgNamespace, 'path');
+        stalk.setAttribute('d', `M${x} 7 Q${x - 1} 0 ${x} ${topY}`);
+        stalk.setAttribute('fill', 'none');
+        stalk.setAttribute('stroke', '#526c31');
+        stalk.setAttribute('stroke-width', '1.6');
+        stalk.setAttribute('stroke-linecap', 'round');
+        icon.appendChild(stalk);
+
+        const grain = document.createElementNS(svgNamespace, 'ellipse');
+        grain.setAttribute('cx', String(x));
+        grain.setAttribute('cy', String(topY));
+        grain.setAttribute('rx', '1.8');
+        grain.setAttribute('ry', '2.8');
+        grain.setAttribute('fill', '#9a6a1b');
+        grain.setAttribute('transform', `rotate(-28 ${x} ${topY})`);
+        icon.appendChild(grain);
+      });
+
+      const title = document.createElementNS(svgNamespace, 'title');
+      title.textContent = `Fazenda em ${code}: ${formatStatisticsNumber(production)} trigo por turno`;
+      icon.appendChild(title);
+      layerElement.appendChild(icon);
+    }
+
     function renderBoardLayers() {
       const svgNamespace = 'http://www.w3.org/2000/svg';
-      const farmTiers = [250, 1000, 4000, 16000, 50000];
+      const farmTiers = Object.keys(window.WillOfManyRules.farmProductionByLevel)
+        .sort((first, second) => Number(first) - Number(second))
+        .map((level) => window.WillOfManyRules.farmProductionByLevel[level]);
       const iconScale = 908 / ((stagePanel.getBoundingClientRect().width || 780) * Math.max(1, stageZoom));
       boardLayerElements.forEach((layerElement, layer) => {
         if (getCircularBlocks().length) layerElement.style.transform = 'rotate(0deg)';
@@ -6395,66 +6931,8 @@
 
         regions.forEach(([code, geometry]) => {
           const renderLayer = getRegionRenderLayer(geometry);
-          if (geometry.shape === 'quadrilateral') {
-            appendCampaignBagIcon(renderLayer, code, geometry, svgNamespace, iconScale);
-            return;
-          }
           const production = Math.max(0, Number(geometry.farmProductionPerTurn) || 0);
-          if (!production) {
-            appendCampaignBagIcon(renderLayer, code, geometry, svgNamespace, iconScale);
-            return;
-          }
-          const tier = Math.max(1, Math.min(5, farmTiers.findIndex((value) => production <= value) + 1));
-          const angle = ((geometry.startAngle + geometry.endAngle) / 2) * Math.PI / 180;
-          const radius = (geometry.innerRadius + geometry.outerRadius) / 2;
-          const centerX = geometry.centerX + radius * Math.cos(angle);
-          const centerY = geometry.centerY - radius * Math.sin(angle);
-          const icon = document.createElementNS(svgNamespace, 'g');
-          icon.setAttribute('transform', `translate(${centerX} ${centerY}) scale(${iconScale})`);
-          icon.setAttribute('aria-label', `Fazenda: ${formatStatisticsNumber(production)} trigo por turno`);
-          icon.setAttribute('pointer-events', 'none');
-          icon.dataset.region = code;
-
-          const background = document.createElementNS(svgNamespace, 'circle');
-          background.setAttribute('r', '15');
-          background.setAttribute('fill', ['#fff2bf', '#f7e8a4', '#eed77d', '#e8c44e', '#dcad2c'][tier - 1]);
-          background.setAttribute('stroke', '#634c1d');
-          background.setAttribute('stroke-width', '1.5');
-          icon.appendChild(background);
-
-          const field = document.createElementNS(svgNamespace, 'path');
-          field.setAttribute('d', 'M-10 9 Q0 5 10 9');
-          field.setAttribute('fill', 'none');
-          field.setAttribute('stroke', '#546b35');
-          field.setAttribute('stroke-width', '1.7');
-          field.setAttribute('stroke-linecap', 'round');
-          icon.appendChild(field);
-
-          const stalkXs = [-7, -3.5, 0, 3.5, 7].slice(0, tier);
-          stalkXs.forEach((x, index) => {
-            const stalk = document.createElementNS(svgNamespace, 'path');
-            const topY = -8 + Math.abs(index - (tier - 1) / 2) * 1.2;
-            stalk.setAttribute('d', `M${x} 7 Q${x - 1} 0 ${x} ${topY}`);
-            stalk.setAttribute('fill', 'none');
-            stalk.setAttribute('stroke', '#526c31');
-            stalk.setAttribute('stroke-width', '1.6');
-            stalk.setAttribute('stroke-linecap', 'round');
-            icon.appendChild(stalk);
-
-            const grain = document.createElementNS(svgNamespace, 'ellipse');
-            grain.setAttribute('cx', String(x));
-            grain.setAttribute('cy', String(topY));
-            grain.setAttribute('rx', '1.8');
-            grain.setAttribute('ry', '2.8');
-            grain.setAttribute('fill', '#9a6a1b');
-            grain.setAttribute('transform', `rotate(-28 ${x} ${topY})`);
-            icon.appendChild(grain);
-          });
-
-          const title = document.createElementNS(svgNamespace, 'title');
-          title.textContent = `Fazenda em ${code}: ${formatStatisticsNumber(production)} trigo por turno`;
-          icon.appendChild(title);
-          renderLayer.appendChild(icon);
+          appendCampaignFarmIcon(renderLayer, code, geometry, svgNamespace, iconScale, farmTiers);
           appendCampaignBagIcon(renderLayer, code, geometry, svgNamespace, iconScale);
         });
       });
@@ -6574,6 +7052,25 @@
       updateWarAvailability();
       if ((gameMode === 'ai' || isCampaignGame()) && isGameStarted && currentTeam === aiTeam) scheduleAiTurn();
       startOnlineMatchWhenReady();
+    }
+
+    async function loadAiConfig() {
+      const fileName = 'will-of-many-ai-config.json';
+      try {
+        let configJson = null;
+        if (location.protocol === 'file:' && window.AndroidBluetooth?.readGameAsset) {
+          configJson = window.AndroidBluetooth.readGameAsset(fileName);
+          if (!configJson) return;
+        } else {
+          const response = await fetch(fileName);
+          if (!response.ok) return;
+          configJson = await response.text();
+        }
+        const parsedConfig = JSON.parse(configJson);
+        window.WillOfManyAI?.setConfig?.(parsedConfig);
+      } catch (error) {
+        console.warn(`Nao foi possivel carregar ${fileName}, usando pesos padrao da IA.`, error);
+      }
     }
 
     async function loadBoardFile(fileName) {
@@ -6869,6 +7366,20 @@
         : victoryPoints.orange === victoryPoints.blue
           ? null
           : victoryPoints.orange > victoryPoints.blue ? 'orange' : 'blue';
+      if (isLevelEightCampaign() && levelEightReplay) {
+        levelEightReplay.result = {
+          winner,
+          reason,
+          finishedAt: new Date().toISOString(),
+          victoryPoints: { ...victoryPoints }
+        };
+        recordLevelEightReplayAction('gameFinished', {
+          team: currentTeam,
+          winner,
+          reason,
+          victoryPoints: { ...victoryPoints }
+        });
+      }
       isGameOver = true;
       isGameStarted = false;
       abandonMatchButton.classList.add('is-hidden');
@@ -6896,6 +7407,7 @@
       if (reason === 'campaign') {
         campaignVictoryMessage.textContent =
           `Você concluiu ${activeCampaignLevel?.name || 'este level'}!`;
+        campaignVictoryReplayButton.classList.toggle('is-hidden', !isLevelEightCampaign());
         campaignNextLevelButton.classList.toggle('is-hidden', !campaignNextLevelId);
         if (campaignNextLevelId) {
           const nextLevelNumber = getCampaignLevelOrder().indexOf(campaignNextLevelId) + 1;
@@ -7037,6 +7549,7 @@
         turnFiveFocus: () => getLevelFiveTurnFiveFocusRegions()
       };
       const resolveRegionTargets = (value) => {
+        if (Array.isArray(value)) return value.flatMap(resolveRegionTargets);
         if (value === 'objectives') return [...campaignObjectiveRegions];
         if (Object.prototype.hasOwnProperty.call(guideRegionTargets, value)) {
           return guideRegionTargets[value]();
@@ -7826,6 +8339,7 @@
       updateWarAvailability();
       updateTurnPointsDisplay();
       campaignActions.classList.toggle('is-hidden', !isCampaignGame() || !isGameStarted);
+      levelEightReplayButton.classList.toggle('is-hidden', !isLevelEightCampaign());
       gameMenuResignButton.classList.toggle('is-hidden', isCampaignGame() || !isGameStarted);
       focusStrongestRegionForTeam(currentTeam);
       updateSelectedRegionPanel(selectedRegionCode);
@@ -7836,7 +8350,11 @@
     }
 
     async function showTurnTransition(roundResult = null) {
-      const playerLabel = currentTeam === 'orange' ? 'JOGADOR LARANJA' : 'JOGADOR AZUL';
+      const isAiTeamTurn = currentTeam === aiTeam &&
+        (gameMode === 'ai' || isCampaignGame()) && isLevelEightAiEnabled();
+      const playerLabel = isAiTeamTurn
+        ? `IA ${currentTeam === 'orange' ? 'LARANJA' : 'AZUL'}`
+        : currentTeam === 'orange' ? 'JOGADOR LARANJA' : 'JOGADOR AZUL';
       const player = document.createElement('span');
       player.className = 'turn-transition-player';
       player.textContent = playerLabel;
@@ -7876,12 +8394,16 @@
     async function scheduleAiTurn() {
       if ((gameMode !== 'ai' && !isCampaignGame()) || !isGameStarted ||
           isGameOver || currentTeam !== aiTeam || isAiTurnRunning) return;
+      if (isLevelEightCampaign() && !levelEightAiEnabled) {
+        updateTurnState();
+        return;
+      }
       isAiTurnRunning = true;
       passTurnButton.disabled = true;
       if (isCampaignGame() && activeCampaignLevel.aiActionsEnabled === false) {
         turnPlayer.textContent = 'Vez: azul · IA inativa';
         isAiTurnRunning = false;
-        await passTurnToNextPlayer();
+        await passTurnToNextPlayer(true);
         return;
       }
       turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA pensando`;
@@ -7891,97 +8413,168 @@
 
       let actionCount = 0;
       let pendingAiFollowUp = null;
-      while (actionCount < 32 && pontosDoTurn[aiTeam] > 0 && !isGameOver) {
-        const pointsBefore = pontosDoTurn[aiTeam];
-        const snapshot = getGameSnapshot();
-        snapshot.pendingAiFollowUp = pendingAiFollowUp;
-        const action = window.WillOfManyAI?.chooseAction(snapshot) || { type: 'pass' };
-        if (action.type === 'rotate') break;
-        if (action.type === 'pass') break;
+      const configuredAiActionLimit = Number(
+        window.WillOfManyAI?.getConfig?.().maxActionsPerTurn
+      );
+      const aiActionLimit = Number.isInteger(configuredAiActionLimit) &&
+        configuredAiActionLimit > 0
+        ? configuredAiActionLimit
+        : 35;
+      async function runAiActions() {
+        while (actionCount < aiActionLimit && pontosDoTurn[aiTeam] > 0 && !isGameOver &&
+            (!isLevelEightCampaign() || levelEightAiEnabled)) {
+          const pointsBefore = pontosDoTurn[aiTeam];
+          const snapshot = getGameSnapshot();
+          snapshot.pendingAiFollowUp = pendingAiFollowUp;
+          const action = window.WillOfManyAI?.chooseAction(snapshot) || { type: 'pass' };
+          if (action.type === 'rotate' || action.type === 'pass') {
+            if (action.type === 'pass') {
+              recordLevelEightReplayAction('aiDecision', {
+                team: aiTeam,
+                decision: { ...action },
+                coinsAvailable: pointsBefore
+              });
+              saveGame();
+            }
+            break;
+          }
 
-        let recycleSucceeded = false;
-        focusActionRegion(action.source, action.target);
-        turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA: ${action.type}`;
-        await waitForWarAnimation(500);
-        if (action.type === 'buy' && action.source) {
-          pendingAiFollowUp = action.followUp || null;
-          selectedRegionCode = action.source;
-          addPiece(aiTeam, action.stage || 'g');
-        } else if (action.type === 'move' && action.source && action.target) {
-          pendingAiFollowUp = null;
-          selectedRegionCode = action.source;
-          performMoveTo(action.target, action.amount || 1);
-        } else if (action.type === 'promote' && action.source && action.target) {
-          pendingAiFollowUp = null;
-          selectedRegionCode = action.source;
-          performPromotion(action.target, action.amount || 1);
-        } else if (action.type === 'relegate' && action.source && action.target && action.stage) {
-          pendingAiFollowUp = null;
-          selectedRegionCode = action.source;
-          performRelegation(action.target, action.stage);
-        } else if (action.type === 'recycle' && action.source && action.stage) {
-          pendingAiFollowUp = null;
-          selectedRegionCode = action.source;
-          recycleSucceeded = recyclePiece(action.source, aiTeam, action.stage);
+          let recycleSucceeded = false;
+          recordLevelEightReplayAction('aiDecision', {
+            team: aiTeam,
+            decision: { ...action },
+            coinsAvailable: pointsBefore
+          });
+          saveGame();
+          const replayActionStartIndex = levelEightReplay?.actions.length || 0;
+          focusActionRegion(action.source, action.target);
+          turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA: ${action.type}`;
+          await waitForWarAnimation(500);
+          if (isLevelEightCampaign() && !levelEightAiEnabled) break;
+          isApplyingAiAction = true;
+          try {
+            if (action.type === 'buy' && action.source) {
+              pendingAiFollowUp = action.followUp || null;
+              selectedRegionCode = action.source;
+              addPiece(aiTeam, action.stage || 'g');
+            } else if (action.type === 'move' && action.source && action.target) {
+              pendingAiFollowUp = null;
+              selectedRegionCode = action.source;
+              performMoveTo(action.target, action.amount || 1);
+            } else if (action.type === 'promote' && action.source && action.target) {
+              pendingAiFollowUp = null;
+              selectedRegionCode = action.source;
+              performPromotion(action.target, action.amount || 1);
+            } else if (action.type === 'relegate' && action.source && action.target && action.stage) {
+              pendingAiFollowUp = null;
+              selectedRegionCode = action.source;
+              performRelegation(action.target, action.stage);
+            } else if (action.type === 'recycle' && action.source && action.stage) {
+              pendingAiFollowUp = null;
+              selectedRegionCode = action.source;
+              recycleSucceeded = recyclePiece(action.source, aiTeam, action.stage);
+            }
+          } finally {
+            isApplyingAiAction = false;
+          }
+          actionCount += 1;
+          await waitForWarAnimation(850);
+          const actionApplied = levelEightReplay
+            ? levelEightReplay.actions.slice(replayActionStartIndex)
+              .some((entry) => entry.type === action.type && entry.team === aiTeam)
+            : action.type === 'recycle'
+              ? recycleSucceeded
+              : pontosDoTurn[aiTeam] < pointsBefore;
+          recordLevelEightReplayAction('aiActionResult', {
+            team: aiTeam,
+            decision: { ...action },
+            applied: actionApplied,
+            coinsBefore: pointsBefore,
+            coinsAfter: pontosDoTurn[aiTeam],
+            message: readout.textContent
+          });
+          saveGame();
+          if (!actionApplied) break;
         }
-        actionCount += 1;
-        await waitForWarAnimation(850);
-        if (pontosDoTurn[aiTeam] >= pointsBefore && !recycleSucceeded) break;
+      }
+      await runAiActions();
+      if (isLevelEightCampaign() && !levelEightAiEnabled) {
+        isAiTurnRunning = false;
+        updateTurnState();
+        return;
       }
 
-      if (!isGameOver && !hasRotatedThisTurn) {
+      let aiRotationApplied = false;
+      if (!isGameOver) {
         let rotationButton = null;
+        try {
+          isApplyingAiAction = true;
+          updateRotationControls();
+        } finally {
+          isApplyingAiAction = false;
+        }
         const suggested = window.WillOfManyAI?.chooseAction(getGameSnapshot());
         if (suggested?.type === 'rotate') {
+          recordLevelEightReplayAction('aiDecision', {
+            team: aiTeam,
+            decision: { ...suggested },
+            coinsAvailable: pontosDoTurn[aiTeam]
+          });
+          saveGame();
+          if (suggested.regionCode) focusActionRegion(suggested.regionCode);
+          selectedRotationPassType = suggested.rotationPassType || 'global';
+          selectedRotationTargetKey = suggested.rotationTargetKey || null;
+          updateRotationControls();
           const candidateLayers = suggested.layers || [suggested.layer];
           for (const candidateLayer of candidateLayers) {
             const candidateButtons = [...document.querySelectorAll(
               `.layer-button[data-layer="${candidateLayer}"][data-direction="${suggested.direction || 'right'}"]`
             )];
             const candidateButton = candidateButtons.find((button) =>
-              button.dataset.rotationBlock) ||
-              candidateButtons.find((button) =>
-                !button.closest('.is-suppressed-by-circular-picker'));
+              (!suggested.blockName || button.dataset.rotationBlock === suggested.blockName) &&
+              (button.dataset.rotationBlock ||
+                !button.closest('.is-suppressed-by-circular-picker')));
             if (candidateButton && !candidateButton.disabled) {
               rotationButton = candidateButton;
               break;
             }
           }
         }
-        if (!rotationButton || rotationButton.disabled) {
-          const availableButtons = [...document.querySelectorAll('.layer-button')]
-            .filter((button) => !button.disabled && Number(button.dataset.layer) >= 2 &&
-              (button.dataset.rotationBlock ||
-                !button.closest('.is-suppressed-by-circular-picker')));
-          rotationButton = availableButtons[Math.floor(Math.random() * availableButtons.length)];
-        }
         if (rotationButton) {
-          focusActionRegion(selectedRegionCode);
           await waitForWarAnimation(500);
           const rotationBefore = rotationAnimationVersion;
           turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA girando disco`;
-          rotationButton.click();
-          await waitForWarAnimation(3200);
-          if (rotationAnimationVersion === rotationBefore) {
-            const retryButton = [...document.querySelectorAll('.layer-button')]
-              .find((button) => !button.disabled && Number(button.dataset.layer) >= 2 &&
-                (button.dataset.rotationBlock ||
-                  !button.closest('.is-suppressed-by-circular-picker')));
-            if (retryButton) {
-              retryButton.click();
-              await waitForWarAnimation(3200);
-            }
+          try {
+            isApplyingAiAction = true;
+            rotationButton.click();
+          } finally {
+            isApplyingAiAction = false;
           }
+          await waitForWarAnimation(3200);
+          aiRotationApplied = rotationAnimationVersion !== rotationBefore;
         }
+        updateRotationControls();
+      }
+      if (!isGameOver && aiRotationApplied && pontosDoTurn[aiTeam] > 0) {
+        await runAiActions();
       }
       isAiTurnRunning = false;
-      if (!isGameOver) await passTurnToNextPlayer();
+      updateTurnState();
+      if (isLevelEightCampaign() && !levelEightAiEnabled) return;
+      if (!isGameOver) await passTurnToNextPlayer(true);
     }
 
-    async function passTurnToNextPlayer() {
-      if (isWarRunning || isGameOver || isAiTurnRunning || !isLocalPlayersTurn()) return;
+    async function passTurnToNextPlayer(fromAi = false) {
+      const aiCanPass = fromAi && currentTeam === aiTeam;
+      if (isWarRunning || isGameOver || isAiTurnRunning ||
+          (!isLocalPlayersTurn() && !aiCanPass)) return;
       passTurnButton.disabled = true;
       const roundResult = scoreCurrentRound();
+      recordLevelEightReplayAction('turnEnded', {
+        team: currentTeam,
+        roundResult: roundResult ? { ...roundResult } : null
+      });
+      saveGame();
       if (finishIfCenterConquered()) return;
       const campaignCurrentTurnLimit = Number(activeCampaignLevel?.turnLimitCurrentTurn);
       if (isCampaignGame() && Number.isFinite(campaignCurrentTurnLimit) &&
@@ -8019,9 +8612,14 @@
           ? getCampaignCoinsPerTurn(activeCampaignLevel, currentTurn)
           : getTurnPointIncome(currentTurn);
       }
-      const wheatReport = isCampaignGame() ? null : applyWheatForTurn(currentTeam);
+      aiTurnStartingPoints = currentTeam === aiTeam ? pontosDoTurn[currentTeam] : null;
+      const wheatReport = isWheatEnabled() ? applyWheatForTurn(currentTeam) : null;
       renderPiecePurchaseButtons();
       recalculateRegionForces();
+      recordLevelEightReplayAction('turnStarted', {
+        team: currentTeam,
+        wheatReport: wheatReport ? { ...wheatReport } : null
+      });
       focusStrongestRegionForTeam(currentTeam);
       updateTurnState();
       updateSelectedRegionPanel(selectedRegionCode);
@@ -8088,7 +8686,7 @@
       startWar(false);
     });
     function performPromotion(targetCode, amount) {
-      if (!isApplyingBluetoothAction && !isLocalPlayersTurn()) return;
+      if (!isCurrentTurnActionAllowed()) return;
       if (!selectedRegionCode) return;
       if (!targetCode) return;
       if (!isRegionAvailableForTeam(targetCode, currentTeam)) {
@@ -8125,6 +8723,14 @@
         target: targetCode,
         amount
       });
+      recordLevelEightReplayAction('promote', {
+        team: currentTeam,
+        source: selectedRegionCode,
+        target: targetCode,
+        amount,
+        cost
+      });
+      saveGame();
       finishIfCenterConquered();
       evaluateCampaignGuideTransitions({
         type: 'actionCompleted',
@@ -8135,7 +8741,7 @@
     }
 
     function performRelegation(targetCode, stage) {
-      if (!isApplyingBluetoothAction && !isLocalPlayersTurn()) return;
+      if (!isCurrentTurnActionAllowed()) return;
       const sourceCode = selectedRegionCode;
       if (!sourceCode || !targetCode ||
           !Object.prototype.hasOwnProperty.call(soldierWeights, stage)) return;
@@ -8180,6 +8786,14 @@
         target: targetCode,
         stage
       });
+      recordLevelEightReplayAction('relegate', {
+        team: currentTeam,
+        source: sourceCode,
+        target: targetCode,
+        stage,
+        refund
+      });
+      saveGame();
       finishIfCenterConquered();
       evaluateCampaignGuideTransitions({
         type: 'actionCompleted',
@@ -8215,7 +8829,7 @@
     }
 
     function performMoveTo(neighbor, amount) {
-      if (!isApplyingBluetoothAction && !isLocalPlayersTurn()) return;
+      if (!isCurrentTurnActionAllowed()) return;
       if (!selectedRegionCode) return;
       if (!neighbor) return;
       const sourceCode = selectedRegionCode;
@@ -8284,6 +8898,14 @@
         target: neighbor,
         amount
       });
+      recordLevelEightReplayAction('move', {
+        team: currentTeam,
+        source: sourceCode,
+        target: neighbor,
+        amount,
+        cost
+      });
+      saveGame();
       finishIfCenterConquered();
       evaluateCampaignGuideTransitions({
         type: 'regionMoved',
@@ -8321,6 +8943,18 @@
     statisticsButton.addEventListener('click', () => {
       renderStatistics();
       statisticsModal.classList.remove('is-hidden');
+    });
+    levelEightAiToggle.addEventListener('click', () => {
+      if (!isLevelEightCampaign()) return;
+      levelEightAiEnabled = !levelEightAiEnabled;
+      updateTurnState();
+      if (levelEightAiEnabled && currentTeam === aiTeam) scheduleAiTurn();
+    });
+    levelEightViewDataButton.addEventListener('click', () => {
+      if (!isLevelEightCampaign() && !isCircularBoardDebugMode()) return;
+      renderLevelEightDesirabilityData();
+      levelEightDataModal.classList.remove('is-hidden');
+      levelEightDataModal.setAttribute('aria-hidden', 'false');
     });
     function changeDebugZoom(delta) {
       const next = Number(Math.min(2.5, Math.max(0.5, debugZoom + delta)).toFixed(2));
@@ -8474,9 +9108,19 @@
         return !!onlineSocket && onlineSocket.readyState === WebSocket.OPEN &&
           currentTeam === onlineTeam;
       }
+      if (gameMode === 'ai' || isCampaignGame()) {
+        if (isLevelEightCampaign() && !levelEightAiEnabled && currentTeam === aiTeam) {
+          return !isGameOver && !isWarRunning;
+        }
+        return currentTeam === humanTeam && !isAiTurnRunning;
+      }
       if (!isBluetoothGame()) return true;
       const localTeam = bluetoothRole === 'host' ? 'orange' : 'blue';
       return bluetoothConnected && currentTeam === localTeam;
+    }
+
+    function isCurrentTurnActionAllowed() {
+      return isApplyingBluetoothAction || isApplyingAiAction || isLocalPlayersTurn();
     }
 
     function sendBluetoothMessage(message) {
@@ -9443,17 +10087,25 @@
         pontosDoTurn.blue = activeCampaignLevel.aiActionsEnabled === false
           ? 0
           : campaignStartingBalance;
+        if (activeCampaignLevel.initialWheat && typeof activeCampaignLevel.initialWheat === 'object') {
+          for (const team of ['orange', 'blue']) {
+            const balance = Number(activeCampaignLevel.initialWheat[team]);
+            wheatBalances[team] = Number.isFinite(balance) ? Math.max(0, balance) : 0;
+          }
+        }
       }
+      aiTurnStartingPoints = currentTeam === aiTeam ? pontosDoTurn[currentTeam] : null;
       renderBoardLayers();
       for (let layer = 1; layer <= 8; layer += 1) {
         if (allRegionMasks[layer]) recomputeNeighborCacheForLayer(layer);
       }
       recalculateRegionForces();
       if (isCampaignGame()) focusStrongestRegionForTeam('orange');
-      const wheatReport = isCampaignGame() ? null : applyWheatForTurn(currentTeam);
+      const wheatReport = isWheatEnabled() ? applyWheatForTurn(currentTeam) : null;
       refreshRegionVisuals();
       updateRotationControls();
       updateSelectedRegionPanel();
+      levelEightReplay = isLevelEightCampaign() ? createLevelEightReplay() : null;
       captureCampaignTurnStartSnapshot();
       saveGame();
       showGameBoard();
@@ -9549,11 +10201,13 @@
       const isOpening = gameMenu.classList.contains('is-hidden');
       gameMenu.classList.toggle('is-hidden', !isOpening);
       gameMenu.setAttribute('aria-hidden', String(!isOpening));
+      levelEightReplayButton.classList.toggle('is-hidden', !isLevelEightCampaign());
       if (isOpening) {
         campaignActions.classList.toggle('is-hidden', !isCampaignGame());
         gameMenuResignButton.classList.toggle('is-hidden', isCampaignGame());
       }
     });
+    levelEightReplayButton.addEventListener('click', exportLevelEightReplay);
     gameMenu.addEventListener('click', (event) => {
       if (event.target === gameMenu) {
         gameMenu.classList.add('is-hidden');
@@ -9724,6 +10378,7 @@
       campaignNextLevelId = null;
       await beginConfiguredGame();
     });
+    campaignVictoryReplayButton.addEventListener('click', exportLevelEightReplay);
     campaignVictoryMenuButton.addEventListener('click', returnCampaignToMenu);
     startBackButton.addEventListener('click', () => {
       if (window.AndroidBluetooth && bluetoothRole && !isGameStarted) {
@@ -9768,6 +10423,7 @@
     updateReadout();
     updateSelectedRegionPanel();
     loadRegionMasks();
+    loadAiConfig();
     if (new URLSearchParams(location.search).get('mode') === 'online') {
       document.querySelector('[data-start-action="new"]').click();
       document.querySelector('#game-mode-options [data-mode="online"]').click();

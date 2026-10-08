@@ -42,7 +42,11 @@ const levelSevenBoard = JSON.parse(fs.readFileSync(
   path.join(root, 'tabuleiro-07.json'),
   'utf8'
 ));
-const campaignBoards = Array.from({ length: 7 }, (_, index) => JSON.parse(fs.readFileSync(
+const levelEightBoard = JSON.parse(fs.readFileSync(
+  path.join(root, 'tabuleiro-08.json'),
+  'utf8'
+));
+const campaignBoards = Array.from({ length: 8 }, (_, index) => JSON.parse(fs.readFileSync(
   path.join(root, `tabuleiro-${String(index + 1).padStart(2, '0')}.json`),
   'utf8'
 )));
@@ -82,6 +86,8 @@ test('Android and server builds package all external client resources', () => {
     assert.ok(serverGradle.includes(`include "${resource}"`), `server includes ${resource}`);
   });
   assert.ok(androidGradle.includes('include("*.json")'), 'Android includes board JSON files');
+  assert.ok(serverGradle.includes('include "will-of-many-ai-config.json"'),
+    'server includes the user-adjustable AI strategy');
   assert.ok(androidGradle.includes('include("*.png")'), 'Android includes campaign map images');
   assert.ok(serverGradle.includes('include "*.png"'), 'server includes campaign map images');
   [
@@ -94,7 +100,8 @@ test('Android and server builds package all external client resources', () => {
     'tabuleiro-04.json',
     'tabuleiro-05.json',
     'tabuleiro-06.json',
-    'tabuleiro-07.json'
+    'tabuleiro-07.json',
+    'tabuleiro-08.json'
   ].forEach((resource) => {
     assert.ok(serverGradle.includes(`include "${resource}"`), `server includes ${resource}`);
   });
@@ -106,6 +113,8 @@ test('Android and server builds package all external client resources', () => {
     'Android permits reading the Level 6 board asset');
   assert.match(androidMainActivity, /"tabuleiro-07\.json"\.equals\(fileName\)/,
     'Android permits reading the Level 7 board asset');
+  assert.match(androidMainActivity, /"tabuleiro-08\.json"\.equals\(fileName\)/,
+    'Android permits reading the Level 8 board asset');
 });
 
 test('new non-campaign games select the circular board configuration', () => {
@@ -150,6 +159,83 @@ test('piece slot centers stay unrotated until the piece is drawn once at the dis
   assert.match(gameClient, /const slots = getBalancedRegionSlots\(regionCode, availableSlots, totalPieces\);[\s\S]*?const rotation = \(getRegionVisualRotation\(regionCode\) \* Math\.PI\) \/ 180;[\s\S]*?const rotatedX = rotationCenter\.x \+ \(localX \* cos - localY \* sin\);/);
 });
 
+test('AI spends remaining actions after rotating the board', () => {
+  const scheduleStart = gameClient.indexOf('async function scheduleAiTurn()');
+  const scheduleEnd = gameClient.indexOf('async function passTurnToNextPlayer()', scheduleStart);
+  const schedule = gameClient.slice(scheduleStart, scheduleEnd);
+
+  assert.match(schedule, /async function runAiActions\(\)/);
+  assert.match(
+    schedule,
+    /await runAiActions\(\);[\s\S]*?if \(!isGameOver && aiRotationApplied && pontosDoTurn\[aiTeam\] > 0\) \{\s*await runAiActions\(\);\s*\}/
+  );
+  assert.match(schedule, /if \(!actionApplied\) break;/);
+  assert.doesNotMatch(schedule, /pontosDoTurn\[aiTeam\] >= pointsBefore && !recycleSucceeded/);
+});
+
+test('campaign keeps blue assigned to the AI and blocks human actions during its turn', () => {
+  assert.match(gameClient, /humanTeam = gameMode === 'campaign'\s*\?\s*'orange'/);
+  assert.match(gameClient, /: gameMode === 'campaign' \? 'blue' : null/);
+  assert.match(gameClient, /if \(gameMode === 'ai' \|\| isCampaignGame\(\)\) \{\s*if \(isLevelEightCampaign\(\) && !levelEightAiEnabled && currentTeam === aiTeam\) \{\s*return !isGameOver && !isWarRunning;\s*\}\s*return currentTeam === humanTeam && !isAiTurnRunning;\s*\}/);
+  assert.match(gameClient, /function isCurrentTurnActionAllowed\(\) \{\s*return isApplyingBluetoothAction \|\| isApplyingAiAction \|\| isLocalPlayersTurn\(\);\s*\}/);
+  assert.match(gameClient, /isApplyingAiAction = true;[\s\S]*?addPiece\(aiTeam, action\.stage \|\| 'g'\)/);
+  assert.match(gameClient, /isApplyingAiAction = true;\s*updateRotationControls\(\);/);
+  assert.match(gameClient, /if \(isLevelEightCampaign\(\) && !levelEightAiEnabled\) \{\s*updateTurnState\(\);\s*return;\s*\}/);
+  assert.match(gameClient, /passTurnToNextPlayer\(true\)/);
+  assert.match(gameClient, /const playerLabel = isAiTeamTurn\s*\?\s*`IA \$\{currentTeam === 'orange' \? 'LARANJA' : 'AZUL'\}`/);
+});
+
+test('Level 8 debug controls toggle AI and show desirability and all region distances', () => {
+  assert.match(html, /id="level-eight-ai-toggle"[^>]*>Desativar IA/);
+  assert.match(html, /id="level-eight-view-data"[^>]*>Ver dados/);
+  assert.match(html, /id="level-eight-data-modal"[^]*?id="level-eight-ranking-table-container"[^]*?id="level-eight-distance-table-container"/);
+  assert.match(gameClient, /levelEightAiToggle\.addEventListener\('click'/);
+  assert.match(gameClient, /levelEightViewDataButton\.addEventListener\('click'/);
+  assert.match(gameClient, /function isCircularBoardDebugMode\(\) \{\s*return !isCampaignGame\(\) && currentBoardData\?\.boardType === 'circular';/);
+  assert.match(gameClient, /const showDesirabilityData = showAiToggle \|\| isCircularBoardDebugMode\(\);/);
+  assert.match(gameClient, /levelEightAiToggle\.classList\.toggle\('is-hidden', !showAiToggle\)/);
+  assert.match(gameClient, /if \(!isLevelEightCampaign\(\) && !isCircularBoardDebugMode\(\)\) return;/);
+  assert.match(gameClient, /ai\.calculateCurrentDesirability\(snapshot, config\?\.desirability\)/);
+  assert.match(gameClient, /Math\.hypot\(selectedX - x, selectedY - y\)/);
+  assert.match(gameClient, /'Desejabilidade interna'[\s\S]*?'Desejabilidade externa'[\s\S]*?'Desejabilidade total'[\s\S]*?'Maior distância do tabuleiro'/);
+  assert.match(gameClient, /selectedScore\.internalBreakdown/);
+  assert.match(gameClient, /description \? ` — \$\{description\}` : ''/);
+  assert.match(gameClient, /'Contribuição à desejabilidade externa'[\s\S]*?'Desejabilidade interna'/);
+  assert.match(gameClient, /Ranking por desejabilidade total|Object\.values\(analysis\.regions\)[\s\S]*?second\.total - first\.total/);
+});
+
+test('AI saves and snapshots the starting coin balance for the current turn', () => {
+  assert.match(gameClient, /aiTurnStartingPoints,/);
+  assert.match(gameClient, /points: pontosDoTurn\[aiTeam\],[\s\S]*?aiTurnStartingPoints,/);
+  assert.match(gameClient, /aiTurnStartingPoints = currentTeam === aiTeam \? pontosDoTurn\[currentTeam\] : null/);
+  assert.match(gameClient, /Number\.isFinite\(savedAiTurnStartingPoints\)[\s\S]*?pontosDoTurn\[currentTeam\]/);
+});
+
+test('AI action limit is taken from the editable strategy configuration', () => {
+  assert.match(gameClient, /getConfig\?\.\(\)\.maxActionsPerTurn/);
+  assert.match(gameClient, /while \(actionCount < aiActionLimit/);
+  assert.doesNotMatch(gameClient, /while \(actionCount < 32/);
+});
+
+test('circular region desirability uses annular sector centroids without changing drawing centers', () => {
+  assert.match(gameClient, /const desirabilityCenter = regionGeometry\.shape === 'circular'[\s\S]*?gameRules\.getAnnularSectorCentroid/);
+  assert.match(gameClient, /desirabilityCenterX: desirabilityCenter\.x,[\s\S]*?desirabilityCenterY: desirabilityCenter\.y/);
+  assert.match(gameClient, /centerX: Number\(geometry\.desirabilityCenterX \?\? geometry\.centerX\)/);
+  assert.match(gameClient, /centerY: Number\(geometry\.desirabilityCenterY \?\? geometry\.centerY\)/);
+});
+
+test('buying a piece does not run relegation replay logic outside its scope', () => {
+  const buyStart = gameClient.indexOf('function addPiece(team, stage)');
+  const buyEnd = gameClient.indexOf('function getRegionRotationCenter', buyStart);
+  const buy = gameClient.slice(buyStart, buyEnd);
+  const relegationStart = gameClient.indexOf('function performRelegation(targetCode, stage)');
+  const relegationEnd = gameClient.indexOf('function collectCampaignBagAtRegion', relegationStart);
+  const relegation = gameClient.slice(relegationStart, relegationEnd);
+
+  assert.doesNotMatch(buy, /recordLevelEightReplayAction\('relegate'/);
+  assert.match(relegation, /recordLevelEightReplayAction\('relegate', \{\s*team: currentTeam,\s*source: sourceCode,\s*target: targetCode,\s*stage,\s*refund/);
+});
+
 test('Level 2 circular sector regions share the configured BC03 disk and preserve rotation', () => {
   assert.equal(levelTwoBoard.campaign.preserveCoinsBetweenTurns, true);
   const circularBlock = levelTwoBoard.blocks.find((block) => block.name === 'BC03');
@@ -174,7 +260,7 @@ test('Level 3 board preserves its campaign rules and all configured block placem
   assert.match(gameClient, /regionRotationBlockName\.textContent = rotationBlockLabel;/);
   assert.match(gameClient, /regionBagCoins\.textContent = hasUncollectedBag[\s\S]*?Saco de moedas:/);
   assert.match(html, /id="region-bag-coins" class="is-hidden"/);
-  assert.match(gameClient, /\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)/);
+  assert.match(gameClient, /\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)/);
   assert.match(
     gameClient,
     /function getRegionFocusPoint\(regionCode, applyRotation = true\) \{[\s\S]*?geometry\?\.shape === 'quadrilateral' &&\s*Array\.isArray\(geometry\.cells\)[\s\S]*?cell\.x - cell\.width \/ 2[\s\S]*?cell\.x \+ cell\.width \/ 2[\s\S]*?return \{\s*x: \(\(bounds\.left \+ bounds\.right\) \/ 2 \/ 908\) \* 100/
@@ -305,6 +391,7 @@ test('campaign guides configure valid objective regions and event-driven transit
     (campaign.objectiveRegions || []).forEach((region) => {
       assert.ok(regionCodes.has(region), `${campaign.id} objective ${region} exists`);
     });
+
     (guide.transitions || []).forEach((transition) => {
       const sources = Array.isArray(transition.from) ? transition.from : [transition.from];
       sources.forEach((source) => {
@@ -397,6 +484,37 @@ test('campaign guides configure valid objective regions and event-driven transit
     'actionCompleted',
     'turnStarted'
   ].forEach((type) => assert.match(gameClient, new RegExp(`type: '${type}'`)));
+});
+
+test('Level 8 saves an exportable action replay with per-action board metrics', () => {
+  assert.match(html, /id="level-eight-replay-button"/);
+  assert.match(html, /id="campaign-victory-replay-button"/);
+  assert.match(gameClient, /function createLevelEightReplay\(coverage = 'complete'\)/);
+  assert.match(gameClient, /function getLevelEightReplayState\(includePieceComposition = false\)/);
+  assert.match(gameClient, /levelEightReplay: levelEightReplay \? JSON\.parse/);
+  assert.match(gameClient, /function recordLevelEightReplayAction\(type, details = \{\}\)/);
+  [
+    'buy',
+    'move',
+    'promote',
+    'relegate',
+    'recycle',
+    'rotate',
+    'battle',
+    'warCompleted',
+    'aiDecision',
+    'aiActionResult',
+    'gameFinished',
+    'turnEnded',
+    'turnStarted'
+  ].forEach((action) => {
+    assert.ok(gameClient.includes(`recordLevelEightReplayAction('${action}'`),
+      `replay records ${action} actions`);
+  });
+  assert.match(androidMainActivity, /public void saveReplay\(String fileName, String replayJson\)/);
+  assert.match(androidMainActivity, /Intent\.ACTION_CREATE_DOCUMENT/);
+  assert.match(androidMainActivity, /REQUEST_SAVE_REPLAY/);
+  assert.match(androidMainActivity, /openOutputStream\(data\.getData\(\)\)/);
 });
 
 test('Level 5 defines its four blocks, campaign economy, deadline, and doubled BQ01 rotation', () => {
@@ -501,11 +619,11 @@ test('Level 5 defines its four blocks, campaign economy, deadline, and doubled B
   );
   assert.match(
     gameClient,
-    /if \(\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)[\s\S]*?for \(let row = 0; row < 2; row \+= 1\)[\s\S]*?for \(let column = 0; column < 4; column \+= 1\)[\s\S]*?\.slice\(0, 8\)/
+    /if \(\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)[\s\S]*?for \(let row = 0; row < 2; row \+= 1\)[\s\S]*?for \(let column = 0; column < 4; column \+= 1\)[\s\S]*?\.slice\(0, 8\)/
   );
   assert.match(
     gameClient,
-    /if \(currentBoardData\?\.boardType === 'mixed' \|\|\s*\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;\s*stageZoomOffset = \{\s*x: \(\(50 - point\.x\) \/ 100\) \* rect\.width \* scale,\s*y: \(\(50 - point\.y\) \/ 100\) \* rect\.height \* scale/
+    /if \(currentBoardData\?\.boardType === 'mixed' \|\|\s*\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;\s*stageZoomOffset = \{\s*x: \(\(50 - point\.x\) \/ 100\) \* rect\.width \* scale,\s*y: \(\(50 - point\.y\) \/ 100\) \* rect\.height \* scale/
   );
   assert.match(gameClient, /gameRules\.rotateQuadrilateralMatrixPath\(matrix, direction, rotationPath\)/);
   assert.match(gameClient, /function getQuadrilateralRegionRotationPath\(block, region, target\)[\s\S]*?target\.rotationType === 'linear'[\s\S]*?getQuadrilateralMatrixLinearPaths/);
@@ -576,6 +694,7 @@ test('Level 6 defines its complete 5x5 board, no-income campaign, and ring/linea
   assert.equal(levelSixGuide.steps['level6-rank-tip'].focusRegion, 'L6-13');
   assert.match(gameClient, /'tabuleiro-06': 'tabuleiro-06\.json'/);
   assert.match(gameClient, /'tabuleiro-07': 'tabuleiro-07\.json'/);
+  assert.match(gameClient, /'tabuleiro-08': 'tabuleiro-08\.json'/);
   assert.match(gameClient, /activeCampaignLevel\.objectiveText \|\| `conquiste/);
   assert.match(gameClient, /function finishCampaignIfObjectiveMet\(\)[\s\S]*?campaignObjectiveRegions\.every\(\(regionCode\) => getRegionDominador\(regionCode\) === 'orange'\)/);
 
@@ -709,16 +828,16 @@ test('Level 6 defines its complete 5x5 board, no-income campaign, and ring/linea
   );
   assert.match(
     gameClient,
-    /if \(currentBoardData\?\.boardType === 'mixed' \|\|\s*\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;/
+    /if \(currentBoardData\?\.boardType === 'mixed' \|\|\s*\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;/
   );
   assert.match(
     gameClient,
-    /if \(\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\) &&\s*geometry\?\.shape === 'quadrilateral'/
+    /if \(\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\) &&\s*geometry\?\.shape === 'quadrilateral'/
   );
   assert.match(gameClient, /function focusRegion\(regionCode, focusScale = null\)[\s\S]*?Number\(focusScale\) \|\| Number\(currentBoardData\?\.regionFocusScale\)/);
   assert.match(
     gameClient,
-    /const restoreCampaignWarView = isCampaignGame\(\) &&\s*\['tabuleiro-06', 'tabuleiro-07'\]\.includes\(activeCampaignLevel\.id\)[\s\S]*?focusRegion\(block\.regionCode, restoreCampaignWarView \? 2 : null\)[\s\S]*?if \(restoreCampaignWarView\) restoreStageView\(\);\s*else resetStageZoom\(\)/
+    /const restoreCampaignWarView = isCampaignGame\(\) &&\s*\['tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\.includes\(activeCampaignLevel\.id\)[\s\S]*?focusRegion\(block\.regionCode, restoreCampaignWarView \? 2 : null\)[\s\S]*?if \(restoreCampaignWarView\) restoreStageView\(\);\s*else resetStageZoom\(\)/
   );
   assert.match(gameClient, /if \(!blocks\.length\)[\s\S]*?restoreStageView\(\)/);
 });
@@ -739,6 +858,87 @@ test('Level 7 duplicates Level 6 with every initial piece team swapped', () => {
   assert.equal(levelSevenBoard.campaign.guide.initialStep, 'level7-intro');
   assert.equal(levelSevenBoard.campaign.guide.steps['level7-intro'].next, 'level7-rank-tip');
   assert.equal(levelSevenBoard.campaign.guide.steps['level7-rank-tip'].focusRegion, 'L6-13');
+});
+
+test('Level 8 defines unique regions, fixed singleton cells, rotating rings, and starting forces', () => {
+  const regions = levelEightBoard.blocks.flatMap((block) => block.regions);
+  const regionCodes = regions.map((region) => region.code);
+  const initialPieces = Object.fromEntries(regions
+    .filter((region) => region.initialPieces.length)
+    .map((region) => [region.code, region.initialPieces]));
+
+  assert.equal(levelEightBoard.campaign.id, 'tabuleiro-08');
+  assert.equal(levelEightBoard.campaign.initialCoins, 60);
+  assert.equal(levelEightBoard.campaign.coinsPerTurn, 60);
+  assert.equal(levelEightBoard.campaign.aiActionsEnabled, true);
+  assert.equal(levelEightBoard.campaign.wheatEnabled, true);
+  assert.deepEqual(levelEightBoard.campaign.initialWheat, { orange: 100, blue: 100 });
+  assert.match(
+    gameClient,
+    /if \(activeCampaignLevel\.initialWheat && typeof activeCampaignLevel\.initialWheat === 'object'\) \{\s*for \(const team of \['orange', 'blue'\]\) \{\s*const balance = Number\(activeCampaignLevel\.initialWheat\[team\]\);\s*wheatBalances\[team\] = Number\.isFinite\(balance\) \? Math\.max\(0, balance\) : 0;\s*\}\s*\}[\s\S]*?const wheatReport = isWheatEnabled\(\) \? applyWheatForTurn\(currentTeam\) : null;/
+  );
+  assert.equal(levelEightBoard.blocks.length, 16);
+  assert.equal(regions.length, 48);
+  assert.equal(new Set(regionCodes).size, 48, 'every physical region has a unique global code');
+  assert.deepEqual(
+    regions.filter((region) => region.layer === 7).map((region) => region.code)
+      .sort((left, right) => Number(left.split('-')[1]) - Number(right.split('-')[1])),
+    Array.from({ length: 32 }, (_, index) => `L7-${index + 1}`)
+  );
+  assert.deepEqual(
+    regions.filter((region) => region.layer === 6).map((region) => region.code)
+      .sort((left, right) => Number(left.split('-')[1]) - Number(right.split('-')[1])),
+    Array.from({ length: 8 }, (_, index) => `L6-${index + 1}`)
+  );
+  assert.deepEqual(levelEightBoard.blocks.slice(0, 12).map((block) => block.rotationEnabled),
+    Array(12).fill(false));
+  assert.deepEqual(levelEightBoard.blocks.slice(12).map((block) => block.rotationEnabled),
+    Array(4).fill(true));
+  assert.deepEqual(levelEightBoard.blocks.slice(12).map((block) => block.linearRotationEnabled),
+    Array(4).fill(false));
+  assert.deepEqual(levelEightBoard.blocks.map((block) => [
+    block.C_inicial.x, block.C_inicial.y
+  ]), [
+    [1250, 75], [3250, 75], [250, 375], [2250, 375],
+    [4250, 375], [1250, 675], [3250, 675], [250, 975],
+    [2250, 975], [4250, 975], [1250, 1275], [3250, 1275],
+    [750, 225], [750, 825], [2750, 225], [2750, 825]
+  ]);
+  assert.ok(regions.every((region) => region.maxPieces === region.layer));
+  assert.deepEqual(levelEightBoard.blocks[12].matrix, [
+    ['L7-1', 'L7-2', 'L7-3'],
+    ['L7-4', 'L6-5', 'L7-5'],
+    ['L7-6', 'L7-7', 'L7-8']
+  ]);
+  assert.equal(gameRules.getQuadrilateralMatrixRotationGroups(
+    levelEightBoard.blocks[12].matrix, 'L7-1', false
+  )[0].type, 'ring');
+  assert.deepEqual(gameRules.getQuadrilateralMatrixRotationGroups(
+    levelEightBoard.blocks[12].matrix, 'L6-5', false
+  ), []);
+  assert.deepEqual(Object.keys(initialPieces).sort(), ['L8-1', 'L8-2', 'L8-7', 'L8-8']);
+  assert.deepEqual(initialPieces['L8-1'], [{ team: 'blue', stage: 'g' }]);
+  assert.deepEqual(initialPieces['L8-2'], [{ team: 'blue', stage: 'g' }]);
+  assert.deepEqual(initialPieces['L8-7'], [{ team: 'orange', stage: 'g' }]);
+  assert.deepEqual(initialPieces['L8-8'], [{ team: 'blue', stage: 'g' }]);
+  const farms = Object.fromEntries(regions
+    .filter((region) => region.farmProductionPerTurn)
+    .map((region) => [region.code, region.farmProductionPerTurn]));
+  assert.deepEqual(farms, {
+    'L8-3': 250,
+    'L8-4': 250,
+    'L8-5': 250,
+    'L8-6': 250
+  });
+  assert.match(gameClient, /function isWheatEnabled\(\) \{\s*return !isCampaignGame\(\) \|\| activeCampaignLevel\.wheatEnabled === true;/);
+  assert.match(gameClient, /farmProductionPerTurn: Math\.max\([\s\S]*?wheatEnabled: isWheatEnabled\(\),\s*wheatTotalsByTeam:/);
+  assert.equal((gameClient.match(/const wheatReport = isWheatEnabled\(\)/g) || []).length, 2);
+  assert.match(gameClient, /function appendCampaignFarmIcon\([\s\S]*?geometry\.shape === 'circular'[\s\S]*?appendCampaignFarmIcon\(renderLayer, code, geometry/);
+  assert.match(gameClient, /window\.WillOfManyRules\.farmProductionByLevel/);
+  assert.match(gameClient, /const tierIndex = farmTiers\.findIndex/);
+  assert.doesNotMatch(gameClient, /const farmTiers = \[250, 1000, 4000, 16000, 50000\]/);
+  assert.deepEqual(levelEightBoard.campaign.objectiveRegions.slice().sort(), regionCodes.slice().sort());
+  assert.equal(levelEightBoard.campaign.objective.type, 'captureAllRegions');
 });
 
 test('campaign guide scripts and presentation settings are configured per level', () => {
@@ -799,6 +999,8 @@ test('campaign guide scripts and presentation settings are configured per level'
 test('campaign guide resolves JSON-configured region, button, and state targets', () => {
   assert.match(gameClient, /pieceButton: \(stage\) => \[/);
   assert.match(gameClient, /regions: \(value\) => resolveRegionTargets\(value\)/);
+  assert.match(gameClient,
+    /const resolveRegionTargets = \(value\) => \{\s*if \(Array\.isArray\(value\)\) return value\.flatMap\(resolveRegionTargets\);/);
   assert.match(gameClient, /function applyCampaignGuideStatePresentation\(state\)/);
   assert.match(gameClient, /statePresentation\?\.\[state\]/);
   assert.equal(campaignBoards[0].campaign.guide.steps.purchase.highlight[0], 'pieceButton:g');
@@ -810,7 +1012,9 @@ test('campaign guide resolves JSON-configured region, button, and state targets'
 test('Level 5 guide stores its lesson sequence, focus, and focus restoration in JSON', () => {
   const guide = levelFiveBoard.campaign.guide;
   assert.equal(guide.initialStep, 'level5-intro');
+  assert.ok(guide.steps['level5-intro'].highlight.includes('regions:objectives'));
   assert.equal(guide.steps['level5-intro'].next, 'level5-neighbor-tip');
+  assert.ok(guide.steps['level5-neighbor-tip'].highlight.includes('regions:L8-10,L8-8'));
   assert.equal(guide.steps['level5-neighbor-tip'].next, 'await-level5-l8-10');
   assert.equal(guide.steps['level5-rotation-groups-tip'].next, 'level5-rotation-passes-tip');
   assert.equal(guide.steps['level5-turn3-tip'].restoreFocusTeam, 'orange');
@@ -894,6 +1098,8 @@ test('campaign mode opens a custom illustrated trail with data-driven unlocked l
   assert.match(html, /id="campaign-trail-levels"/);
   assert.match(gameClient, /function renderCampaignTrail\(\)/);
   assert.match(gameClient, /getCampaignLevelOrder\(\)/);
+  assert.match(gameClient, /const campaignAllLevelsUnlockedForTesting = true;/);
+  assert.match(gameClient, /const unlockedThrough = campaignAllLevelsUnlockedForTesting\s*\?\s*levels\.length - 1\s*:\s*levels\.indexOf\(getUnlockedCampaignLevelId\(\)\)/);
   assert.match(gameClient, /button\.disabled = !isUnlocked/);
   assert.match(gameClient, /button\.dataset\.levelId = levelId/);
   assert.match(gameClient, /function getCampaignTrailPosition\(index\)/);

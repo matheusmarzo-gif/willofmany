@@ -31,6 +31,8 @@ nova: confira a branch, o commit e o estado do Git conforme abaixo.
    preservando as mudanças locais.
 5. O APK entregue é uma saída de build, não a fonte do código. Seu caminho usual é
    `C:\Users\MATHEUS\Desktop\matheus - the will of many\android-app\app\build\outputs\apk\debug\app-debug.apk`.
+6. Não confunda **Level 8** (a oitava missão de campanha, `tabuleiro-08.json`) com
+   **L8** (o rank/camada mais externo do mapa). São conceitos independentes.
 
 ## Ordem de leitura do código
 
@@ -44,8 +46,8 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
    relevantes de `game-client.js`, `game-rules.js` ou arquivos de plataforma.
    Evite despejar ou ler o arquivo todo sem necessidade.
 5. Leia os JSONs do tabuleiro ou dados de região envolvidos antes de alterar
-   valores codificados. O tabuleiro de campanha é configurado em
-   `tabuleiro-01.json`, `tabuleiro-02.json` e `tabuleiro-03.json`. Blocos
+   valores codificados. Os tabuleiros de campanha são configurados em
+   `tabuleiro-01.json`–`tabuleiro-08.json`. Blocos
    quadriculares rotativos são selecionados individualmente, e a rotação
    recursiva dos anéis é definida pela matriz quadrada do bloco.
 6. Leia os testes relacionados e procure consumidores da regra em IA, campanha,
@@ -61,6 +63,8 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
 - `game-rules.js`: regras puras de composição, contagem e custo; exporta
   `window.WillOfManyRules` no navegador e CommonJS nos testes.
 - `will-of-many-ai.js`: decisões da IA.
+- `will-of-many-ai-config.json`: pesos, faixas de desejabilidade, bônus de trigo,
+  proporções de tropas, penalidades temporárias e critérios de reciclagem editáveis.
 - `tabuleiro-01.json` / `tabuleiro-02.json` / `tabuleiro-03.json`: dados
   específicos dos níveis de campanha.
 - `regioes-will-of-many-circular.json`: dados-base carregados para o tabuleiro
@@ -84,6 +88,10 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
 - Ao introduzir/remover arquivo web, confira `index.html`, a tarefa
   `prepareWebAssets` do Android e `server-app/build.gradle`. O jogo precisa manter
   os mesmos caminhos tanto no navegador, quanto no WebView e no servidor.
+- Ao alterar a estratégia da IA, sincronize os padrões com
+  `will-of-many-ai-config.json`, a carga de configuração do cliente e a inclusão
+  do JSON nos assets Android/servidor. Custos efetivos continuam sendo regras do
+  jogo e não devem ser substituídos por pesos de estratégia.
 - A ordem do cliente é importante: `game.css`, `game-rules.js`,
   `will-of-many-ai.js`, depois `game-client.js`.
 - Tabuleiros usam JSONs externos. Se o carregamento falhar, exiba/trate o erro;

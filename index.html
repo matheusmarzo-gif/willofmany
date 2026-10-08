@@ -192,6 +192,7 @@
         <h2 id="game-menu-title">Menu</h2>
         <div class="campaign-actions is-hidden" id="campaign-actions">
           <button id="campaign-restart-turn-button" type="button" title="Reiniciar o turno atual" disabled>Reiniciar turno</button>
+          <button id="level-eight-replay-button" class="is-hidden" type="button">Salvar replay (JSON)</button>
           <button id="campaign-menu-button" type="button">Retornar ao menu principal</button>
           <button id="campaign-restart-button" type="button">Reiniciar level</button>
         </div>
@@ -210,6 +211,10 @@
         <p id="campaign-objective" class="is-hidden"></p>
         <p id="turn-wheat"><svg id="turn-wheat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V4m0 5C8 9 6 7 6 4c4 0 6 2 6 5Zm0 5c4 0 6-2 6-5-4 0-6 2-6 5Zm0-4C8 12 6 10 6 7c4 0 6 2 6 5Zm0 7c4 0 6-2 6-5-4 0-6 2-6 5Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></svg><span id="turn-wheat-value">Trigo: 0</span></p>
         <p id="wheat-feedback" class="is-hidden" aria-live="polite"></p>
+        <div class="level-eight-debug-actions is-hidden" id="level-eight-debug-actions">
+          <button class="turn-button" id="level-eight-ai-toggle" type="button" aria-pressed="true">Desativar IA</button>
+          <button class="turn-button" id="level-eight-view-data" type="button">Ver dados</button>
+        </div>
         <button class="turn-button" id="pass-turn-button" type="button" aria-label="Passar a vez" title="Passar a vez">
           <svg class="turn-button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"></path></svg>
           <span class="turn-button-label">Passar a vez</span>
@@ -353,6 +358,17 @@
       <button class="modal-close" type="button" data-close-modal="statistics-modal">Fechar</button>
     </div>
   </div>
+  <div class="game-modal is-hidden" id="level-eight-data-modal" role="dialog" aria-modal="true" aria-labelledby="level-eight-data-title" aria-hidden="true">
+    <div class="game-modal-card level-eight-data-card">
+      <h2 id="level-eight-data-title">Dados de desejabilidade</h2>
+      <p class="level-eight-data-summary" id="level-eight-data-summary"></p>
+      <h3 class="level-eight-data-section-title">Ranking por desejabilidade total</h3>
+      <div class="statistics-table-wrap level-eight-ranking-table-container" id="level-eight-ranking-table-container"></div>
+      <h3 class="level-eight-data-section-title">Distâncias em relação à região selecionada</h3>
+      <div class="statistics-table-wrap" id="level-eight-distance-table-container"></div>
+      <button class="modal-close" type="button" data-close-modal="level-eight-data-modal">Fechar</button>
+    </div>
+  </div>
   <div class="game-modal is-hidden" id="final-modal" role="dialog" aria-modal="true" aria-labelledby="final-modal-title">
     <div class="game-modal-card final-card">
       <h2 id="final-modal-title">Fim de jogo</h2>
@@ -364,6 +380,7 @@
     <div class="game-modal-card campaign-victory-card">
       <h2 id="campaign-victory-title">Parabéns!</h2>
       <p id="campaign-victory-message"></p>
+      <button class="modal-close is-hidden" id="campaign-victory-replay-button" type="button">Salvar replay (JSON)</button>
       <button class="modal-close" id="campaign-victory-menu-button" type="button">Voltar ao menu principal</button>
       <button class="modal-close is-hidden" id="campaign-next-level-button" type="button">Continuar para o próximo level</button>
     </div>

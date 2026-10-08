@@ -1,0 +1,1259 @@
+{
+  "boardType": "quadrilateral",
+  "version": 1,
+  "displayScale": 1,
+  "regionFocusScale": 3,
+  "coordinateSystem": {
+    "unit": "pixel",
+    "tileColumns": 226,
+    "tileRows": 226,
+    "tileSize": 4,
+    "tileCenterOffset": 2
+  },
+  "campaign": {
+    "id": "tabuleiro-08",
+    "name": "Tabuleiro 08",
+    "initialCoins": 60,
+    "coinsPerTurn": 60,
+    "preserveCoinsBetweenTurns": false,
+    "aiActionsEnabled": true,
+    "wheatEnabled": true,
+    "initialWheat": {
+      "orange": 100,
+      "blue": 100
+    },
+    "rotationEnabled": true,
+    "warIncludesCornerContact": true,
+    "objectiveRegions": [
+      "L8-1",
+      "L8-2",
+      "L8-3",
+      "L6-1",
+      "L8-4",
+      "L6-2",
+      "L6-3",
+      "L8-5",
+      "L6-4",
+      "L8-6",
+      "L8-7",
+      "L8-8",
+      "L7-1",
+      "L7-2",
+      "L7-3",
+      "L7-4",
+      "L6-5",
+      "L7-5",
+      "L7-6",
+      "L7-7",
+      "L7-8",
+      "L7-9",
+      "L7-10",
+      "L7-11",
+      "L7-12",
+      "L6-6",
+      "L7-13",
+      "L7-14",
+      "L7-15",
+      "L7-16",
+      "L7-17",
+      "L7-18",
+      "L7-19",
+      "L7-20",
+      "L6-7",
+      "L7-21",
+      "L7-22",
+      "L7-23",
+      "L7-24",
+      "L7-25",
+      "L7-26",
+      "L7-27",
+      "L7-28",
+      "L6-8",
+      "L7-29",
+      "L7-30",
+      "L7-31",
+      "L7-32"
+    ],
+    "objectiveText": "Conquiste todas as regiões",
+    "objective": {
+      "type": "captureAllRegions"
+    },
+    "guide": {
+      "initialStep": "level8-intro",
+      "steps": {
+        "level8-intro": {
+          "title": "Level 8: domine os anéis",
+          "message": "Conquiste todas as regiões. Os quatro anéis podem ser girados; os centros e blocos isolados permanecem fixos. Use suas peças G para avançar.",
+          "dismissible": true,
+          "next": "complete",
+          "highlight": [
+            "regions:objectives"
+          ]
+        }
+      },
+      "states": []
+    }
+  },
+  "blocks": [
+    {
+      "name": "BQ1",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L8-1"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 1250,
+        "y": 75
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L8-1",
+          "code": "L8-1",
+          "rank": "L8",
+          "layer": 8,
+          "region": 1,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 8,
+          "initialPieces": [
+            {
+              "team": "blue",
+              "stage": "g"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BQ2",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L8-2"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 3250,
+        "y": 75
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L8-2",
+          "code": "L8-2",
+          "rank": "L8",
+          "layer": 8,
+          "region": 2,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 8,
+          "initialPieces": [
+            {
+              "team": "blue",
+              "stage": "g"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BQ3",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L8-3"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 250,
+        "y": 375
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L8-3",
+          "code": "L8-3",
+          "rank": "L8",
+          "layer": 8,
+          "region": 3,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 8,
+          "farmProductionPerTurn": 250,
+          "initialPieces": []
+        }
+      ]
+    },
+    {
+      "name": "BQ4",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L6-1"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 2250,
+        "y": 375
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L6-1",
+          "code": "L6-1",
+          "rank": "L6",
+          "layer": 6,
+          "region": 1,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 6,
+          "initialPieces": []
+        }
+      ]
+    },
+    {
+      "name": "BQ5",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L8-4"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 4250,
+        "y": 375
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L8-4",
+          "code": "L8-4",
+          "rank": "L8",
+          "layer": 8,
+          "region": 4,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 8,
+          "farmProductionPerTurn": 250,
+          "initialPieces": []
+        }
+      ]
+    },
+    {
+      "name": "BQ6",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L6-2"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 1250,
+        "y": 675
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L6-2",
+          "code": "L6-2",
+          "rank": "L6",
+          "layer": 6,
+          "region": 2,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 6,
+          "initialPieces": []
+        }
+      ]
+    },
+    {
+      "name": "BQ7",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L6-3"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 3250,
+        "y": 675
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L6-3",
+          "code": "L6-3",
+          "rank": "L6",
+          "layer": 6,
+          "region": 3,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 6,
+          "initialPieces": []
+        }
+      ]
+    },
+    {
+      "name": "BQ8",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L8-5"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 250,
+        "y": 975
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L8-5",
+          "code": "L8-5",
+          "rank": "L8",
+          "layer": 8,
+          "region": 5,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 8,
+          "farmProductionPerTurn": 250,
+          "initialPieces": []
+        }
+      ]
+    },
+    {
+      "name": "BQ9",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L6-4"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 2250,
+        "y": 975
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L6-4",
+          "code": "L6-4",
+          "rank": "L6",
+          "layer": 6,
+          "region": 4,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 6,
+          "initialPieces": []
+        }
+      ]
+    },
+    {
+      "name": "BQ10",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L8-6"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 4250,
+        "y": 975
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L8-6",
+          "code": "L8-6",
+          "rank": "L8",
+          "layer": 8,
+          "region": 6,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 8,
+          "farmProductionPerTurn": 250,
+          "initialPieces": []
+        }
+      ]
+    },
+    {
+      "name": "BQ11",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L8-7"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 1250,
+        "y": 1275
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L8-7",
+          "code": "L8-7",
+          "rank": "L8",
+          "layer": 8,
+          "region": 7,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 8,
+          "initialPieces": [
+            {
+              "team": "orange",
+              "stage": "g"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BQ12",
+      "type": "quadrilateral",
+      "matrixSize": 1,
+      "matrix": [
+        [
+          "L8-8"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 3250,
+        "y": 1275
+      },
+      "rotationEnabled": false,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L8-8",
+          "code": "L8-8",
+          "rank": "L8",
+          "layer": 8,
+          "region": 8,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 8,
+          "initialPieces": [
+            {
+              "team": "blue",
+              "stage": "g"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BQ13",
+      "type": "quadrilateral",
+      "matrixSize": 3,
+      "matrix": [
+        [
+          "L7-1",
+          "L7-2",
+          "L7-3"
+        ],
+        [
+          "L7-4",
+          "L6-5",
+          "L7-5"
+        ],
+        [
+          "L7-6",
+          "L7-7",
+          "L7-8"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 750,
+        "y": 225
+      },
+      "rotationEnabled": true,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L7-1",
+          "code": "L7-1",
+          "rank": "L7",
+          "layer": 7,
+          "region": 1,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-2",
+          "code": "L7-2",
+          "rank": "L7",
+          "layer": 7,
+          "region": 2,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              2
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-3",
+          "code": "L7-3",
+          "rank": "L7",
+          "layer": 7,
+          "region": 3,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-4",
+          "code": "L7-4",
+          "rank": "L7",
+          "layer": 7,
+          "region": 4,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L6-5",
+          "code": "L6-5",
+          "rank": "L6",
+          "layer": 6,
+          "region": 5,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              2
+            ]
+          ],
+          "maxPieces": 6,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-5",
+          "code": "L7-5",
+          "rank": "L7",
+          "layer": 7,
+          "region": 5,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-6",
+          "code": "L7-6",
+          "rank": "L7",
+          "layer": 7,
+          "region": 6,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-7",
+          "code": "L7-7",
+          "rank": "L7",
+          "layer": 7,
+          "region": 7,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              2
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-8",
+          "code": "L7-8",
+          "rank": "L7",
+          "layer": 7,
+          "region": 8,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        }
+      ]
+    },
+    {
+      "name": "BQ14",
+      "type": "quadrilateral",
+      "matrixSize": 3,
+      "matrix": [
+        [
+          "L7-9",
+          "L7-10",
+          "L7-11"
+        ],
+        [
+          "L7-12",
+          "L6-6",
+          "L7-13"
+        ],
+        [
+          "L7-14",
+          "L7-15",
+          "L7-16"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 750,
+        "y": 825
+      },
+      "rotationEnabled": true,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L7-9",
+          "code": "L7-9",
+          "rank": "L7",
+          "layer": 7,
+          "region": 9,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-10",
+          "code": "L7-10",
+          "rank": "L7",
+          "layer": 7,
+          "region": 10,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              2
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-11",
+          "code": "L7-11",
+          "rank": "L7",
+          "layer": 7,
+          "region": 11,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-12",
+          "code": "L7-12",
+          "rank": "L7",
+          "layer": 7,
+          "region": 12,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L6-6",
+          "code": "L6-6",
+          "rank": "L6",
+          "layer": 6,
+          "region": 6,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              2
+            ]
+          ],
+          "maxPieces": 6,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-13",
+          "code": "L7-13",
+          "rank": "L7",
+          "layer": 7,
+          "region": 13,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-14",
+          "code": "L7-14",
+          "rank": "L7",
+          "layer": 7,
+          "region": 14,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-15",
+          "code": "L7-15",
+          "rank": "L7",
+          "layer": 7,
+          "region": 15,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              2
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-16",
+          "code": "L7-16",
+          "rank": "L7",
+          "layer": 7,
+          "region": 16,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        }
+      ]
+    },
+    {
+      "name": "BQ15",
+      "type": "quadrilateral",
+      "matrixSize": 3,
+      "matrix": [
+        [
+          "L7-17",
+          "L7-18",
+          "L7-19"
+        ],
+        [
+          "L7-20",
+          "L6-7",
+          "L7-21"
+        ],
+        [
+          "L7-22",
+          "L7-23",
+          "L7-24"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 2750,
+        "y": 225
+      },
+      "rotationEnabled": true,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L7-17",
+          "code": "L7-17",
+          "rank": "L7",
+          "layer": 7,
+          "region": 17,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-18",
+          "code": "L7-18",
+          "rank": "L7",
+          "layer": 7,
+          "region": 18,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              2
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-19",
+          "code": "L7-19",
+          "rank": "L7",
+          "layer": 7,
+          "region": 19,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-20",
+          "code": "L7-20",
+          "rank": "L7",
+          "layer": 7,
+          "region": 20,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L6-7",
+          "code": "L6-7",
+          "rank": "L6",
+          "layer": 6,
+          "region": 7,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              2
+            ]
+          ],
+          "maxPieces": 6,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-21",
+          "code": "L7-21",
+          "rank": "L7",
+          "layer": 7,
+          "region": 21,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-22",
+          "code": "L7-22",
+          "rank": "L7",
+          "layer": 7,
+          "region": 22,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-23",
+          "code": "L7-23",
+          "rank": "L7",
+          "layer": 7,
+          "region": 23,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              2
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-24",
+          "code": "L7-24",
+          "rank": "L7",
+          "layer": 7,
+          "region": 24,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        }
+      ]
+    },
+    {
+      "name": "BQ16",
+      "type": "quadrilateral",
+      "matrixSize": 3,
+      "matrix": [
+        [
+          "L7-25",
+          "L7-26",
+          "L7-27"
+        ],
+        [
+          "L7-28",
+          "L6-8",
+          "L7-29"
+        ],
+        [
+          "L7-30",
+          "L7-31",
+          "L7-32"
+        ]
+      ],
+      "L1": 150,
+      "L2": 500,
+      "C_inicial": {
+        "x": 2750,
+        "y": 825
+      },
+      "rotationEnabled": true,
+      "linearRotationEnabled": false,
+      "regions": [
+        {
+          "name": "L7-25",
+          "code": "L7-25",
+          "rank": "L7",
+          "layer": 7,
+          "region": 25,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-26",
+          "code": "L7-26",
+          "rank": "L7",
+          "layer": 7,
+          "region": 26,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              2
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-27",
+          "code": "L7-27",
+          "rank": "L7",
+          "layer": 7,
+          "region": 27,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              1,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-28",
+          "code": "L7-28",
+          "rank": "L7",
+          "layer": 7,
+          "region": 28,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L6-8",
+          "code": "L6-8",
+          "rank": "L6",
+          "layer": 6,
+          "region": 8,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              2
+            ]
+          ],
+          "maxPieces": 6,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-29",
+          "code": "L7-29",
+          "rank": "L7",
+          "layer": 7,
+          "region": 29,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              2,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-30",
+          "code": "L7-30",
+          "rank": "L7",
+          "layer": 7,
+          "region": 30,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              1
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-31",
+          "code": "L7-31",
+          "rank": "L7",
+          "layer": 7,
+          "region": 31,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              2
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        },
+        {
+          "name": "L7-32",
+          "code": "L7-32",
+          "rank": "L7",
+          "layer": 7,
+          "region": 32,
+          "shape": "quadrilateral",
+          "positions": [
+            [
+              3,
+              3
+            ]
+          ],
+          "maxPieces": 7,
+          "initialPieces": []
+        }
+      ]
+    }
+  ]
+}

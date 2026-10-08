@@ -1,0 +1,111 @@
+{
+  "_readme": "Ajuste estes valores para mudar a estrategia da IA sem editar codigo. Eles NAO alteram os custos reais do jogo (compra, movimento, promocao sao regras fixas do motor); controlam apenas preferencias e prioridades de decisao da IA.",
+
+  "maxActionsPerTurn": 50,
+  "_maxActionsPerTurn_readme": "Numero maximo de acoes que a IA pode executar em um turno. Cada compra, movimento, promocao ou reciclagem conta como uma acao.",
+
+  "layerBalanceMinRatio": 0.5,
+  "_layerBalanceMinRatio_readme": "Fracao minima da forca humana em uma camada que a IA tenta manter antes de gastar/mover suas propria tropas daquela camada (0.5 = manter pelo menos metade da forca humana).",
+
+  "weakOuterLayerBuyRatio": 0.5,
+  "_weakOuterLayerBuyRatio_readme": "Se a forca da IA na camada mais externa (L8) cair abaixo desta fracao da forca humana na mesma camada, a IA prioriza comprar pecas 'g' ali como emergencia.",
+
+  "highBalanceTurnRule": {
+    "enabled": true,
+    "minimumStartingCoins": 800,
+    "recycleByLayer": {
+      "8": ["g", "f"],
+      "7": ["g"]
+    },
+    "prohibitPurchasesByLayer": {
+      "8": ["g", "f"],
+      "7": ["g"]
+    }
+  },
+  "_highBalanceTurnRule_readme": "Quando as moedas da IA no inicio do turno forem maiores que minimumStartingCoins, recicla as pecas listadas em recycleByLayer e proibe as compras listadas em prohibitPurchasesByLayer durante todo o turno. As vendas seguem a regra do jogo que exige manter pelo menos uma peca em cada regiao.",
+
+  "recycleCoinThresholdByLayer": {
+    "8": 25,
+    "7": 80,
+    "6": 400,
+    "5": 800
+  },
+  "_recycleCoinThresholdByLayer_readme": "Quantas moedas (multiplicadas pelo custo da peca) a IA precisa ter sobrando numa camada antes de reciclar uma peca fraca para abrir espaco para uma mais forte.",
+
+  "conquestPriority": {
+    "baseWeight": 1.0,
+    "weightPerRegionDeficit": 0.5,
+    "maxWeight": 6.0
+  },
+  "_conquestPriority_readme": "Quanto mais regioes o jogador humano dominar a mais do que a IA, maior o peso aplicado a forca da IA ao decidir quais regioes humanas ameacar/atacar primeiro. peso = min(maxWeight, baseWeight + weightPerRegionDeficit * (regioes_humano - regioes_IA)).",
+
+  "conquestCostHeuristic": {
+    "freeRegionCost": 2,
+    "sufficientForceRatioCost": 4
+  },
+  "_conquestCostHeuristic_readme": "Custo estimado (em moedas) para a IA considerar a conquista de uma regiao vizinha: freeRegionCost para regioes livres; sufficientForceRatioCost quando a IA ja tem a proporcao de forca necessaria (igual a regra de promocao do motor: camada de origem x forca da camada superior). Caso contrario, soma-se o custo de comprar a forca que falta.",
+
+  "wheat": {
+    "seekFarmsWhenDeficit": true
+  },
+  "_wheat_readme": "Quando o consumo de trigo da IA superar a producao, seekFarmsWhenDeficit=true faz a IA priorizar avancar e comprar tropas na direcao da fazenda livre mais proxima.",
+
+  "desirability": {
+    "baseScoreByLayer": {
+      "8": { "free": 50, "allied": 30, "enemy": 150 },
+      "7": { "free": 40, "allied": 25, "enemy": 105 },
+      "6": { "free": 35, "allied": 20, "enemy": 75 },
+      "5": { "free": 25, "allied": 15, "enemy": 55 },
+      "4": { "free": 20, "allied": 10, "enemy": 35 },
+      "3": { "free": 15, "allied": 8, "enemy": 25 },
+      "2": { "free": 10, "allied": 5, "enemy": 20 },
+      "1": { "free": 5, "allied": 2, "enemy": 10 }
+    },
+    "_baseScoreByLayer_readme": "Pontuacao interna inicial por rank e dominador: free=livre, allied=IA, enemy=adversario.",
+    "relativeStrengthBands": [
+      { "maxPercent": 4, "allied": 50, "enemy": 0 },
+      { "maxPercent": 25, "allied": 40, "enemy": 0 },
+      { "maxPercent": 50, "allied": 20, "enemy": 5 },
+      { "maxPercent": 75, "allied": 10, "enemy": 10 },
+      { "maxPercent": 100, "allied": 0, "enemy": 20 },
+      { "maxPercent": 130, "allied": -10, "enemy": 40 },
+      { "maxPercent": 170, "allied": -20, "enemy": 60 },
+      { "maxPercent": 230, "allied": -40, "enemy": 80 },
+      { "maxPercent": 300, "allied": -60, "enemy": 90 },
+      { "maxPercent": 400, "allied": -80, "enemy": 100 },
+      { "maxPercent": 600, "allied": -100, "enemy": 200 },
+      { "maxPercent": 800, "allied": -150, "enemy": 300 },
+      { "maxPercent": 1200, "allied": -250, "enemy": 400 },
+      { "maxPercent": null, "allied": -400, "enemy": 600 }
+    ],
+    "_relativeStrengthBands_readme": "Percentual relativo = (tropas da regiao / tropas totais do rank) / (1 / regioes ocupadas do rank) * 100. maxPercent define o limite inclusivo de cada faixa; null representa acima da faixa anterior.",
+    "farmBonusByLevel": { "1": 100, "2": 135, "3": 200, "4": 250, "5": 350 },
+    "_farmLevelByProduction_readme": "O nivel e determinado pela producao farmProductionPerTurn: nivel 1=250, nivel 2=1000, nivel 3=4000, nivel 4=16000 e nivel 5=50000. Essa tabela factual compartilhada esta definida uma unica vez em game-rules.js; por exemplo, producao 250 corresponde ao nivel 1.",
+    "wheatDeficitFarmBonus": 250,
+    "unsupportedNeighborBonus": 40,
+    "troopRatioByOuterLayer": { "8": 8, "7": 7, "6": 6, "5": 5, "4": 4, "3": 3, "2": 2 },
+    "troopDeficitBonus": 100,
+    "external": { "logBase": 2, "offset": 2, "distanceScale": 1, "exponent": 3 },
+    "_external_readme": "Desejabilidade externa soma bi * (log_base( offset - (distancia / distanciaMax) / distanceScale )) ^ exponent para cada outra regiao. Os padroes implementam bi * (log2(2 - dij/D))^2.",
+    "penalties": {
+      "inaccessible": {
+        "amount": 20,
+        "durationTurns": 5,
+        "label": "Inacessibilidade",
+        "description": "Sem vizinhos de rank igual ou imediatamente adjacente."
+      },
+      "unavailableAction": {
+        "amount": 20,
+        "durationTurns": 1,
+        "label": "Ação temporariamente inviável",
+        "description": "Há vizinhos de rank elegível, mas nenhuma ação legal e viável no momento."
+      }
+    },
+    "_penalties_readme": "Penalidades acumulam por tentativa e expiram após durationTurns. inaccessible só se aplica sem vizinho geométrico de rank igual ou imediatamente superior/inferior; unavailableAction se aplica quando há vizinho elegível, mas força, saldo, composição ou regras impedem uma ação. Edite amount, durationTurns, label e description separadamente por tipo."
+  },
+  "recycling": {
+    "availableCoinFraction": 0.01,
+    "minimumStageGap": 2
+  },
+  "_recycling_readme": "Ao faltar espaco para comprar, permite reciclar uma peca se seu custo real for menor que esta fracao das moedas disponiveis, ou se for a peca mais fraca em uma regiao com diferenca de pelo menos minimumStageGap entre ranks de pecas."
+}
