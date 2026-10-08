@@ -186,7 +186,8 @@ public final class MainActivity extends Activity {
 
         @JavascriptInterface
         public String readGameAsset(String fileName) {
-            if (!"regioes-will-of-many-circular.json".equals(fileName) &&
+            if (!"will-of-many-ai-config.json".equals(fileName) &&
+                !"regioes-will-of-many-circular.json".equals(fileName) &&
                 !"tabuleiro-01.json".equals(fileName) &&
                 !"tabuleiro-02.json".equals(fileName) &&
                 !"tabuleiro-03.json".equals(fileName) &&
@@ -195,7 +196,7 @@ public final class MainActivity extends Activity {
                 !"tabuleiro-06.json".equals(fileName) &&
                 !"tabuleiro-07.json".equals(fileName) &&
                 !"tabuleiro-08.json".equals(fileName)) {
-                Log.w(TAG, "Rejeitando arquivo de tabuleiro não permitido: " + fileName);
+                Log.w(TAG, "Rejeitando recurso não permitido: " + fileName);
                 return "";
             }
             try (BufferedReader reader = new BufferedReader(

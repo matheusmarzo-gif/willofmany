@@ -81,11 +81,11 @@
     "_relativeStrengthBands_readme": "Percentual relativo = (tropas da regiao / tropas totais do rank) / (1 / regioes ocupadas do rank) * 100. maxPercent define o limite inclusivo de cada faixa; null representa acima da faixa anterior.",
     "farmBonusByLevel": { "1": 100, "2": 135, "3": 200, "4": 250, "5": 350 },
     "_farmLevelByProduction_readme": "O nivel e determinado pela producao farmProductionPerTurn: nivel 1=250, nivel 2=1000, nivel 3=4000, nivel 4=16000 e nivel 5=50000. Essa tabela factual compartilhada esta definida uma unica vez em game-rules.js; por exemplo, producao 250 corresponde ao nivel 1.",
-    "wheatDeficitFarmBonus": 250,
+    "wheatDeficitFarmBonus": 350,
     "unsupportedNeighborBonus": 40,
     "troopRatioByOuterLayer": { "8": 8, "7": 7, "6": 6, "5": 5, "4": 4, "3": 3, "2": 2 },
     "troopDeficitBonus": 100,
-    "external": { "logBase": 2, "offset": 2, "distanceScale": 1, "exponent": 3 },
+    "external": { "logBase": 2, "offset": 2, "distanceScale": 1, "exponent": 4 },
     "_external_readme": "Desejabilidade externa soma bi * (log_base( offset - (distancia / distanciaMax) / distanceScale )) ^ exponent para cada outra regiao. Os padroes implementam bi * (log2(2 - dij/D))^2.",
     "penalties": {
       "inaccessible": {

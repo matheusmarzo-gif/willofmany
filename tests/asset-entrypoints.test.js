@@ -115,6 +115,12 @@ test('Android and server builds package all external client resources', () => {
     'Android permits reading the Level 7 board asset');
   assert.match(androidMainActivity, /"tabuleiro-08\.json"\.equals\(fileName\)/,
     'Android permits reading the Level 8 board asset');
+  assert.match(androidMainActivity, /"will-of-many-ai-config\.json"\.equals\(fileName\)/,
+    'Android permits reading the editable AI strategy asset');
+  assert.match(gameClient, /if \(!configJson\) \{\s*throw new Error\(`O Android não encontrou \$\{fileName\}/,
+    'AI configuration read failures are explicit');
+  assert.match(gameClient, /if \(!\(await loadAiConfig\(\)\)\) \{[\s\S]*?configuração indisponível/,
+    'AI does not execute with default weights when configuration loading fails');
 });
 
 test('new non-campaign games select the circular board configuration', () => {

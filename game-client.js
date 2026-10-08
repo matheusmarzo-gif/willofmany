@@ -309,6 +309,7 @@
     let isApplyingBluetoothAction = false;
     let isApplyingAiAction = false;
     let isAiTurnRunning = false;
+    let aiConfigLoadPromise = null;
     let levelEightAiEnabled = true;
     let selectedCircularRotationBlock = null;
     let rotationAnimationVersion = 0;
@@ -7054,23 +7055,40 @@
       startOnlineMatchWhenReady();
     }
 
-    async function loadAiConfig() {
+    function loadAiConfig() {
+      if (aiConfigLoadPromise) return aiConfigLoadPromise;
       const fileName = 'will-of-many-ai-config.json';
-      try {
-        let configJson = null;
-        if (location.protocol === 'file:' && window.AndroidBluetooth?.readGameAsset) {
-          configJson = window.AndroidBluetooth.readGameAsset(fileName);
-          if (!configJson) return;
-        } else {
-          const response = await fetch(fileName);
-          if (!response.ok) return;
-          configJson = await response.text();
+      aiConfigLoadPromise = (async () => {
+        try {
+          let configJson;
+          if (location.protocol === 'file:' && window.AndroidBluetooth?.readGameAsset) {
+            configJson = window.AndroidBluetooth.readGameAsset(fileName);
+            if (!configJson) {
+              throw new Error(`O Android não encontrou ${fileName} nos recursos do aplicativo.`);
+            }
+          } else {
+            const response = await fetch(fileName);
+            if (!response.ok) throw new Error(`${fileName}: HTTP ${response.status}`);
+            configJson = await response.text();
+          }
+          const parsedConfig = JSON.parse(configJson);
+          if (!parsedConfig || typeof parsedConfig !== 'object' || Array.isArray(parsedConfig)) {
+            throw new Error(`${fileName} precisa conter um objeto JSON.`);
+          }
+          if (typeof window.WillOfManyAI?.setConfig !== 'function') {
+            throw new Error('O módulo da IA não disponibilizou setConfig.');
+          }
+          window.WillOfManyAI.setConfig(parsedConfig);
+          return true;
+        } catch (error) {
+          const message = `Não foi possível carregar ${fileName}; a IA ficará bloqueada.`;
+          console.error(message, error);
+          debugStatus.textContent = `${message} ${error.message}`;
+          readout.textContent = `${message} Recarregue o aplicativo após corrigir os recursos.`;
+          return false;
         }
-        const parsedConfig = JSON.parse(configJson);
-        window.WillOfManyAI?.setConfig?.(parsedConfig);
-      } catch (error) {
-        console.warn(`Nao foi possivel carregar ${fileName}, usando pesos padrao da IA.`, error);
-      }
+      })();
+      return aiConfigLoadPromise;
     }
 
     async function loadBoardFile(fileName) {
@@ -8404,6 +8422,13 @@
         turnPlayer.textContent = 'Vez: azul · IA inativa';
         isAiTurnRunning = false;
         await passTurnToNextPlayer(true);
+        return;
+      }
+      if (!(await loadAiConfig())) {
+        isAiTurnRunning = false;
+        const message = 'Vez da IA suspensa: configuração indisponível; recarregue o aplicativo.';
+        turnPlayer.textContent = message;
+        readout.textContent = message;
         return;
       }
       turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA pensando`;
