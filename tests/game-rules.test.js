@@ -895,6 +895,58 @@ test('war groups all unspent adjacent armies and skips a region after it fought'
   }]);
 });
 
+test('focused war preview builds a conflict independently from a neighboring focal region', () => {
+  const neighborsByRegion = {
+    'L8-2': ['L8-3'],
+    'L8-3': ['L8-2', 'L7-7', 'L8-4'],
+    'L7-7': ['L8-3'],
+    'L8-4': ['L8-3', 'L8-5'],
+    'L8-5': ['L8-4']
+  };
+  const dominators = {
+    'L8-2': 'orange',
+    'L8-3': 'orange',
+    'L7-7': 'orange',
+    'L8-4': 'blue',
+    'L8-5': 'blue'
+  };
+  const realConflicts = rules.buildWarConflicts(
+    rules.getWarRegionOrder(Object.keys(dominators)),
+    neighborsByRegion,
+    dominators
+  );
+
+  assert.deepEqual(
+    realConflicts.find((block) =>
+      block.alliedRegions.concat(block.enemyRegions).includes('L8-3')),
+    {
+      regionCode: 'L8-4',
+      alliedRegions: ['L8-4', 'L8-5'],
+      enemyRegions: ['L8-3'],
+      attacker: 'blue'
+    }
+  );
+  assert.deepEqual(
+    rules.buildWarConflictForRegion('L8-3', neighborsByRegion, dominators),
+    {
+      regionCode: 'L8-3',
+      alliedRegions: ['L8-3', 'L8-2', 'L7-7'],
+      enemyRegions: ['L8-4'],
+      attacker: 'orange'
+    }
+  );
+  assert.deepEqual(
+    rules.buildWarConflictForRegion('L8-4', neighborsByRegion, dominators),
+    {
+      regionCode: 'L8-4',
+      alliedRegions: ['L8-4', 'L8-5'],
+      enemyRegions: ['L8-3'],
+      attacker: 'blue'
+    }
+  );
+  assert.equal(rules.buildWarConflictForRegion('L7-7', neighborsByRegion, dominators), null);
+});
+
 test('war conflict flags are fresh for every new iteration', () => {
   const regionOrder = rules.getWarRegionOrder(['L8-1', 'L8-2']);
   const neighbors = { 'L8-1': ['L8-2'], 'L8-2': ['L8-1'] };

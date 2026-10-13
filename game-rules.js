@@ -311,33 +311,44 @@
     });
   }
 
+  function buildWarConflictForRegion(regionCode, neighborsByRegion, dominators) {
+    const attacker = dominators[regionCode];
+    if (attacker !== 'orange' && attacker !== 'blue') return null;
+
+    const alliedRegions = [regionCode];
+    const enemyRegions = [];
+    (neighborsByRegion[regionCode] || []).forEach((neighborCode) => {
+      const neighborDominator = dominators[neighborCode];
+      if (neighborDominator === attacker) alliedRegions.push(neighborCode);
+      if (neighborDominator !== 'free' && neighborDominator !== attacker) {
+        enemyRegions.push(neighborCode);
+      }
+    });
+    if (!enemyRegions.length) return null;
+
+    return {
+      regionCode,
+      alliedRegions: [...new Set(alliedRegions)],
+      enemyRegions: [...new Set(enemyRegions)],
+      attacker
+    };
+  }
+
   function buildWarConflicts(regionOrder, neighborsByRegion, dominators) {
     const consumedRegions = new Set();
     const conflicts = [];
 
     regionOrder.forEach((regionCode) => {
       if (consumedRegions.has(regionCode)) return;
-      const attacker = dominators[regionCode];
-      if (attacker !== 'orange' && attacker !== 'blue') return;
-
-      const alliedRegions = [regionCode];
-      const enemyRegions = [];
-      (neighborsByRegion[regionCode] || []).forEach((neighborCode) => {
-        if (consumedRegions.has(neighborCode)) return;
-        const neighborDominator = dominators[neighborCode];
-        if (neighborDominator === attacker) alliedRegions.push(neighborCode);
-        if (neighborDominator !== 'free' && neighborDominator !== attacker) {
-          enemyRegions.push(neighborCode);
-        }
-      });
-      if (!enemyRegions.length) return;
-
-      const conflict = {
+      const neighbors = (neighborsByRegion[regionCode] || [])
+        .filter((neighborCode) => !consumedRegions.has(neighborCode));
+      const conflict = buildWarConflictForRegion(
         regionCode,
-        alliedRegions: [...new Set(alliedRegions)],
-        enemyRegions: [...new Set(enemyRegions)],
-        attacker
-      };
+        { [regionCode]: neighbors },
+        dominators
+      );
+      if (!conflict) return;
+
       conflicts.push(conflict);
       conflict.alliedRegions.concat(conflict.enemyRegions)
         .forEach((participant) => consumedRegions.add(participant));
@@ -400,6 +411,7 @@
     getQuadrilateralMatrixHorizontalPath,
     getRegionLayer,
     getWarRegionOrder,
+    buildWarConflictForRegion,
     buildWarConflicts,
     getRecruitmentCost,
     getRelegationRefund,

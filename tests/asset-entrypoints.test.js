@@ -1074,9 +1074,13 @@ test('campaign guide moves away from highlighted action controls', () => {
 
 test('game menu groups campaign actions and Android exit closes the app', () => {
   assert.match(html, /id="game-menu-trigger"[^]*?id="game-menu"[^]*?id="campaign-restart-turn-button"[^]*?id="campaign-menu-button"[^]*?id="campaign-restart-button"/);
+  assert.match(html, /id="game-menu-conflict-mode-button"[^>]*aria-pressed="true">Blocos de Conflitos Reais/);
   assert.match(html, /id="campaign-menu-button"[^>]*>Retornar ao menu principal/);
   assert.match(html, /id="game-menu-resign-button"[^>]*>Desistir da partida/);
   assert.match(gameClient, /gameMenuTrigger\.addEventListener\('click'/);
+  assert.match(gameClient, /let conflictPreviewMode = 'real'/);
+  assert.match(gameClient, /gameMenuConflictModeButton\.addEventListener\('click'/);
+  assert.match(gameClient, /Blocos de Conflitos por Vizinhança/);
   assert.match(gameClient, /gameMenuResignButton\.addEventListener\('click'/);
   assert.match(gameClient, /window\.AndroidBluetooth\.closeApp\(\)/);
   assert.match(androidMainActivity, /public void closeApp\(\)[\s\S]*?runOnUiThread\(\(\) -> \{[\s\S]*?finish\(\);/);

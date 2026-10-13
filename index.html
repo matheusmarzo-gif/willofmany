@@ -196,6 +196,8 @@
           <button id="campaign-menu-button" type="button">Retornar ao menu principal</button>
           <button id="campaign-restart-button" type="button">Reiniciar level</button>
         </div>
+        <button class="game-menu-simulate" id="game-menu-simulate-button" type="button">Simular conflito</button>
+        <button class="game-menu-conflict-mode" id="game-menu-conflict-mode-button" type="button" aria-pressed="true">Blocos de Conflitos Reais</button>
         <button class="game-menu-resign is-hidden" id="game-menu-resign-button" type="button">Desistir da partida</button>
       </div>
     </section>
@@ -286,6 +288,16 @@
         <p id="region-farm" class="is-hidden"></p>
         <p id="region-force">Força: 0</p>
         <p id="region-final-force">Força final: 0</p>
+        <button class="conflict-energy is-hidden" id="region-conflict-energy" type="button">
+          <span class="conflict-energy-track" aria-hidden="true">
+            <span class="conflict-energy-orange"></span>
+            <span class="conflict-energy-blue"></span>
+          </span>
+          <span class="conflict-energy-totals">
+            <span id="region-conflict-orange-total"></span>
+            <span id="region-conflict-blue-total"></span>
+          </span>
+        </button>
         <p class="region-technical" id="region-free-units">Unidades livres temporárias: 0</p>
         <p class="region-technical" id="region-dominator">Dominador: livre</p>
         <p id="region-neighbors">Vizinhos: —</p>
@@ -315,6 +327,26 @@
         <button class="debug-button" id="debug-export" type="button">Exportar JSON</button>
       </div>
       <p class="debug-status" id="debug-status" aria-live="polite">Regiões: aguardando JSON.</p>
+    </section>
+    <section class="conflict-simulator-hud is-hidden" id="conflict-simulator-hud" aria-label="Simulação de conflito">
+      <div class="conflict-simulator-energy" aria-live="polite">
+        <p id="conflict-simulator-hint">Selecione regiões ocupadas por laranja ou azul.</p>
+        <div class="conflict-energy-track" role="img" id="conflict-simulator-track" aria-label="Força final selecionada por equipe">
+          <span class="conflict-energy-orange"></span>
+          <span class="conflict-energy-blue"></span>
+        </div>
+        <div class="conflict-energy-totals">
+          <span id="conflict-simulator-orange-total">Laranja: 0</span>
+          <span id="conflict-simulator-blue-total">Azul: 0</span>
+        </div>
+      </div>
+      <div class="conflict-simulator-pad" id="conflict-simulator-pad" aria-label="Navegação da simulação">
+        <button type="button" class="conflict-simulator-direction is-up" data-pan="up" aria-label="Mover mapa para cima">↑</button>
+        <button type="button" class="conflict-simulator-direction is-left" data-pan="left" aria-label="Mover mapa para a esquerda">←</button>
+        <button type="button" class="conflict-simulator-cancel" id="conflict-simulator-cancel-button">Cancelar</button>
+        <button type="button" class="conflict-simulator-direction is-right" data-pan="right" aria-label="Mover mapa para a direita">→</button>
+        <button type="button" class="conflict-simulator-direction is-down" data-pan="down" aria-label="Mover mapa para baixo">↓</button>
+      </div>
     </section>
   </main>
   <div class="turn-transition" id="turn-transition" aria-hidden="true">

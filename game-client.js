@@ -47,6 +47,15 @@
     const gameMenuTrigger = document.querySelector('#game-menu-trigger');
     const gameMenu = document.querySelector('#game-menu');
     const gameMenuResignButton = document.querySelector('#game-menu-resign-button');
+    const gameMenuSimulateButton = document.querySelector('#game-menu-simulate-button');
+    const gameMenuConflictModeButton = document.querySelector('#game-menu-conflict-mode-button');
+    const conflictSimulatorHud = document.querySelector('#conflict-simulator-hud');
+    const conflictSimulatorPad = document.querySelector('#conflict-simulator-pad');
+    const conflictSimulatorCancelButton = document.querySelector('#conflict-simulator-cancel-button');
+    const conflictSimulatorTrack = document.querySelector('#conflict-simulator-track');
+    const conflictSimulatorHint = document.querySelector('#conflict-simulator-hint');
+    const conflictSimulatorOrangeTotal = document.querySelector('#conflict-simulator-orange-total');
+    const conflictSimulatorBlueTotal = document.querySelector('#conflict-simulator-blue-total');
     const levelEightReplayButton = document.querySelector('#level-eight-replay-button');
     const levelEightDebugActions = document.querySelector('#level-eight-debug-actions');
     const levelEightAiToggle = document.querySelector('#level-eight-ai-toggle');
@@ -109,6 +118,9 @@
     const regionFarm = document.querySelector('#region-farm');
     const regionForce = document.querySelector('#region-force');
     const regionFinalForce = document.querySelector('#region-final-force');
+    const regionConflictEnergy = document.querySelector('#region-conflict-energy');
+    const regionConflictOrangeTotal = document.querySelector('#region-conflict-orange-total');
+    const regionConflictBlueTotal = document.querySelector('#region-conflict-blue-total');
     const regionFreeUnits = document.querySelector('#region-free-units');
     const rotateQuadrilateralBlockButton = document.querySelector('#rotate-quadrilateral-block-button');
     const regionRotationHelp = document.querySelector('#region-rotation-help');
@@ -278,6 +290,9 @@
     let currentDebugLayer = 8; // Which layer's regions to show in debug canvas
     let selectedRegionCode = null;
     let warSpotlightRegionCodes = [];
+    let conflictPreview = null;
+    let conflictSimulation = null;
+    let conflictPreviewMode = 'real';
     let focusedRegionCode = null;
     let stageZoom = 1;
     let stageZoomOffset = { x: 0, y: 0 };
@@ -2176,8 +2191,76 @@
       return [...new Set(regionNeighbors)];
     }
 
+    function getCurrentWarConflicts() {
+      const regionOrder = gameRules.getWarRegionOrder(getRegionCalculationOrder());
+      const neighborsByRegion = {};
+      const dominators = {};
+      regionOrder.forEach((regionCode) => {
+        neighborsByRegion[regionCode] = getCombatNeighbors(regionCode);
+        dominators[regionCode] = getRegionDominador(regionCode);
+      });
+      return gameRules.buildWarConflicts(regionOrder, neighborsByRegion, dominators);
+    }
+
+    function getCurrentWarConflictForRegion(regionCode) {
+      if (!regionCode) return null;
+      const neighbors = getCombatNeighbors(regionCode);
+      const dominators = { [regionCode]: getRegionDominador(regionCode) };
+      neighbors.forEach((neighborCode) => {
+        dominators[neighborCode] = getRegionDominador(neighborCode);
+      });
+      return gameRules.buildWarConflictForRegion(
+        regionCode,
+        { [regionCode]: neighbors },
+        dominators
+      );
+    }
+
+    function getConflictPreviewForRegion(regionCode) {
+      if (conflictPreviewMode === 'neighborhood') {
+        return getCurrentWarConflictForRegion(regionCode);
+      }
+      return getCurrentWarConflicts().find((block) =>
+        block.alliedRegions.concat(block.enemyRegions).includes(regionCode)) || null;
+    }
+
     function getRegionFinalForceValue(regionCode) {
       return Number(regionForceStats[regionCode]?.forca_final || 0);
+    }
+
+    function getConflictSideForces(block) {
+      const alliedForce = block.alliedRegions.reduce(
+        (sum, code) => sum + getRegionFinalForceValue(code), 0);
+      const enemyForce = block.enemyRegions.reduce(
+        (sum, code) => sum + getRegionFinalForceValue(code), 0);
+      return block.attacker === 'orange'
+        ? { orange: alliedForce, blue: enemyForce }
+        : { orange: enemyForce, blue: alliedForce };
+    }
+
+    function getSelectedRegionTeamForces(regionCodes) {
+      return regionCodes.reduce((totals, regionCode) => {
+        ['orange', 'blue'].forEach((team) => {
+          totals[team] += Number(
+            regionForceStats[regionCode]?.byTeam?.[team]?.forca_final || 0
+          );
+        });
+        return totals;
+      }, { orange: 0, blue: 0 });
+    }
+
+    function updateConflictEnergyTrack(track, orangeLabel, blueLabel, forces) {
+      const orangeForce = Math.max(0, Number(forces.orange) || 0);
+      const blueForce = Math.max(0, Number(forces.blue) || 0);
+      const totalForce = orangeForce + blueForce;
+      const orangeShare = totalForce > 0 ? orangeForce / totalForce * 100 : 50;
+      track.style.setProperty('--orange-force-share', `${orangeShare}%`);
+      orangeLabel.textContent = `Laranja: ${formatStatisticsNumber(orangeForce)}`;
+      blueLabel.textContent = `Azul: ${formatStatisticsNumber(blueForce)}`;
+      track.setAttribute(
+        'aria-label',
+        `Força final: laranja ${formatStatisticsNumber(orangeForce)}, azul ${formatStatisticsNumber(blueForce)}`
+      );
     }
 
     function formatStatisticsNumber(value) {
@@ -2424,15 +2507,7 @@
         updateStageZoom();
       };
       resetStageZoom();
-      const blocks = [];
-      const regionOrder = gameRules.getWarRegionOrder(getRegionCalculationOrder());
-      const neighborsByRegion = {};
-      const dominators = {};
-      regionOrder.forEach((regionCode) => {
-        neighborsByRegion[regionCode] = getCombatNeighbors(regionCode);
-        dominators[regionCode] = getRegionDominador(regionCode);
-      });
-      blocks.push(...gameRules.buildWarConflicts(regionOrder, neighborsByRegion, dominators));
+      const blocks = getCurrentWarConflicts();
       blocks.forEach((block) => {
         block.alliedRegions.concat(block.enemyRegions).forEach((regionCode) => {
           if (regionCombatState[regionCode]) regionCombatState[regionCode].is_active = false;
@@ -4075,6 +4150,7 @@
         : '';
       regionForce.textContent = `Força: ${Number(forceState.forca || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
       regionFinalForce.textContent = `Força final: ${Number(forceState.forca_final || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
+      updateRegionConflictEnergy(regionCode);
       regionFreeUnits.textContent = `unidades_livres_temp: ${Number(forceState.unidades_livres_temp || 0).toLocaleString('pt-BR', { maximumFractionDigits: 6 })}`;
       updateTurnPointsDisplay();
       regionDominator.textContent = `Dominador: ${dominator === 'blue' ? 'azul' : dominator === 'orange' ? 'laranja' : 'livre'}`;
@@ -5114,6 +5190,215 @@
         piece.style.width = size;
         piece.style.height = size;
       });
+    }
+
+    function captureStageView() {
+      return {
+        zoom: stageZoom,
+        offset: { ...stageZoomOffset },
+        focusedRegionCode
+      };
+    }
+
+    function restoreStageView(view) {
+      if (!view) return;
+      stageZoom = view.zoom;
+      stageZoomOffset = { ...view.offset };
+      focusedRegionCode = view.focusedRegionCode;
+      updateStageZoom();
+    }
+
+    function getConflictBounds(regionCodes) {
+      const bounds = {
+        left: Number.POSITIVE_INFINITY,
+        right: Number.NEGATIVE_INFINITY,
+        top: Number.POSITIVE_INFINITY,
+        bottom: Number.NEGATIVE_INFINITY
+      };
+      const includePoint = (x, y) => {
+        bounds.left = Math.min(bounds.left, x);
+        bounds.right = Math.max(bounds.right, x);
+        bounds.top = Math.min(bounds.top, y);
+        bounds.bottom = Math.max(bounds.bottom, y);
+      };
+
+      [...new Set(regionCodes)].forEach((regionCode) => {
+        const geometry = regionGeometryByCode[regionCode];
+        if (!geometry) return;
+        if (geometry.shape === 'quadrilateral' &&
+            Array.isArray(geometry.cells) && geometry.cells.length) {
+          geometry.cells.forEach((cell) => {
+            includePoint(cell.x - cell.width / 2, cell.y - cell.height / 2);
+            includePoint(cell.x + cell.width / 2, cell.y + cell.height / 2);
+          });
+          return;
+        }
+
+        const [, layerText, regionText] = String(regionCode).match(/^L(\d+)-(\d+)$/) || [];
+        const tiles = allRegionMasks?.[Number(layerText)]?.[regionText];
+        if (!Array.isArray(tiles) || !tiles.length) {
+          const point = getRegionFocusPoint(regionCode);
+          if (point) {
+            includePoint(point.x * 908 / 100 - 24, point.y * 908 / 100 - 24);
+            includePoint(point.x * 908 / 100 + 24, point.y * 908 / 100 + 24);
+          }
+          return;
+        }
+        const rotation = getRegionVisualRotation(regionCode) * Math.PI / 180;
+        const sin = Math.sin(rotation);
+        const cos = Math.cos(rotation);
+        const rotationCenter = currentBoardData?.boardType === 'mixed' &&
+          geometry.shape === 'circular'
+          ? { x: geometry.centerX, y: geometry.centerY }
+          : { x: 454, y: 454 };
+        tiles.forEach((tile) => {
+          const [column, row] = tile.split(',').map(Number);
+          [
+            [column * 4, row * 4],
+            [(column + 1) * 4, row * 4],
+            [column * 4, (row + 1) * 4],
+            [(column + 1) * 4, (row + 1) * 4]
+          ].forEach(([x, y]) => {
+            const dx = x - rotationCenter.x;
+            const dy = y - rotationCenter.y;
+            includePoint(
+              rotationCenter.x + dx * cos - dy * sin,
+              rotationCenter.y + dx * sin + dy * cos
+            );
+          });
+        });
+      });
+      if (!Number.isFinite(bounds.left) || !Number.isFinite(bounds.top)) return null;
+      bounds.width = Math.max(1, bounds.right - bounds.left);
+      bounds.height = Math.max(1, bounds.bottom - bounds.top);
+      return bounds;
+    }
+
+    function focusConflictRegions(regionCodes, minimumScale, maximumScale) {
+      const bounds = getConflictBounds(regionCodes);
+      if (!bounds) return false;
+      const rect = stagePanel.getBoundingClientRect();
+      stageZoom = Math.max(minimumScale, Math.min(
+        maximumScale,
+        908 * 0.76 / bounds.width,
+        908 * 0.76 / bounds.height
+      ));
+      stageZoomOffset = {
+        x: ((454 - (bounds.left + bounds.right) / 2) / 908) * rect.width * stageZoom,
+        y: ((454 - (bounds.top + bounds.bottom) / 2) / 908) * rect.height * stageZoom
+      };
+      focusedRegionCode = null;
+      updateBoardFocusOverlay();
+      updateStageZoom();
+      return true;
+    }
+
+    function showConflictPreview(block) {
+      const regionCodes = [...new Set([...block.alliedRegions, ...block.enemyRegions])];
+      conflictPreview = {
+        regionCodes,
+        previousView: conflictPreview?.previousView || captureStageView()
+      };
+      updateBoardFocusOverlay();
+      focusConflictRegions(regionCodes, 1, 8);
+    }
+
+    function clearConflictPreview() {
+      if (!conflictPreview) return;
+      const previousView = conflictPreview.previousView;
+      conflictPreview = null;
+      updateBoardFocusOverlay();
+      restoreStageView(previousView);
+    }
+
+    function updateRegionConflictEnergy(regionCode) {
+      const block = !conflictSimulation && regionCode
+        ? getConflictPreviewForRegion(regionCode)
+        : null;
+      regionConflictEnergy.classList.toggle('is-hidden', !block);
+      if (!block) return;
+      const forces = getConflictSideForces(block);
+      updateConflictEnergyTrack(
+        regionConflictEnergy.querySelector('.conflict-energy-track'),
+        regionConflictOrangeTotal,
+        regionConflictBlueTotal,
+        forces
+      );
+      regionConflictEnergy.setAttribute(
+        'aria-label',
+        `Ver conflito: laranja ${formatStatisticsNumber(forces.orange)}, azul ${formatStatisticsNumber(forces.blue)}`
+      );
+      regionConflictEnergy.title = 'Mostrar participantes deste conflito';
+      regionConflictEnergy.dataset.conflictRegion = block.regionCode;
+    }
+
+    function updateConflictSimulationEnergy() {
+      if (!conflictSimulation) return;
+      const regionCodes = [...conflictSimulation.regionCodes];
+      const forces = getSelectedRegionTeamForces(regionCodes);
+      updateConflictEnergyTrack(
+        conflictSimulatorTrack,
+        conflictSimulatorOrangeTotal,
+        conflictSimulatorBlueTotal,
+        forces
+      );
+      conflictSimulatorHint.textContent = regionCodes.length
+        ? `${regionCodes.length} região(ões) selecionada(s) · toque para adicionar ou remover`
+        : 'Selecione regiões ocupadas por laranja ou azul.';
+      updateBoardFocusOverlay();
+    }
+
+    function startConflictSimulation() {
+      if (!isGameStarted || isGameOver || isWarRunning || isAiTurnRunning ||
+          quadrilateralRotationMode || pieceDragState || conflictSimulation) return;
+      clearConflictPreview();
+      const previousView = captureStageView();
+      const conflicts = getCurrentWarConflicts();
+      const exampleBlock = conflicts.length
+        ? conflicts[Math.floor(Math.random() * conflicts.length)]
+        : null;
+      conflictSimulation = {
+        regionCodes: new Set(),
+        previousView
+      };
+      app.classList.add('is-conflict-simulating');
+      conflictSimulatorHud.classList.remove('is-hidden');
+      gameMenu.classList.add('is-hidden');
+      gameMenu.setAttribute('aria-hidden', 'true');
+      const focusedRegions = exampleBlock
+        ? [...new Set([...exampleBlock.alliedRegions, ...exampleBlock.enemyRegions])]
+        : [];
+      if (focusedRegions.length) {
+        focusConflictRegions(focusedRegions, 0.45, 0.82);
+      } else {
+        stageZoom = 0.72;
+        stageZoomOffset = { x: 0, y: 0 };
+        focusedRegionCode = null;
+        updateStageZoom();
+      }
+      updateConflictSimulationEnergy();
+    }
+
+    function cancelConflictSimulation() {
+      if (!conflictSimulation) return;
+      const previousView = conflictSimulation.previousView;
+      conflictSimulation = null;
+      conflictSimulatorHud.classList.add('is-hidden');
+      app.classList.remove('is-conflict-simulating');
+      updateBoardFocusOverlay();
+      restoreStageView(previousView);
+      updateSelectedRegionPanel(selectedRegionCode);
+    }
+
+    function panConflictSimulation(direction) {
+      if (!conflictSimulation) return;
+      const step = Math.max(48, stagePanel.getBoundingClientRect().width * 0.28);
+      if (direction === 'left') stageZoomOffset.x -= step;
+      if (direction === 'right') stageZoomOffset.x += step;
+      if (direction === 'up') stageZoomOffset.y -= step;
+      if (direction === 'down') stageZoomOffset.y += step;
+      focusedRegionCode = null;
+      updateStageZoom();
     }
 
     function focusRegion(regionCode, focusScale = null) {
@@ -6697,16 +6982,28 @@
       const svgNamespace = 'http://www.w3.org/2000/svg';
       const warRegions = [...new Set(warSpotlightRegionCodes)]
         .filter((code) => Object.prototype.hasOwnProperty.call(regionGeometryByCode, code));
-      const selectedRegion = !warRegions.length && selectedRegionCode &&
+      const previewRegions = conflictPreview?.regionCodes || [];
+      const simulationRegions = conflictSimulation ? [...conflictSimulation.regionCodes] : [];
+      const spotlightRegions = [...new Set([
+        ...warRegions,
+        ...previewRegions,
+        ...simulationRegions
+      ])].filter((code) =>
+        Object.prototype.hasOwnProperty.call(regionGeometryByCode, code));
+      const selectedRegion = !spotlightRegions.length && !conflictSimulation && selectedRegionCode &&
         Object.prototype.hasOwnProperty.call(regionGeometryByCode, selectedRegionCode)
         ? selectedRegionCode
         : null;
-      const focusRegions = [...new Set([...warRegions, ...(selectedRegion ? [selectedRegion] : [])])];
+      const focusRegions = [...new Set([
+        ...spotlightRegions,
+        ...(selectedRegion ? [selectedRegion] : [])
+      ])];
       boardFocusMaskHoles.replaceChildren();
       boardFocusOutlines.replaceChildren();
-      boardFocusDim.style.display = warRegions.length || quadrilateralRotationMode ? '' : 'none';
+      boardFocusDim.style.display =
+        spotlightRegions.length || conflictSimulation || quadrilateralRotationMode ? '' : 'none';
 
-      warRegions.forEach((regionCode) => {
+      spotlightRegions.forEach((regionCode) => {
         const geometry = regionGeometryByCode[regionCode];
         const path = document.createElementNS(svgNamespace, 'path');
         path.setAttribute('d', getRegionFocusPathData(geometry));
@@ -6722,6 +7019,13 @@
       focusRegions.forEach((regionCode) => {
         const geometry = regionGeometryByCode[regionCode];
         const isWarRegion = warRegions.includes(regionCode);
+        const isSimulationRegion = simulationRegions.includes(regionCode);
+        const isPreviewRegion = previewRegions.includes(regionCode);
+        const highlightType = isWarRegion || isPreviewRegion
+          ? 'war'
+          : isSimulationRegion
+            ? 'simulation'
+            : 'selected';
         const pathData = getRegionFocusPathData(geometry);
         const rotationCenter = getRegionRotationCenter(regionCode);
         const transform = `rotate(${getRegionVisualRotation(regionCode)} ${rotationCenter.x} ${rotationCenter.y})`;
@@ -6731,7 +7035,7 @@
         outerOutline.setAttribute('transform', transform);
         outerOutline.setAttribute(
           'class',
-          `board-focus-outline ${isWarRegion ? 'is-war-outer' : 'is-selected-outer'}`
+          `board-focus-outline is-${highlightType}-outer`
         );
         boardFocusOutlines.appendChild(outerOutline);
 
@@ -6741,7 +7045,7 @@
         innerOutline.setAttribute('transform', transform);
         innerOutline.setAttribute(
           'class',
-          `board-focus-outline ${isWarRegion ? 'is-war-inner' : 'is-selected-inner'}`
+          `board-focus-outline is-${highlightType}-inner`
         );
         boardFocusOutlines.appendChild(innerOutline);
       });
@@ -9029,12 +9333,29 @@
         beginQuadrilateralRotationGesture(event);
         return;
       }
+      if (!allRegionMasks) return;
+      const regionCode = resolveRegionFromPointer(event.clientX, event.clientY);
+      if (conflictSimulation) {
+        event.preventDefault();
+        event.stopPropagation();
+        const dominator = getRegionDominador(regionCode);
+        if (dominator !== 'orange' && dominator !== 'blue') {
+          conflictSimulatorHint.textContent = 'Escolha uma região ocupada por laranja ou azul.';
+          return;
+        }
+        if (conflictSimulation.regionCodes.has(regionCode)) {
+          conflictSimulation.regionCodes.delete(regionCode);
+        } else {
+          conflictSimulation.regionCodes.add(regionCode);
+        }
+        updateConflictSimulationEnergy();
+        return;
+      }
       if (isDebugModeActive()) {
         event.stopPropagation();
         return;
       }
-      if (!allRegionMasks) return;
-      const regionCode = resolveRegionFromPointer(event.clientX, event.clientY);
+      if (conflictPreview) clearConflictPreview();
       if (!regionCode) {
         selectedRegionCode = null;
         updateSelectedRegionPanel();
@@ -9046,6 +9367,12 @@
       updateSelectedRegionPanel(selectedRegionCode);
       updateMobileRotationControls();
       focusRegion(regionCode);
+    });
+    document.addEventListener('pointerdown', (event) => {
+      if (!conflictPreview ||
+          regionConflictEnergy.contains(event.target) ||
+          stage.contains(event.target)) return;
+      clearConflictPreview();
     });
     stage.addEventListener('pointermove', (event) => {
       if (quadrilateralRotationMode) {
@@ -10231,6 +10558,41 @@
         campaignActions.classList.toggle('is-hidden', !isCampaignGame());
         gameMenuResignButton.classList.toggle('is-hidden', isCampaignGame());
       }
+    });
+    gameMenuConflictModeButton.addEventListener('click', () => {
+      conflictPreviewMode = conflictPreviewMode === 'real' ? 'neighborhood' : 'real';
+      gameMenuConflictModeButton.textContent = conflictPreviewMode === 'real'
+        ? 'Blocos de Conflitos Reais'
+        : 'Blocos de Conflitos por Vizinhança';
+      gameMenuConflictModeButton.setAttribute(
+        'aria-pressed',
+        String(conflictPreviewMode === 'real')
+      );
+      updateRegionConflictEnergy(selectedRegionCode);
+      if (!conflictPreview) return;
+      const block = getConflictPreviewForRegion(selectedRegionCode);
+      if (block) showConflictPreview(block);
+      else clearConflictPreview();
+    });
+    regionConflictEnergy.addEventListener('click', () => {
+      if (conflictSimulation || !selectedRegionCode) return;
+      if (conflictPreview) {
+        clearConflictPreview();
+        return;
+      }
+      const conflict = getConflictPreviewForRegion(selectedRegionCode);
+      if (conflict) showConflictPreview(conflict);
+    });
+    gameMenuSimulateButton.addEventListener('click', () => {
+      gameMenu.classList.add('is-hidden');
+      gameMenu.setAttribute('aria-hidden', 'true');
+      startConflictSimulation();
+    });
+    conflictSimulatorCancelButton.addEventListener('click', cancelConflictSimulation);
+    conflictSimulatorPad.querySelectorAll('[data-pan]').forEach((button) => {
+      button.addEventListener('click', () => {
+        panConflictSimulation(button.dataset.pan);
+      });
     });
     levelEightReplayButton.addEventListener('click', exportLevelEightReplay);
     gameMenu.addEventListener('click', (event) => {
