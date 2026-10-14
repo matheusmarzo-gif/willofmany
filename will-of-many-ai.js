@@ -26,6 +26,13 @@
     },
     conquestPriority: { baseWeight: 1.0, weightPerRegionDeficit: 0.5, maxWeight: 6.0 },
     conquestCostHeuristic: { freeRegionCost: 2, sufficientForceRatioCost: 4 },
+    rankChange: {
+      minimumPriority: 1,
+      instabilityWeight: 1,
+      extremeInstabilityBonus: 2,
+      stabilizationBonus: 2,
+      downgradeTieBreakWeight: 0.01
+    },
     wheat: { seekFarmsWhenDeficit: true },
     desirability: {
       baseScoreByLayer: {
@@ -174,6 +181,158 @@
     var value = teamStats.unidades_livres_temp;
     if (value !== undefined) return Math.max(0, Number(value) || 0);
     return Math.max(0, Number(forceStats.unidades_livres_temp) || 0);
+  }
+
+  function chooseRankChangeAction(snapshot) {
+    snapshot = object(snapshot);
+    var team = snapshot.aiTeam || snapshot.aiPlayer || snapshot.team || snapshot.currentTeam;
+    if ((team !== 'orange' && team !== 'blue') ||
+        snapshot.upgradeDowngradeEnabled !== true) return null;
+
+    var settings = object(config.rankChange);
+    var candidates = Array.isArray(snapshot.rankChangeCandidates)
+      ? snapshot.rankChangeCandidates
+      : [];
+    var regions = object(snapshot.regions);
+    var piecesByRegion = object(snapshot.regionPiecesByRegion);
+    var forceStats = object(snapshot.regionForceStats);
+    var codes = Object.keys(regions);
+    Object.keys(piecesByRegion).forEach(function (code) {
+      if (codes.indexOf(code) === -1) codes.push(code);
+    });
+    var ownedCodes = codes.filter(function (code) {
+      return getRegionOwner(snapshot, code, team, opposite[team]) === team;
+    });
+    var totalSoldiers = ownedCodes.reduce(function (total, code) {
+      return total + getSnapshotSoldiers(snapshot, code, team);
+    }, 0);
+    function finalForce(code) {
+      var teamStats = object(object(object(forceStats[code]).byTeam)[team]);
+      var value = Number(teamStats.forca_final);
+      return Number.isFinite(value) && value > 0
+        ? value
+        : getSnapshotSoldiers(snapshot, code, team);
+    }
+    var totalFinalForce = ownedCodes.reduce(function (total, code) {
+      return total + finalForce(code);
+    }, 0);
+    var maxCommitment = 0.05;
+
+    function hasStabilizingNeighbors(layerNumber, neighborLayers) {
+      if (layerNumber === 8) return neighborLayers.indexOf(7) !== -1;
+      if (layerNumber === 1) return neighborLayers.indexOf(2) !== -1;
+      return neighborLayers.indexOf(layerNumber - 1) !== -1 &&
+        neighborLayers.indexOf(layerNumber + 1) !== -1;
+    }
+
+    var minimumPriority = Number(settings.minimumPriority);
+    if (!Number.isFinite(minimumPriority)) minimumPriority = 1;
+    var instabilityWeight = Number(settings.instabilityWeight);
+    if (!Number.isFinite(instabilityWeight)) instabilityWeight = 1;
+    var extremeInstabilityBonus = Number(settings.extremeInstabilityBonus);
+    if (!Number.isFinite(extremeInstabilityBonus)) extremeInstabilityBonus = 2;
+    var stabilizationBonus = Number(settings.stabilizationBonus);
+    if (!Number.isFinite(stabilizationBonus)) stabilizationBonus = 2;
+    var downgradeTieBreakWeight = Number(settings.downgradeTieBreakWeight);
+    if (!Number.isFinite(downgradeTieBreakWeight)) downgradeTieBreakWeight = 0.01;
+
+    var candidatesBySource = Object.create(null);
+    candidates.forEach(function (candidate) {
+      if (!candidate || !['upgrade', 'downgrade'].includes(candidate.type) ||
+          !candidate.source || !candidate.target ||
+          getRegionOwner(snapshot, candidate.source, team, opposite[team]) !== team) {
+        return;
+      }
+      var sourceLayer = Number(candidate.sourceLayer);
+      var neighborLayers = Array.isArray(candidate.neighborLayers)
+        ? candidate.neighborLayers.map(Number).filter(Number.isInteger)
+        : [];
+      if (!Number.isInteger(sourceLayer) || sourceLayer < 1 || sourceLayer > 8 ||
+          hasStabilizingNeighbors(sourceLayer, neighborLayers)) return;
+
+      var hasSuperior = sourceLayer > 1 &&
+        neighborLayers.indexOf(sourceLayer - 1) !== -1;
+      var hasInferior = sourceLayer < 8 &&
+        neighborLayers.indexOf(sourceLayer + 1) !== -1;
+      var isExtremelyUnstable = !hasSuperior && !hasInferior;
+      var upgradeLayer = sourceLayer - 1;
+      var downgradeLayer = sourceLayer + 1;
+      var upgradeStabilizes = upgradeLayer >= 1 &&
+        hasStabilizingNeighbors(upgradeLayer, neighborLayers);
+      var downgradeStabilizes = downgradeLayer <= 8 &&
+        hasStabilizingNeighbors(downgradeLayer, neighborLayers);
+      var soldiersBefore = Number(candidate.soldiersBefore);
+      var regionForce = finalForce(candidate.source);
+      if (!Number.isFinite(soldiersBefore) || soldiersBefore < 1 ||
+          totalSoldiers <= 0 || totalFinalForce <= 0 ||
+          soldiersBefore > totalSoldiers * maxCommitment ||
+          regionForce > totalFinalForce * maxCommitment) return;
+      if (!candidatesBySource[candidate.source]) {
+        candidatesBySource[candidate.source] = {
+          sourceLayer: sourceLayer,
+          neighborLayers: neighborLayers,
+          isExtremelyUnstable: isExtremelyUnstable,
+          upgradeStabilizes: upgradeStabilizes,
+          downgradeStabilizes: downgradeStabilizes,
+          options: []
+        };
+      }
+      candidatesBySource[candidate.source].options.push(candidate);
+    });
+
+    var eligible = [];
+    Object.keys(candidatesBySource).forEach(function (source) {
+      var group = candidatesBySource[source];
+      var upgradeOption = group.options.find(function (option) {
+        return option.type === 'upgrade';
+      });
+      var downgradeOption = group.options.find(function (option) {
+        return option.type === 'downgrade';
+      });
+      var preferredType = group.upgradeStabilizes && !group.downgradeStabilizes
+        ? 'upgrade'
+        : group.downgradeStabilizes && !group.upgradeStabilizes
+          ? 'downgrade'
+          : downgradeOption
+            ? 'downgrade'
+            : 'upgrade';
+      var option = preferredType === 'upgrade' ? upgradeOption : downgradeOption;
+      if (!option) return;
+
+      var stabilizes = group.upgradeStabilizes || group.downgradeStabilizes;
+      var priority = instabilityWeight +
+        (group.isExtremelyUnstable ? extremeInstabilityBonus : 0) +
+        (stabilizes ? stabilizationBonus : 0) +
+        (preferredType === 'downgrade' ? downgradeTieBreakWeight : 0);
+      if (priority < minimumPriority) return;
+      eligible.push({
+        type: option.type,
+        source: option.source,
+        target: option.target,
+        priority: priority,
+        isExtremelyUnstable: group.isExtremelyUnstable,
+        stabilizes: stabilizes,
+        soldiersAfter: Number(option.soldiersAfter) || 0,
+        cost: Number(option.cost) || 0
+      });
+    });
+
+    eligible.sort(function (left, right) {
+      return right.priority - left.priority ||
+        Number(right.isExtremelyUnstable) - Number(left.isExtremelyUnstable) ||
+        Number(right.stabilizes) - Number(left.stabilizes) ||
+        right.soldiersAfter - left.soldiersAfter ||
+        left.cost - right.cost ||
+        left.source.localeCompare(right.source);
+    });
+    if (!eligible.length) return null;
+    var selected = eligible[0];
+    return {
+      type: 'rankChange',
+      rankChangeType: selected.type,
+      source: selected.source,
+      target: selected.target
+    };
   }
 
   function getSnapshotWheatBalance(snapshot, team) {
@@ -2330,6 +2489,7 @@
 
   root.WillOfManyAI = {
     chooseAction: chooseAction,
+    chooseRankChangeAction: chooseRankChangeAction,
     calculateDesirability: calculateDesirability,
     calculateCurrentDesirability: calculateCurrentDesirability,
     setConfig: setConfig,

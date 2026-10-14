@@ -65,6 +65,39 @@ test('browser entrypoint loads the external client resources in dependency order
   assert.equal(html.includes('embedded-region-data'), false, 'no embedded board fallback remains');
 });
 
+test('rank changes are opt-in for AI/online games and disabled in campaign levels 1-8', () => {
+  campaignBoards.forEach((board) => {
+    assert.equal(board.campaign.upgradeDowngradeEnabled, false, board.campaign.id);
+  });
+  assert.match(html, /id="upgrade-downgrade-enabled" type="checkbox"/);
+  assert.match(gameClient,
+    /upgradeDowngradeOption\.classList\.toggle\('is-hidden',\s*!?\['ai', 'online'\]\.includes\(gameMode\)\)/);
+  assert.match(gameClient,
+    /upgradeDowngradeEnabled = isCampaignGame\(\)\s*\?\s*activeCampaignLevel\.upgradeDowngradeEnabled === true\s*:\s*\['ai', 'online'\]\.includes\(gameMode\) && upgradeDowngradeCheckbox\.checked/);
+  assert.match(gameClient, /regionRankChanges:/);
+  assert.match(gameClient,
+    /function chooseAiRankChangeAction\(snapshot\)[\s\S]*?if \(!upgradeDowngradeEnabled\) return null[\s\S]*?chooseRankChangeAction\(snapshot\)/);
+  assert.match(gameClient,
+    /suggestedAction\.type === 'pass'[\s\S]*?chooseAiRankChangeAction\(snapshot\)/);
+  assert.match(gameClient,
+    /action\.type === 'rankChange'[\s\S]*?performRankChange\(action\.source, action\.rankChangeType, action\.target\)/);
+  assert.match(gameClient, /rankChangeCandidates\.push\(\{ \.\.\.option, neighborLayers \}\)/);
+  assert.match(gameClient, /window\.setTimeout\(\(\) => \{[\s\S]*?rankChangeControlsExpanded = false;[\s\S]*?\}, 3000\)/);
+  assert.match(gameClient, /rank-change-expand-button/);
+  assert.match(gameCss, /\.rank-change-floating-controls\.is-collapsed/);
+});
+
+test('circular movement uses geometric same-rank neighbors instead of region numbering', () => {
+  assert.match(gameClient,
+    /function usesDirectRegionMoveTargets\(regionCode\)[\s\S]*?geometry\?\.shape === 'circular'/);
+  assert.match(gameClient,
+    /function getDragMoveTargets\(sourceCode, team, amount\)[\s\S]*?usesDirectRegionMoveTargets\(sourceCode\)[\s\S]*?regionNeighborCache\[sourceCode\]\?\.sameRank/);
+  assert.match(gameClient,
+    /function openMoveModal\(\)[\s\S]*?usesDirectRegionMoveTargets\(selectedRegionCode\)[\s\S]*?regionNeighborCache\[selectedRegionCode\]\?\.sameRank/);
+  assert.match(gameClient,
+    /function getMoveAmountOptions\(target\)[\s\S]*?usesDirectRegionMoveTargets\(selectedRegionCode\)[\s\S]*?regionNeighborCache\[selectedRegionCode\]\?\.sameRank/);
+});
+
 test('turn transition includes its fade-out within the one-second display duration', () => {
   assert.match(
     gameClient,
@@ -530,6 +563,7 @@ test('Level 5 defines its four blocks, campaign economy, deadline, and doubled B
   assert.deepEqual(levelFiveCampaign, {
     id: 'tabuleiro-05',
     name: 'Tabuleiro 05',
+    upgradeDowngradeEnabled: false,
     initialCoins: 12,
     coinsPerTurn: 4,
     coinsPerTurnStopAtTurn: 6,
@@ -677,6 +711,7 @@ test('Level 6 defines its complete 5x5 board, no-income campaign, and ring/linea
   assert.deepEqual(levelSixCampaign, {
     id: 'tabuleiro-06',
     name: 'Tabuleiro 06',
+    upgradeDowngradeEnabled: false,
     initialCoins: 0,
     coinsPerTurn: 0,
     preserveCoinsBetweenTurns: false,
@@ -1178,6 +1213,7 @@ test('campaign mode opens a custom illustrated trail with data-driven unlocked l
   assert.deepEqual(levelThreeCampaign, {
     id: 'tabuleiro-03',
     name: 'Tabuleiro 03',
+    upgradeDowngradeEnabled: false,
     initialCoins: 4,
     coinsPerTurn: 0,
     preserveCoinsBetweenTurns: true,

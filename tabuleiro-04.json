@@ -16,6 +16,7 @@
   "campaign": {
     "id": "tabuleiro-04",
     "name": "Tabuleiro 04",
+    "upgradeDowngradeEnabled": false,
     "initialCoins": 4,
     "coinsPerTurn": 0,
     "preserveCoinsBetweenTurns": true,

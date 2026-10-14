@@ -12,6 +12,7 @@
   "campaign": {
     "id": "tabuleiro-01",
     "name": "Tabuleiro 01",
+    "upgradeDowngradeEnabled": false,
     "coinsPerTurn": 4,
     "turnLimit": 1,
     "rotationEnabled": false,

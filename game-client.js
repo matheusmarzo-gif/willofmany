@@ -1,9 +1,12 @@
     const stage = document.querySelector('#stage');
+    const rankChangeFloatingControls = document.querySelector('#rank-change-floating-controls');
     const app = document.querySelector('.app');
     app.classList.toggle('is-android-webview', !!window.AndroidBluetooth);
     const startScreen = document.querySelector('#start-screen');
     const startMenu = document.querySelector('#start-menu');
     const newGameOptions = document.querySelector('#new-game-options');
+    const upgradeDowngradeOption = document.querySelector('#upgrade-downgrade-option');
+    const upgradeDowngradeCheckbox = document.querySelector('#upgrade-downgrade-enabled');
     const startMessage = document.querySelector('#start-message');
     const startGameButton = document.querySelector('#start-game-button');
     const startBackButton = document.querySelector('#start-back-button');
@@ -239,6 +242,11 @@
     let regionNeighborCache = {};
     const regionProbeBoxes = {};
     let regionGeometryByCode = {};
+    let rankChangedRegions = [];
+    const rankChangeOriginSnapshots = new Map();
+    let rankChangeControlsCollapseTimeout = null;
+    let rankChangeControlsRegionCode = null;
+    let rankChangeControlsExpanded = true;
     let quadrilateralBoard = null;
     let currentBoardData = null;
     let campaignBoardConfig = null;
@@ -307,6 +315,7 @@
     let selectedStartColor = null;
     let selectedStartSpeed = null;
     let gameMode = 'ai';
+    let upgradeDowngradeEnabled = false;
     let bluetoothRole = null;
     let bluetoothConnected = false;
     let onlineToken = localStorage.getItem('will-of-many-online-token') || '';
@@ -450,6 +459,12 @@
 
     function resetGameState() {
       gameSessionVersion += 1;
+      if (rankChangeControlsCollapseTimeout) {
+        window.clearTimeout(rankChangeControlsCollapseTimeout);
+        rankChangeControlsCollapseTimeout = null;
+      }
+      rankChangeControlsRegionCode = null;
+      rankChangeControlsExpanded = true;
       Object.keys(regionPiecesByRegion).forEach((key) => delete regionPiecesByRegion[key]);
       Object.keys(regionStats).forEach((key) => delete regionStats[key]);
       Object.keys(regionForceStats).forEach((key) => delete regionForceStats[key]);
@@ -575,6 +590,8 @@
         campaignMoveUndoHistory: JSON.parse(JSON.stringify(campaignMoveUndoHistory)),
         turnRecycledPieces: JSON.parse(JSON.stringify(turnRecycledPieces)),
         turnCreatedPieces: JSON.parse(JSON.stringify(turnCreatedPieces)),
+        upgradeDowngradeEnabled,
+        regionRankChanges: JSON.parse(JSON.stringify(rankChangedRegions)),
         victoryPoints: { ...victoryPoints },
         wheatBalances: { ...wheatBalances },
         lastWheatTurnReport: lastWheatTurnReport ? { ...lastWheatTurnReport } : null,
@@ -767,13 +784,20 @@
         aiTeam = gameMode === 'ai' ? (humanTeam === 'orange' ? 'blue' : 'orange')
           : gameMode === 'campaign' ? 'blue' : null;
         activeCampaignLevel = gameMode === 'campaign' ? campaignBoardConfig : null;
+        upgradeDowngradeEnabled = save.upgradeDowngradeEnabled === true &&
+          (!isCampaignGame() || activeCampaignLevel?.upgradeDowngradeEnabled === true);
+        applySavedRankChanges(save.regionRankChanges || []);
         const savedRegionMapVersion = Number(save.levelThreeRegionMapVersion);
         const migrateLevelThreeRegionCodes = gameMode === 'campaign' &&
           activeCampaignLevel?.id === 'tabuleiro-03' &&
           (!Number.isFinite(savedRegionMapVersion) || savedRegionMapVersion < 1);
-        const mapSavedRegionCode = (code) => migrateLevelThreeRegionCodes
-          ? (levelThreeRegionCodeMigration[code] || code)
-          : code;
+        const mapSavedRegionCode = (code) => {
+          const rankChange = rankChangedRegions.find((change) => change.originCode === code);
+          const mappedCode = rankChange?.code || code;
+          return migrateLevelThreeRegionCodes
+            ? (levelThreeRegionCodeMigration[mappedCode] || mappedCode)
+            : mappedCode;
+        };
         campaignCollectedBags = Array.isArray(save.campaignCollectedBags)
           ? save.campaignCollectedBags
             .filter((code) => typeof code === 'string')
@@ -1109,10 +1133,40 @@
           }));
         });
       });
+      const rankChangeCandidates = [];
+      if (upgradeDowngradeEnabled) {
+        const boardRegionCodes = getRegionCalculationOrder();
+        boardRegionCodes
+          .filter((code) => getRegionDominador(code) === aiTeam)
+          .forEach((source) => {
+            const options = getRankChangeOptionsForRegion(source, aiTeam);
+            if (!options.length) return;
+            const sourceLayer = getRegionLayer(source);
+            const knownNeighbors = regionNeighborCache[source] || {};
+            const neighborCodes = [
+              ...(knownNeighbors.superior || []),
+              ...(knownNeighbors.inferior || []),
+              ...(knownNeighbors.sameRank || [])
+            ];
+            const additionalLayers = [sourceLayer - 2, sourceLayer + 2]
+              .filter((layer) => layer >= 1 && layer <= 8);
+            boardRegionCodes
+              .filter((candidate) => candidate !== source &&
+                additionalLayers.includes(getRegionLayer(candidate)) &&
+                areRegionsNeighbors(source, candidate))
+              .forEach((candidate) => neighborCodes.push(candidate));
+            const neighborLayers = [...new Set(neighborCodes)]
+              .map(getRegionLayer);
+            options.forEach((option) => {
+              rankChangeCandidates.push({ ...option, neighborLayers });
+            });
+          });
+      }
       return {
         currentTeam, humanTeam, aiTeam, currentTurn, gameSpeed, hasRotatedThisTurn,
         points: pontosDoTurn[aiTeam],
         aiTurnStartingPoints,
+        upgradeDowngradeEnabled,
         campaignLevelId: activeCampaignLevel?.id || null,
         pontosDoTurn: { ...pontosDoTurn },
         wheatEnabled: isWheatEnabled(),
@@ -1137,6 +1191,7 @@
         regionForceBonusFactors: { ...regionForceBonusFactors },
         regionPiecesByRegion: JSON.parse(JSON.stringify(regionPiecesByRegion)),
         regionNeighborCache: JSON.parse(JSON.stringify(regionNeighborCache)),
+        rankChangeCandidates,
         allRegionMasks
       };
     }
@@ -2116,6 +2171,209 @@
       return `${teamLabel}: faltaram ${formatStatisticsNumber(report.shortage)} de trigo (${formatStatisticsNumber(report.deficitRatio * 100)}% do consumo); perda de ${formatStatisticsNumber(report.lossRate * 100)}% das peças (${report.piecesLost} peça(s)).`;
     }
 
+    function parseRankChangeRegionCode(regionCode) {
+      const match = String(regionCode || '').match(/^L([1-8])-(\d+)$/);
+      return match
+        ? { layer: Number(match[1]), region: Number(match[2]) }
+        : null;
+    }
+
+    function cloneRankChangeData(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function getNextRankChangeRegionCode(layer) {
+      const numbers = [
+        ...Object.keys(allRegionMasks?.[layer] || {}).map(Number),
+        ...Object.keys(regionGeometryByCode)
+          .map((code) => parseRankChangeRegionCode(code))
+          .filter((parts) => parts?.layer === layer)
+          .map((parts) => parts.region)
+      ].filter((number) => Number.isInteger(number) && number > 0);
+      return `L${layer}-${Math.max(0, ...numbers) + 1}`;
+    }
+
+    function captureRankChangeOriginSnapshot(regionCode) {
+      const parts = parseRankChangeRegionCode(regionCode);
+      const mask = parts && allRegionMasks?.[parts.layer]?.[parts.region];
+      const geometry = regionGeometryByCode[regionCode];
+      if (!parts || !Array.isArray(mask) || !geometry) {
+        throw new Error(`Não foi possível preservar a geometria original de ${regionCode}.`);
+      }
+      return {
+        mask: cloneRankChangeData(mask),
+        geometry: cloneRankChangeData(geometry),
+        slots: cloneRankChangeData(getRegionSlots(regionCode)),
+        probeBoxes: cloneRankChangeData(regionProbeBoxes[regionCode] || [])
+      };
+    }
+
+    function removeRankChangeRegionFromBoard(regionCode) {
+      const parts = parseRankChangeRegionCode(regionCode);
+      if (!parts) throw new Error(`Código de região inválido: ${regionCode}.`);
+      delete allRegionMasks?.[parts.layer]?.[parts.region];
+      delete regionGeometryByCode[regionCode];
+      delete regionSlots[parts.layer]?.[parts.region];
+      delete regionProbeBoxes[regionCode];
+    }
+
+    function insertRankChangeRegionOnBoard(regionCode, snapshot, useTargetRank) {
+      const parts = parseRankChangeRegionCode(regionCode);
+      if (!parts) throw new Error(`Código de região inválido: ${regionCode}.`);
+      if (!allRegionMasks[parts.layer]) allRegionMasks[parts.layer] = {};
+      if (Object.prototype.hasOwnProperty.call(allRegionMasks[parts.layer], parts.region) ||
+          Object.prototype.hasOwnProperty.call(regionGeometryByCode, regionCode)) {
+        throw new Error(`A região ${regionCode} já existe neste tabuleiro.`);
+      }
+      allRegionMasks[parts.layer][parts.region] = cloneRankChangeData(snapshot.mask);
+      regionGeometryByCode[regionCode] = {
+        ...cloneRankChangeData(snapshot.geometry),
+        layer: parts.layer,
+        region: parts.region,
+        maxPieces: useTargetRank ? parts.layer : snapshot.geometry.maxPieces
+      };
+      if (!regionSlots[parts.layer]) regionSlots[parts.layer] = {};
+      regionSlots[parts.layer][parts.region] = cloneRankChangeData(snapshot.slots);
+      if (snapshot.probeBoxes.length) {
+        regionProbeBoxes[regionCode] = cloneRankChangeData(snapshot.probeBoxes);
+      }
+    }
+
+    function updateRankChangeBoardDefinitions() {
+      const changesByOrigin = new Map(
+        rankChangedRegions.map((change) => [change.originCode, change.code])
+      );
+      const definitions = new Set();
+      [currentBoardData, quadrilateralBoard].forEach((board) => {
+        (board?.blocks || []).forEach((block) => {
+          (block?.regions || []).forEach((region) => definitions.add(region));
+        });
+      });
+      definitions.forEach((region) => {
+        if (!region || typeof region !== 'object') return;
+        const originalCode = region.rankChangeOriginCode ||
+          region.code || region.name ||
+          `L${region.layer || String(region.rank || '').match(/L([1-8])/)?.[1]}-${region.region}`;
+        const currentCode = changesByOrigin.get(originalCode);
+        const nextCode = currentCode || (region.rankChangeOriginCode ? originalCode : null);
+        if (!nextCode) return;
+        const parts = parseRankChangeRegionCode(nextCode);
+        if (!parts) return;
+        if (currentCode) region.rankChangeOriginCode = originalCode;
+        region.code = nextCode;
+        region.name = nextCode;
+        region.rank = `L${parts.layer}`;
+        region.layer = parts.layer;
+        region.region = parts.region;
+        if (Object.prototype.hasOwnProperty.call(region, 'index')) region.index = parts.region;
+        if (Object.prototype.hasOwnProperty.call(region, 'number')) region.number = parts.region;
+        if (!currentCode) delete region.rankChangeOriginCode;
+      });
+    }
+
+    function synchronizeRankChangedBoardData() {
+      regionMasks = allRegionMasks?.['8'] || {};
+      if (quadrilateralBoard) {
+        quadrilateralBoard.masks = allRegionMasks;
+        quadrilateralBoard.geometry = regionGeometryByCode;
+      }
+      updateRankChangeBoardDefinitions();
+      regionNeighborCache = {};
+      for (let layer = 1; layer <= 8; layer += 1) {
+        if (allRegionMasks?.[layer]) recomputeNeighborCacheForLayer(layer);
+      }
+      Object.keys(regionCombatState).forEach((code) => delete regionCombatState[code]);
+      resetCombatRegions();
+      updateActiveRegions();
+    }
+
+    function restoreRankChangesToOriginalBoard() {
+      if (!rankChangedRegions.length) return;
+      const changes = [...rankChangedRegions];
+      changes.forEach((change) => removeRankChangeRegionFromBoard(change.code));
+      changes.forEach((change) => {
+        const snapshot = rankChangeOriginSnapshots.get(change.originCode);
+        if (!snapshot) {
+          throw new Error(`Falta a geometria original de ${change.originCode}.`);
+        }
+        insertRankChangeRegionOnBoard(change.originCode, snapshot, false);
+      });
+      rankChangedRegions = [];
+      updateRankChangeBoardDefinitions();
+      synchronizeRankChangedBoardData();
+    }
+
+    function applySavedRankChanges(changes) {
+      if (!Array.isArray(changes)) {
+        throw new TypeError('A lista de alterações de rank salva é inválida.');
+      }
+      const normalizedChanges = changes.map((change) => {
+        if (!change || typeof change !== 'object' ||
+            !parseRankChangeRegionCode(change.originCode) ||
+            !parseRankChangeRegionCode(change.code)) {
+          throw new TypeError('Uma alteração de rank salva contém códigos de região inválidos.');
+        }
+        return { originCode: change.originCode, code: change.code };
+      });
+      if (new Set(normalizedChanges.map((change) => change.originCode)).size !== normalizedChanges.length ||
+          new Set(normalizedChanges.map((change) => change.code)).size !== normalizedChanges.length) {
+        throw new Error('A lista de alterações de rank contém regiões duplicadas.');
+      }
+      if (JSON.stringify(rankChangedRegions) === JSON.stringify(normalizedChanges)) return;
+
+      restoreRankChangesToOriginalBoard();
+      const snapshots = normalizedChanges.map((change) => {
+        let snapshot = rankChangeOriginSnapshots.get(change.originCode);
+        if (!snapshot) {
+          snapshot = captureRankChangeOriginSnapshot(change.originCode);
+          rankChangeOriginSnapshots.set(change.originCode, snapshot);
+        }
+        return { ...change, snapshot };
+      });
+      snapshots.forEach(({ originCode }) => removeRankChangeRegionFromBoard(originCode));
+      snapshots.forEach(({ originCode, code, snapshot }) => {
+        insertRankChangeRegionOnBoard(code, snapshot, true);
+      });
+      rankChangedRegions = normalizedChanges;
+      synchronizeRankChangedBoardData();
+    }
+
+    function getRankChangeOptionsForRegion(regionCode, team) {
+      if (!upgradeDowngradeEnabled || !regionCode ||
+          !['orange', 'blue'].includes(team) ||
+          getRegionDominador(regionCode) !== team) return [];
+      const sourceLayer = getRegionLayer(regionCode);
+      const soldiers = getTeamSoldierCount(regionCode, team);
+      const coins = Number(pontosDoTurn[team]) || 0;
+      return ['upgrade', 'downgrade'].flatMap((type) => {
+        const requirements = gameRules.getRankChangeRequirements(type, sourceLayer);
+        if (!requirements || soldiers < requirements.minimumSoldiers ||
+            coins < requirements.cost) return [];
+        const resultSoldiers = gameRules.calculateRankChangeSoldierTotal(
+          type,
+          sourceLayer,
+          soldiers
+        );
+        if (!Number.isInteger(resultSoldiers) || resultSoldiers < 1) return [];
+        return [{
+          type,
+          source: regionCode,
+          target: getNextRankChangeRegionCode(requirements.targetLayer),
+          sourceLayer,
+          targetLayer: requirements.targetLayer,
+          cost: requirements.cost,
+          minimumSoldiers: requirements.minimumSoldiers,
+          soldiersBefore: soldiers,
+          soldiersAfter: resultSoldiers
+        }];
+      });
+    }
+
+    function chooseAiRankChangeAction(snapshot) {
+      if (!upgradeDowngradeEnabled) return null;
+      return window.WillOfManyAI?.chooseRankChangeAction(snapshot) || null;
+    }
+
     function getRegionLayer(regionCode) {
       return gameRules.getRegionLayer(regionCode);
     }
@@ -2758,6 +3016,13 @@
       return `L${layerNumber}-${targetRegion}`;
     }
 
+    function usesDirectRegionMoveTargets(regionCode) {
+      const geometry = regionGeometryByCode[regionCode];
+      return currentBoardData?.boardType === 'mixed' ||
+        geometry?.shape === 'quadrilateral' ||
+        geometry?.shape === 'circular';
+    }
+
     function getDragMoveTargets(sourceCode, team, amount) {
       if (!sourceCode || !team || !Number.isInteger(amount) || amount <= 0) return [];
       const available = getTeamSoldierCount(sourceCode, team);
@@ -2769,8 +3034,7 @@
       if (sourceFinalPieces > sourceLimit) return [];
 
       const targets = [];
-      const candidateTargets = currentBoardData?.boardType === 'mixed' ||
-        regionGeometryByCode[sourceCode]?.shape === 'quadrilateral'
+      const candidateTargets = usesDirectRegionMoveTargets(sourceCode)
         ? (regionNeighborCache[sourceCode]?.sameRank || [])
         : ['left', 'right'].map((direction) => getNeighborRegionCode(sourceCode, direction)).filter(Boolean);
       for (const targetCode of candidateTargets) {
@@ -3834,6 +4098,142 @@
       regionPromotionControls.classList.toggle('is-hidden', !promotionTargets.length);
       const relegationOptions = regionCode ? getRelegationOptionsForRegion(regionCode, currentTeam) : [];
       regionRelegationControls.classList.toggle('is-hidden', !relegationOptions.length);
+      renderRankChangeControls(regionCode);
+    }
+
+    function positionCollapsedRankChangeControl(regionCode, button) {
+      const regionShape = [...stage.querySelectorAll('[data-region]')]
+        .find((shape) => shape.dataset.region === regionCode);
+      if (!regionShape) return;
+
+      const regionBounds = regionShape.getBoundingClientRect();
+      const stageBounds = stage.getBoundingClientRect();
+      const buttonBounds = button.getBoundingClientRect();
+      if (!regionBounds.width || !regionBounds.height ||
+          !stageBounds.width || !stageBounds.height) return;
+
+      const halfWidth = buttonBounds.width / 2;
+      const halfHeight = buttonBounds.height / 2;
+      const regionCenterX = (regionBounds.left + regionBounds.right) / 2;
+      const regionCenterY = (regionBounds.top + regionBounds.bottom) / 2;
+      const clamp = (value, minimum, maximum) =>
+        minimum <= maximum ? Math.max(minimum, Math.min(maximum, value)) : (minimum + maximum) / 2;
+      const candidates = [
+        {
+          x: regionBounds.left - halfWidth,
+          y: clamp(regionCenterY, regionBounds.top + halfHeight, regionBounds.bottom - halfHeight)
+        },
+        {
+          x: regionBounds.right + halfWidth,
+          y: clamp(regionCenterY, regionBounds.top + halfHeight, regionBounds.bottom - halfHeight)
+        },
+        {
+          x: clamp(regionCenterX, regionBounds.left + halfWidth, regionBounds.right - halfWidth),
+          y: regionBounds.top - halfHeight
+        },
+        {
+          x: clamp(regionCenterX, regionBounds.left + halfWidth, regionBounds.right - halfWidth),
+          y: regionBounds.bottom + halfHeight
+        }
+      ];
+      const fitsOnStage = (candidate) =>
+        candidate.x - halfWidth >= stageBounds.left &&
+        candidate.x + halfWidth <= stageBounds.right &&
+        candidate.y - halfHeight >= stageBounds.top &&
+        candidate.y + halfHeight <= stageBounds.bottom;
+      const fittingCandidates = candidates.filter(fitsOnStage);
+      const position = (fittingCandidates.length ? fittingCandidates : candidates)
+        .sort((first, second) =>
+          Math.hypot(first.x - regionCenterX, first.y - regionCenterY) -
+          Math.hypot(second.x - regionCenterX, second.y - regionCenterY)
+        )[0];
+
+      rankChangeFloatingControls.style.left =
+        `${((position.x - stageBounds.left) / stageBounds.width) * 100}%`;
+      rankChangeFloatingControls.style.top =
+        `${((position.y - halfHeight - stageBounds.top) / stageBounds.height) * 100}%`;
+    }
+
+    function renderRankChangeControls(regionCode) {
+      rankChangeFloatingControls.replaceChildren();
+      if (!upgradeDowngradeEnabled || !isGameStarted || isGameOver || isWarRunning ||
+          conflictSimulation || !isLocalPlayersTurn() || !regionCode) {
+        if (rankChangeControlsCollapseTimeout) {
+          window.clearTimeout(rankChangeControlsCollapseTimeout);
+          rankChangeControlsCollapseTimeout = null;
+        }
+        rankChangeControlsRegionCode = null;
+        rankChangeControlsExpanded = true;
+        rankChangeFloatingControls.classList.add('is-hidden');
+        return;
+      }
+      const options = getRankChangeOptionsForRegion(regionCode, currentTeam);
+      const position = getRegionFocusPoint(regionCode);
+      if (!options.length || !position) {
+        if (rankChangeControlsCollapseTimeout) {
+          window.clearTimeout(rankChangeControlsCollapseTimeout);
+          rankChangeControlsCollapseTimeout = null;
+        }
+        rankChangeControlsRegionCode = null;
+        rankChangeControlsExpanded = true;
+        rankChangeFloatingControls.classList.add('is-hidden');
+        return;
+      }
+      if (rankChangeControlsRegionCode !== regionCode) {
+        if (rankChangeControlsCollapseTimeout) {
+          window.clearTimeout(rankChangeControlsCollapseTimeout);
+          rankChangeControlsCollapseTimeout = null;
+        }
+        rankChangeControlsRegionCode = regionCode;
+        rankChangeControlsExpanded = true;
+      }
+      rankChangeFloatingControls.style.left = `${Math.max(8, Math.min(92, position.x))}%`;
+      rankChangeFloatingControls.style.top = `${Math.max(4, Math.min(94, position.y + 3))}%`;
+      if (!rankChangeControlsExpanded) {
+        const expandButton = document.createElement('button');
+        expandButton.type = 'button';
+        expandButton.className = 'rank-change-expand-button';
+        expandButton.textContent = '↕';
+        expandButton.title = 'Mostrar opções de upgrade e downgrade';
+        expandButton.setAttribute('aria-label', 'Mostrar opções de upgrade e downgrade');
+        expandButton.setAttribute('aria-expanded', 'false');
+        expandButton.addEventListener('pointerdown', (event) => event.stopPropagation());
+        expandButton.addEventListener('click', (event) => {
+          event.stopPropagation();
+          rankChangeControlsExpanded = true;
+          renderRankChangeControls(regionCode);
+        });
+        rankChangeFloatingControls.classList.add('is-collapsed');
+        rankChangeFloatingControls.classList.remove('is-hidden');
+        rankChangeFloatingControls.appendChild(expandButton);
+        positionCollapsedRankChangeControl(regionCode, expandButton);
+        return;
+      }
+      rankChangeFloatingControls.classList.remove('is-collapsed');
+      options.forEach((option) => {
+        const button = document.createElement('button');
+        const actionLabel = option.type === 'upgrade' ? 'UPGRADE' : 'DOWNGRADE';
+        button.type = 'button';
+        button.textContent = `${actionLabel} · ${option.cost}`;
+        button.title = `${option.target}: ${option.soldiersBefore} → ${option.soldiersAfter} soldados; mínimo ${option.minimumSoldiers}; custo ${option.cost} moedas.`;
+        button.setAttribute('aria-label',
+          `${actionLabel} para ${option.target}, custa ${option.cost} moedas`);
+        button.addEventListener('pointerdown', (event) => event.stopPropagation());
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          performRankChange(regionCode, option.type, option.target);
+        });
+        rankChangeFloatingControls.appendChild(button);
+      });
+      rankChangeFloatingControls.classList.remove('is-hidden');
+      if (!rankChangeControlsCollapseTimeout) {
+        rankChangeControlsCollapseTimeout = window.setTimeout(() => {
+          rankChangeControlsCollapseTimeout = null;
+          if (rankChangeControlsRegionCode !== regionCode) return;
+          rankChangeControlsExpanded = false;
+          renderRankChangeControls(regionCode);
+        }, 3000);
+      }
     }
 
     function closeModal(modal) {
@@ -3842,9 +4242,7 @@
     }
 
     function getMoveAmountOptions(target) {
-      const geometry = regionGeometryByCode[selectedRegionCode];
-      const usesDirectRegionTargets = currentBoardData?.boardType === 'mixed' ||
-        geometry?.shape === 'quadrilateral';
+      const usesDirectRegionTargets = usesDirectRegionMoveTargets(selectedRegionCode);
       const neighbor = usesDirectRegionTargets
         ? target
         : getNeighborRegionCode(selectedRegionCode, target);
@@ -3859,8 +4257,7 @@
     }
 
     function openMoveModal() {
-      if (currentBoardData?.boardType === 'mixed' ||
-          regionGeometryByCode[selectedRegionCode]?.shape === 'quadrilateral') {
+      if (usesDirectRegionMoveTargets(selectedRegionCode)) {
         moveDirectionOptions.replaceChildren();
         (regionNeighborCache[selectedRegionCode]?.sameRank || [])
           .filter((code) => getRegionLayer(code) === getRegionLayer(selectedRegionCode))
@@ -3871,7 +4268,7 @@
             button.addEventListener('click', () => renderMoveAmountOptions(code));
             moveDirectionOptions.appendChild(button);
           });
-        moveModal.querySelector('#move-modal-instructions').textContent = 'Escolha a região quadricular vizinha.';
+        moveModal.querySelector('#move-modal-instructions').textContent = 'Escolha a região vizinha.';
       } else {
         moveDirectionOptions.innerHTML = '<button type="button" data-direction="left">Esquerda</button><button type="button" data-direction="right">Direita</button>';
         moveDirectionOptions.querySelectorAll('[data-direction]').forEach((button) => {
@@ -3887,8 +4284,7 @@
 
     function renderMoveAmountOptions(target) {
       const options = getMoveAmountOptions(target);
-      const targetCode = currentBoardData?.boardType === 'mixed' ||
-        regionGeometryByCode[selectedRegionCode]?.shape === 'quadrilateral'
+      const targetCode = usesDirectRegionMoveTargets(selectedRegionCode)
         ? target
         : getNeighborRegionCode(selectedRegionCode, target);
       moveDirectionOptions.classList.add('is-hidden');
@@ -7279,6 +7675,8 @@
     }
 
     function applyRegionData(data) {
+      rankChangedRegions = [];
+      rankChangeOriginSnapshots.clear();
       currentBoardData = data;
       const normalizedMasks = normalizeImportedRegionMasks(data);
       const importedProbeBoxes = normalizeImportedRegionProbeBoxes(data);
@@ -8755,7 +9153,10 @@
           const pointsBefore = pontosDoTurn[aiTeam];
           const snapshot = getGameSnapshot();
           snapshot.pendingAiFollowUp = pendingAiFollowUp;
-          const action = window.WillOfManyAI?.chooseAction(snapshot) || { type: 'pass' };
+          const suggestedAction = window.WillOfManyAI?.chooseAction(snapshot) || { type: 'pass' };
+          const action = suggestedAction.type === 'pass'
+            ? chooseAiRankChangeAction(snapshot) || suggestedAction
+            : suggestedAction;
           if (action.type === 'rotate' || action.type === 'pass') {
             if (action.type === 'pass') {
               recordLevelEightReplayAction('aiDecision', {
@@ -8802,6 +9203,11 @@
               pendingAiFollowUp = null;
               selectedRegionCode = action.source;
               recycleSucceeded = recyclePiece(action.source, aiTeam, action.stage);
+            } else if (action.type === 'rankChange' && action.source &&
+                (action.rankChangeType === 'upgrade' || action.rankChangeType === 'downgrade')) {
+              pendingAiFollowUp = null;
+              selectedRegionCode = action.source;
+              performRankChange(action.source, action.rankChangeType, action.target);
             }
           } finally {
             isApplyingAiAction = false;
@@ -9014,6 +9420,101 @@
       });
       startWar(false);
     });
+
+    function performRankChange(sourceCode, type, targetCode) {
+      if (!isGameStarted || isGameOver || isWarRunning ||
+          !isCurrentTurnActionAllowed() || !upgradeDowngradeEnabled ||
+          (type !== 'upgrade' && type !== 'downgrade')) return false;
+      const option = getRankChangeOptionsForRegion(sourceCode, currentTeam)
+        .find((candidate) => candidate.type === type);
+      if (!option || (targetCode && targetCode !== option.target)) {
+        readout.textContent = `${sourceCode}: requisitos de ${type} não atendidos ou região indisponível.`;
+        return false;
+      }
+      const sourcePieces = regionPiecesByRegion[sourceCode];
+      if (!sourcePieces) {
+        readout.textContent = `${sourceCode}: não foi possível encontrar as tropas da região.`;
+        return false;
+      }
+
+      const sourceTeam = currentTeam;
+      const nextChanges = rankChangedRegions.map((change) => ({ ...change }));
+      const existingChange = nextChanges.find((change) => change.code === sourceCode);
+      if (existingChange) {
+        existingChange.code = option.target;
+      } else {
+        nextChanges.push({ originCode: sourceCode, code: option.target });
+      }
+      applySavedRankChanges(nextChanges);
+
+      sourcePieces[sourceTeam] = gameRules.buildStageCountsFromSoldierTotal(option.soldiersAfter);
+      sourcePieces[sourceTeam === 'orange' ? 'blue' : 'orange'] =
+        gameRules.buildStageCountsFromSoldierTotal(0);
+      delete regionPiecesByRegion[sourceCode];
+      regionPiecesByRegion[option.target] = sourcePieces;
+      delete regionStats[sourceCode];
+      regionStats[option.target] = {
+        orange: getTeamPieceCount(option.target, 'orange'),
+        blue: getTeamPieceCount(option.target, 'blue')
+      };
+
+      turnMoveHistory = turnMoveHistory.map((move) => ({
+        ...move,
+        source: move.source === sourceCode ? option.target : move.source,
+        target: move.target === sourceCode ? option.target : move.target
+      }));
+      turnCreatedPieces = turnCreatedPieces.map((piece) => ({
+        ...piece,
+        source: piece.source === sourceCode ? option.target : piece.source
+      }));
+      turnRecycledPieces = turnRecycledPieces.map((piece) => ({
+        ...piece,
+        source: piece.source === sourceCode ? option.target : piece.source
+      }));
+      clearCampaignMoveUndoHistory();
+      Object.keys(localRotationPasses).forEach((team) => {
+        localRotationPasses[team] = localRotationPasses[team]
+          .filter((pass) => pass.regionCode !== sourceCode);
+      });
+      delete rotationOwnershipByRegion[sourceCode];
+      recordRotationOwnership(option.target);
+
+      pontosDoTurn[sourceTeam] -= option.cost;
+      selectedRegionCode = option.target;
+      recalculatePieceCounts();
+      recalculateRegionForces();
+      refreshRegionVisuals();
+      renderPiecePurchaseButtons();
+      updateSelectedRegionPanel(option.target);
+      updateTurnState();
+      readout.textContent = `${sourceCode} → ${option.target}: ${type === 'upgrade' ? 'upgrade' : 'downgrade'} realizado; ${option.soldiersAfter} soldados restantes.`;
+      publishBluetoothAction({
+        type: 'rankChange',
+        rankChangeType: type,
+        team: sourceTeam,
+        source: sourceCode,
+        target: option.target
+      });
+      recordLevelEightReplayAction('rankChange', {
+        team: sourceTeam,
+        source: sourceCode,
+        target: option.target,
+        rankChangeType: type,
+        cost: option.cost,
+        soldiersBefore: option.soldiersBefore,
+        soldiersAfter: option.soldiersAfter
+      });
+      saveGame();
+      finishIfCenterConquered();
+      evaluateCampaignGuideTransitions({
+        type: 'actionCompleted',
+        action: 'rankChange',
+        team: sourceTeam,
+        region: option.target
+      });
+      return true;
+    }
+
     function performPromotion(targetCode, amount) {
       if (!isCurrentTurnActionAllowed()) return;
       if (!selectedRegionCode) return;
@@ -10088,6 +10589,9 @@
           performRelegation(action.target, action.stage);
         } else if (action.type === 'recycle' && source && action.stage) {
           selectedRegionCode = source;
+        } else if (action.type === 'rankChange' && source &&
+            (action.rankChangeType === 'upgrade' || action.rankChangeType === 'downgrade')) {
+          selectedRegionCode = action.target || source;
         } else if (action.type === 'rotate' && Number.isInteger(action.layer)) {
           updateRotationControls();
           const direction = action.direction === 'left' ? 'left' : 'right';
@@ -10154,6 +10658,7 @@
         promote: `promoveu ${action.amount} unidade(s): ${source} → ${action.target}`,
         relegate: `rebaixou uma peça ${String(action.stage || '').toUpperCase()}: ${source} → ${action.target}`,
         recycle: `reciclou uma peça ${String(action.stage || '').toUpperCase()} em ${source}`,
+        rankChange: `${action.rankChangeType === 'upgrade' ? 'melhorou' : 'rebaixou'} a região ${source} para ${action.target}`,
         rotate: `girou o disco L${action.layer} para a ${action.direction === 'left' ? 'esquerda' : 'direita'}`
       }[action.type] || 'realizou uma ação';
       readout.textContent = `${teamLabel} ${actionLabel}.`;
@@ -10417,6 +10922,9 @@
         : gameMode === 'campaign' ? 'blue' : null;
       gameSpeed = isOnlineGame() || gameMode === 'campaign' ? 1 : Number(selectedStartSpeed);
       activeCampaignLevel = gameMode === 'campaign' ? campaignBoardConfig : null;
+      upgradeDowngradeEnabled = isCampaignGame()
+        ? activeCampaignLevel.upgradeDowngradeEnabled === true
+        : ['ai', 'online'].includes(gameMode) && upgradeDowngradeCheckbox.checked;
       localStorage.removeItem('will-of-many-save');
       resetGameState();
       placeBoardInitialPieces();
@@ -10479,6 +10987,8 @@
 
     function updateStartModeSelection() {
       selectStartOption('#game-mode-options button', 'mode', gameMode);
+      upgradeDowngradeOption.classList.toggle('is-hidden',
+        !['ai', 'online'].includes(gameMode));
       colorOptionsGroup.classList.toggle('is-hidden', gameMode !== 'ai');
       document.querySelector('#color-choice-label').classList.toggle('is-hidden', gameMode !== 'ai');
       localModeHint.classList.toggle('is-hidden', gameMode !== 'local');

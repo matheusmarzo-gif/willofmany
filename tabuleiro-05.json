@@ -13,6 +13,7 @@
   "campaign": {
     "id": "tabuleiro-05",
     "name": "Tabuleiro 05",
+    "upgradeDowngradeEnabled": false,
     "initialCoins": 12,
     "coinsPerTurn": 4,
     "coinsPerTurnStopAtTurn": 6,

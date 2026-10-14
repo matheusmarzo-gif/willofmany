@@ -45,6 +45,15 @@
   },
   "_conquestCostHeuristic_readme": "Custo estimado (em moedas) para a IA considerar a conquista de uma regiao vizinha: freeRegionCost para regioes livres; sufficientForceRatioCost quando a IA ja tem a proporcao de forca necessaria (igual a regra de promocao do motor: camada de origem x forca da camada superior). Caso contrario, soma-se o custo de comprar a forca que falta.",
 
+  "rankChange": {
+    "minimumPriority": 1,
+    "instabilityWeight": 1,
+    "extremeInstabilityBonus": 2,
+    "stabilizationBonus": 2,
+    "downgradeTieBreakWeight": 0.01
+  },
+  "_rankChange_readme": "Pesos da busca por UPGRADE/DOWNGRADE: minimumPriority maior deixa a IA menos agressiva; instabilityWeight pontua qualquer regiao instavel; extremeInstabilityBonus favorece regioes sem vizinhos dos ranks adjacentes; stabilizationBonus favorece a conversao que torna a regiao estavel; downgradeTieBreakWeight desempata quando ambas as direcoes estabilizam. O limite de comprometimento e fixo: cada operacao pode envolver no maximo 5% das tropas totais e 5% da forca final total da IA.",
+
   "wheat": {
     "seekFarmsWhenDeficit": true
   },
@@ -65,18 +74,18 @@
     "relativeStrengthBands": [
       { "maxPercent": 4, "allied": 50, "enemy": 0 },
       { "maxPercent": 25, "allied": 40, "enemy": 0 },
-      { "maxPercent": 50, "allied": 20, "enemy": 5 },
-      { "maxPercent": 75, "allied": 10, "enemy": 10 },
-      { "maxPercent": 100, "allied": 0, "enemy": 20 },
-      { "maxPercent": 130, "allied": -10, "enemy": 40 },
-      { "maxPercent": 170, "allied": -20, "enemy": 60 },
-      { "maxPercent": 230, "allied": -40, "enemy": 80 },
-      { "maxPercent": 300, "allied": -60, "enemy": 90 },
-      { "maxPercent": 400, "allied": -80, "enemy": 100 },
-      { "maxPercent": 600, "allied": -100, "enemy": 200 },
-      { "maxPercent": 800, "allied": -150, "enemy": 300 },
-      { "maxPercent": 1200, "allied": -250, "enemy": 400 },
-      { "maxPercent": null, "allied": -400, "enemy": 600 }
+      { "maxPercent": 50, "allied": 20, "enemy": 0 },
+      { "maxPercent": 75, "allied": 10, "enemy": 0 },
+      { "maxPercent": 100, "allied": 0, "enemy": 0 },
+      { "maxPercent": 130, "allied": -10, "enemy": 10 },
+      { "maxPercent": 170, "allied": -20, "enemy": 20 },
+      { "maxPercent": 230, "allied": -40, "enemy": 40 },
+      { "maxPercent": 300, "allied": -60, "enemy": 60 },
+      { "maxPercent": 400, "allied": -80, "enemy": 80 },
+      { "maxPercent": 600, "allied": -100, "enemy": 100 },
+      { "maxPercent": 800, "allied": -150, "enemy": 150 },
+      { "maxPercent": 1200, "allied": -250, "enemy": 250 },
+      { "maxPercent": null, "allied": -400, "enemy": 400 }
     ],
     "_relativeStrengthBands_readme": "Percentual relativo = (tropas da regiao / tropas totais do rank) / (1 / regioes ocupadas do rank) * 100. maxPercent define o limite inclusivo de cada faixa; null representa acima da faixa anterior.",
     "farmBonusByLevel": { "1": 100, "2": 135, "3": 200, "4": 250, "5": 350 },
@@ -85,7 +94,7 @@
     "unsupportedNeighborBonus": 40,
     "troopRatioByOuterLayer": { "8": 8, "7": 7, "6": 6, "5": 5, "4": 4, "3": 3, "2": 2 },
     "troopDeficitBonus": 100,
-    "external": { "logBase": 2, "offset": 2, "distanceScale": 1, "exponent": 4 },
+    "external": { "logBase": 2, "offset": 2, "distanceScale": 1, "exponent": 6 },
     "_external_readme": "Desejabilidade externa soma bi * (log_base( offset - (distancia / distanciaMax) / distanceScale )) ^ exponent para cada outra regiao. Os padroes implementam bi * (log2(2 - dij/D))^2.",
     "penalties": {
       "inaccessible": {

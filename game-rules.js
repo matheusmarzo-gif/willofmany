@@ -36,6 +36,16 @@
     3: 729,
     2: 2197
   });
+  const rankChangeRules = Object.freeze({
+    upgrade: Object.freeze({
+      costBySourceLayer: Object.freeze({ 8: 1, 7: 4, 6: 20, 5: 100, 4: 350, 3: 1000, 2: 2000 }),
+      minimumSoldiersBySourceLayer: Object.freeze({ 8: 32, 7: 28, 6: 24, 5: 15, 4: 12, 3: 9, 2: 5 })
+    }),
+    downgrade: Object.freeze({
+      costBySourceLayer: Object.freeze({ 7: 1, 6: 4, 5: 20, 4: 100, 3: 350, 2: 1000, 1: 2000 }),
+      minimumSoldiersBySourceLayer: Object.freeze({ 7: 35, 6: 24, 5: 20, 4: 12, 3: 9, 2: 7, 1: 6 })
+    })
+  });
 
   function mergeTeamCounts(counts) {
     for (const stage of ascendingStages.slice(0, -1)) {
@@ -76,6 +86,32 @@
 
   function getPieceCount(teamCounts) {
     return ascendingStages.reduce((total, stage) => total + Number(teamCounts[stage] || 0), 0);
+  }
+
+  function getRankChangeRequirements(type, sourceLayer) {
+    const rules = rankChangeRules[type];
+    const layer = Number(sourceLayer);
+    if (!rules || !Number.isInteger(layer) ||
+        !Object.prototype.hasOwnProperty.call(rules.costBySourceLayer, layer)) {
+      return null;
+    }
+    return {
+      sourceLayer: layer,
+      targetLayer: type === 'upgrade' ? layer - 1 : layer + 1,
+      cost: rules.costBySourceLayer[layer],
+      minimumSoldiers: rules.minimumSoldiersBySourceLayer[layer]
+    };
+  }
+
+  function calculateRankChangeSoldierTotal(type, sourceLayer, originalSoldiers) {
+    const requirements = getRankChangeRequirements(type, sourceLayer);
+    const soldiers = Number(originalSoldiers);
+    if (!requirements || !Number.isFinite(soldiers) || soldiers < 0) return null;
+    const { sourceLayer: layer, targetLayer } = requirements;
+    const converted = type === 'upgrade'
+      ? Math.floor((soldiers - 2 * layer + 1) / layer)
+      : Math.floor((soldiers - 2 * targetLayer + 1) * layer / 3);
+    return Math.max(0, converted);
   }
 
   function areAxisAlignedCellsNeighbors(
@@ -397,11 +433,14 @@
     stageOrder,
     farmProductionByLevel,
     promotionCostBySourceLayer,
+    rankChangeRules,
     mergeTeamCounts,
     getFinalPieceCountForTeam,
     buildStageCountsFromSoldierTotal,
     getSoldierCount,
     getPieceCount,
+    getRankChangeRequirements,
+    calculateRankChangeSoldierTotal,
     areAxisAlignedCellsNeighbors,
     rotateQuadrilateralMatrix,
     rotateQuadrilateralMatrixPath,

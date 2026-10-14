@@ -13,6 +13,7 @@
   "campaign": {
     "id": "tabuleiro-08",
     "name": "Tabuleiro 08",
+    "upgradeDowngradeEnabled": false,
     "initialCoins": 60,
     "coinsPerTurn": 60,
     "preserveCoinsBetweenTurns": false,
@@ -28,12 +29,12 @@
       "L8-1",
       "L8-2",
       "L8-3",
-      "L6-1",
+      "L8-10",
       "L8-4",
-      "L6-2",
-      "L6-3",
+      "L8-9",
+      "L8-12",
       "L8-5",
-      "L6-4",
+      "L8-11",
       "L8-6",
       "L8-7",
       "L8-8",
@@ -220,7 +221,7 @@
       "matrixSize": 1,
       "matrix": [
         [
-          "L6-1"
+          "L8-10"
         ]
       ],
       "L1": 150,
@@ -233,11 +234,11 @@
       "linearRotationEnabled": false,
       "regions": [
         {
-          "name": "L6-1",
-          "code": "L6-1",
-          "rank": "L6",
-          "layer": 6,
-          "region": 1,
+          "name": "L8-10",
+          "code": "L8-10",
+          "rank": "L8",
+          "layer": 8,
+          "region": 10,
           "shape": "quadrilateral",
           "positions": [
             [
@@ -245,7 +246,7 @@
               1
             ]
           ],
-          "maxPieces": 6,
+          "maxPieces": 8,
           "initialPieces": []
         }
       ]
@@ -293,7 +294,7 @@
       "matrixSize": 1,
       "matrix": [
         [
-          "L6-2"
+          "L8-9"
         ]
       ],
       "L1": 150,
@@ -306,11 +307,11 @@
       "linearRotationEnabled": false,
       "regions": [
         {
-          "name": "L6-2",
-          "code": "L6-2",
-          "rank": "L6",
-          "layer": 6,
-          "region": 2,
+          "name": "L8-9",
+          "code": "L8-9",
+          "rank": "L8",
+          "layer": 8,
+          "region": 9,
           "shape": "quadrilateral",
           "positions": [
             [
@@ -318,7 +319,7 @@
               1
             ]
           ],
-          "maxPieces": 6,
+          "maxPieces": 8,
           "initialPieces": []
         }
       ]
@@ -329,7 +330,7 @@
       "matrixSize": 1,
       "matrix": [
         [
-          "L6-3"
+          "L8-12"
         ]
       ],
       "L1": 150,
@@ -342,11 +343,11 @@
       "linearRotationEnabled": false,
       "regions": [
         {
-          "name": "L6-3",
-          "code": "L6-3",
-          "rank": "L6",
-          "layer": 6,
-          "region": 3,
+          "name": "L8-12",
+          "code": "L8-12",
+          "rank": "L8",
+          "layer": 8,
+          "region": 12,
           "shape": "quadrilateral",
           "positions": [
             [
@@ -354,7 +355,7 @@
               1
             ]
           ],
-          "maxPieces": 6,
+          "maxPieces": 8,
           "initialPieces": []
         }
       ]
@@ -402,7 +403,7 @@
       "matrixSize": 1,
       "matrix": [
         [
-          "L6-4"
+          "L8-11"
         ]
       ],
       "L1": 150,
@@ -415,11 +416,11 @@
       "linearRotationEnabled": false,
       "regions": [
         {
-          "name": "L6-4",
-          "code": "L6-4",
-          "rank": "L6",
-          "layer": 6,
-          "region": 4,
+          "name": "L8-11",
+          "code": "L8-11",
+          "rank": "L8",
+          "layer": 8,
+          "region": 11,
           "shape": "quadrilateral",
           "positions": [
             [
@@ -427,7 +428,7 @@
               1
             ]
           ],
-          "maxPieces": 6,
+          "maxPieces": 8,
           "initialPieces": []
         }
       ]

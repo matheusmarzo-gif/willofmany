@@ -22,6 +22,40 @@ test('piece stage weights preserve the current soldier values', () => {
   assert.deepEqual(rules.stageOrder, ['a', 'b', 'c', 'd', 'e', 'f', 'g']);
 });
 
+test('rank change requirements cover every supported source layer', () => {
+  assert.deepEqual(
+    Array.from({ length: 8 }, (_, index) =>
+      rules.getRankChangeRequirements('upgrade', 8 - index)?.cost ?? null),
+    [1, 4, 20, 100, 350, 1000, 2000, null]
+  );
+  assert.deepEqual(
+    Array.from({ length: 8 }, (_, index) =>
+      rules.getRankChangeRequirements('downgrade', 8 - index)?.cost ?? null),
+    [null, 1, 4, 20, 100, 350, 1000, 2000]
+  );
+  assert.deepEqual(rules.getRankChangeRequirements('upgrade', 7), {
+    sourceLayer: 7,
+    targetLayer: 6,
+    cost: 4,
+    minimumSoldiers: 28
+  });
+  assert.deepEqual(rules.getRankChangeRequirements('downgrade', 3), {
+    sourceLayer: 3,
+    targetLayer: 4,
+    cost: 350,
+    minimumSoldiers: 9
+  });
+  assert.equal(rules.getRankChangeRequirements('upgrade', 1), null);
+  assert.equal(rules.getRankChangeRequirements('downgrade', 8), null);
+});
+
+test('rank change soldier conversions follow the requested formulas', () => {
+  assert.equal(rules.calculateRankChangeSoldierTotal('upgrade', 7, 1000), 141);
+  assert.equal(rules.calculateRankChangeSoldierTotal('downgrade', 3, 23), 16);
+  assert.equal(rules.calculateRankChangeSoldierTotal('upgrade', 1, 100), null);
+  assert.equal(rules.calculateRankChangeSoldierTotal('upgrade', 7, -1), null);
+});
+
 test('AI turn action limit is configurable and defaults to 35', () => {
   const configuredLimit = Number(aiConfig.maxActionsPerTurn);
   assert.ok(Number.isInteger(configuredLimit) && configuredLimit > 0);

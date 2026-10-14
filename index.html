@@ -42,6 +42,12 @@
           <button type="button" data-speed="2">2x</button>
           <button type="button" data-speed="3">3x</button>
         </div>
+        <div class="upgrade-downgrade-option is-hidden" id="upgrade-downgrade-option">
+          <label for="upgrade-downgrade-enabled">
+            <input id="upgrade-downgrade-enabled" type="checkbox">
+            Permitir Upgrade/Downgrade
+          </label>
+        </div>
         <div class="is-hidden" id="bluetooth-options">
           <p>O anfitrião escolhe a velocidade, cria a sala e joga de Laranja. O convidado joga de Azul.</p>
           <button class="start-confirm" id="bluetooth-host-button" type="button">Criar sala Bluetooth</button>
@@ -254,6 +260,8 @@
             <rect class="board-focus-dim" id="board-focus-dim" width="908" height="908" mask="url(#board-focus-mask)"></rect>
             <g id="board-focus-outlines"></g>
           </svg>
+          <div class="rank-change-floating-controls is-hidden" id="rank-change-floating-controls"
+               role="group" aria-label="Upgrade ou downgrade da região selecionada"></div>
         </div>
       </div>
       <div class="piece-controls" id="piece-controls" aria-label="Comprar peças"></div>
