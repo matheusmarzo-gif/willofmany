@@ -200,6 +200,9 @@ test('farm production tiers are shared and map 250 wheat per turn to level 1', (
     4: 16000,
     5: 50000
   });
+  assert.equal(rules.getFarmBuildingLevel({ farmBuildingLevel: 1 }), 1);
+  assert.equal(rules.getFarmBuildingLevel({ farmBuildingLevel: 2 }), 2);
+  assert.equal(rules.getFarmBuildingLevel({ farmProductionPerTurn: 250 }), 1);
   const analysis = gameAI.calculateDesirability({
     regions: {
       'L8-1': { dominator: 'free', farmProductionPerTurn: 250 }
@@ -210,6 +213,19 @@ test('farm production tiers are shared and map 250 wheat per turn to level 1', (
     { label: 'Base L8 livre', value: 50 },
     { label: 'Fazenda nível 1', value: 30 }
   ]);
+});
+
+test('village levels map to their configured coin production per turn', () => {
+  assert.deepEqual(rules.villageCoinProductionByLevel, {
+    1: 10,
+    2: 50,
+    3: 250,
+    4: 1000,
+    5: 4000
+  });
+  assert.equal(rules.getVillageBuildingLevel({ villageBuildingLevel: 1 }), 1);
+  assert.equal(rules.getVillageBuildingLevel({ villageBuildingLevel: 5 }), 5);
+  assert.equal(rules.getVillageBuildingLevel({ villageBuildingLevel: 6 }), 0);
 });
 
 test('annular sector centroid matches the geometric center of circular regions', () => {

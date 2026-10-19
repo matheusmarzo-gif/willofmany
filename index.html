@@ -42,6 +42,21 @@
           <button type="button" data-speed="2">2x</button>
           <button type="button" data-speed="3">3x</button>
         </div>
+        <div class="random-map-option is-hidden" id="ai-random-map-option">
+          <label for="ai-random-map-enabled">
+            <input id="ai-random-map-enabled" type="checkbox">
+            Usar mapa aleatório
+          </label>
+          <label class="is-hidden" id="ai-random-map-size-label" for="ai-random-map-target">
+            Meta: <output id="ai-random-map-target-value">60</output> regiões
+            <input id="ai-random-map-target" type="number" min="25" max="900" step="5" value="60">
+          </label>
+          <label class="is-hidden" id="ai-random-map-rotations-label" for="ai-random-map-rotations-enabled">
+            <input id="ai-random-map-rotations-enabled" type="checkbox">
+            Ativar rotações dos blocos
+          </label>
+          <small>Escolha o número de regiões do tabuleiro para esta partida contra a IA.</small>
+        </div>
         <div class="upgrade-downgrade-option is-hidden" id="upgrade-downgrade-option">
           <label for="upgrade-downgrade-enabled">
             <input id="upgrade-downgrade-enabled" type="checkbox">
@@ -56,6 +71,21 @@
         </div>
         <div class="online-panel is-hidden" id="online-options">
           <p>Entre com o Google e encontre um adversário com Elo próximo. O servidor salva seu nome e ranking.</p>
+          <div class="random-map-option">
+            <label for="online-random-map-enabled">
+              <input id="online-random-map-enabled" type="checkbox">
+              Usar mapa aleatório
+            </label>
+            <label class="is-hidden" id="online-random-map-size-label" for="online-random-map-target">
+              Meta: <output id="online-random-map-target-value">60</output> regiões
+              <input id="online-random-map-target" type="number" min="25" max="900" step="5" value="60">
+            </label>
+            <label class="is-hidden" id="online-random-map-rotations-label" for="online-random-map-rotations-enabled">
+              <input id="online-random-map-rotations-enabled" type="checkbox">
+              Ativar rotações dos blocos
+            </label>
+            <small>Esta configuração vale para o anfitrião Laranja; o mapa será sincronizado com o adversário.</small>
+          </div>
           <label for="online-name">Nome de jogador (opcional)</label>
           <input id="online-name" maxlength="32" autocomplete="nickname" placeholder="Nome exibido">
           <div id="google-sign-in"></div>
@@ -80,11 +110,15 @@
       <div class="campaign-trail-card">
         <header class="campaign-trail-header">
           <div>
-            <p class="campaign-trail-eyebrow">Iter Romanus</p>
+            <p class="campaign-trail-eyebrow" id="campaign-trail-eyebrow">Iter Romanus</p>
             <h2 id="campaign-trail-title">Trilha da campanha</h2>
-            <p>Escolha um level desbloqueado para continuar sua jornada.</p>
+            <p id="campaign-trail-description">Escolha um level desbloqueado para continuar sua jornada.</p>
           </div>
-          <button class="campaign-trail-back" id="campaign-trail-back" type="button">Voltar</button>
+          <div class="campaign-trail-header-actions">
+            <button class="campaign-trail-back is-hidden" id="campaign-trail-switch" type="button">Página anterior</button>
+            <button class="campaign-trail-back is-hidden" id="campaign-trail-next" type="button">Levels 10–14</button>
+            <button class="campaign-trail-back" id="campaign-trail-back" type="button">Voltar</button>
+          </div>
         </header>
         <div class="campaign-trail-map" role="group" aria-label="Trilha ilustrada dos levels da campanha">
           <svg class="campaign-trail-art" viewBox="0 0 1000 400" preserveAspectRatio="none" aria-hidden="true">
@@ -294,6 +328,7 @@
         <p id="region-soldier-counts">Soldados: 0</p>
         <p id="region-bag-coins" class="is-hidden"></p>
         <p id="region-farm" class="is-hidden"></p>
+        <p id="region-village" class="is-hidden"></p>
         <p id="region-force">Força: 0</p>
         <p id="region-final-force">Força final: 0</p>
         <button class="conflict-energy is-hidden" id="region-conflict-energy" type="button">
@@ -481,6 +516,7 @@
   </section>
   <script src="game-rules.js"></script>
   <script src="will-of-many-ai.js"></script>
+  <script src="random-map-generator.js"></script>
   <script src="game-client.js"></script>
 </body>
 </html>

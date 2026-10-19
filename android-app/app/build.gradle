@@ -39,6 +39,7 @@ tasks.register("prepareWebAssets", Sync) {
         include("game-client.js")
         include("game-rules.js")
         include("will-of-many-ai.js")
+        include("random-map-generator.js")
         include("*.png")
         include("*.json")
         include("*.svg")

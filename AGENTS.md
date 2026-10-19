@@ -47,7 +47,7 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
    Evite despejar ou ler o arquivo todo sem necessidade.
 5. Leia os JSONs do tabuleiro ou dados de região envolvidos antes de alterar
    valores codificados. Os tabuleiros de campanha são configurados em
-   `tabuleiro-01.json`–`tabuleiro-08.json`. Blocos
+  `tabuleiro-01.json`–`tabuleiro-09.json`. Blocos
    quadriculares rotativos são selecionados individualmente, e a rotação
    recursiva dos anéis é definida pela matriz quadrada do bloco.
 6. Leia os testes relacionados e procure consumidores da regra em IA, campanha,
@@ -62,6 +62,13 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
   campanha, renderização e integrações do cliente.
 - `game-rules.js`: regras puras de composição, contagem e custo; exporta
   `window.WillOfManyRules` no navegador e CommonJS nos testes.
+- `random-map-generator.js`: bundle do Cartógrafo carregado antes de
+  `game-client.js`; a fonte TypeScript e o comando de build ficam em
+  `cartografo-estrategico/`.
+- Levels aleatórios da campanha começam no Level 10 e continuam em páginas de
+  cinco níveis; cada meta aumenta 5 regiões de 60 até o limite de 900. Os mapas
+  usam células duas vezes mais largas que altas e são salvos individualmente em
+  IndexedDB, com migração dos mapas legados do `localStorage`.
 - `will-of-many-ai.js`: decisões da IA.
 - `will-of-many-ai-config.json`: pesos, faixas de desejabilidade, bônus de trigo,
   proporções de tropas, penalidades temporárias e critérios de reciclagem editáveis.
@@ -88,12 +95,14 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
 - Ao introduzir/remover arquivo web, confira `index.html`, a tarefa
   `prepareWebAssets` do Android e `server-app/build.gradle`. O jogo precisa manter
   os mesmos caminhos tanto no navegador, quanto no WebView e no servidor.
+- Após mudar o algoritmo ou o adaptador de mapas, regenere o bundle com
+  `npm run build:game-generator` dentro de `cartografo-estrategico/`.
 - Ao alterar a estratégia da IA, sincronize os padrões com
   `will-of-many-ai-config.json`, a carga de configuração do cliente e a inclusão
   do JSON nos assets Android/servidor. Custos efetivos continuam sendo regras do
   jogo e não devem ser substituídos por pesos de estratégia.
 - A ordem do cliente é importante: `game.css`, `game-rules.js`,
-  `will-of-many-ai.js`, depois `game-client.js`.
+  `will-of-many-ai.js`, `random-map-generator.js`, depois `game-client.js`.
 - Tabuleiros usam JSONs externos. Se o carregamento falhar, exiba/trate o erro;
   não reintroduza fallback silencioso com snapshot antigo.
 - Preserve os contratos de save, Bluetooth e WebSocket. Confira os clientes e
@@ -110,7 +119,7 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
 Execute os testes relevantes para os arquivos alterados:
 
 ```powershell
-node --test tests\game-rules.test.js tests\asset-entrypoints.test.js
+node --test tests\game-rules.test.js tests\asset-entrypoints.test.js tests\random-map-generator.test.js
 ```
 
 Para qualquer alteração de HTML, JavaScript do jogo, Android, manifesto ou

@@ -1,0 +1,6 @@
+{
+  "name": "Cartógrafo Estratégico - Gerador de Mapas",
+  "description": "Gerador procedural de mapas topológicos com povoados, fazendas, propagação estocástica de ranks e exportação JSON.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

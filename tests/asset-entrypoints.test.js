@@ -46,7 +46,11 @@ const levelEightBoard = JSON.parse(fs.readFileSync(
   path.join(root, 'tabuleiro-08.json'),
   'utf8'
 ));
-const campaignBoards = Array.from({ length: 8 }, (_, index) => JSON.parse(fs.readFileSync(
+const levelNineBoard = JSON.parse(fs.readFileSync(
+  path.join(root, 'tabuleiro-09.json'),
+  'utf8'
+));
+const campaignBoards = Array.from({ length: 9 }, (_, index) => JSON.parse(fs.readFileSync(
   path.join(root, `tabuleiro-${String(index + 1).padStart(2, '0')}.json`),
   'utf8'
 )));
@@ -56,6 +60,7 @@ test('browser entrypoint loads the external client resources in dependency order
     'href="game.css"',
     'src="game-rules.js"',
     'src="will-of-many-ai.js"',
+    'src="random-map-generator.js"',
     'src="game-client.js"'
   ];
   const positions = resources.map((resource) => html.indexOf(resource));
@@ -65,13 +70,38 @@ test('browser entrypoint loads the external client resources in dependency order
   assert.equal(html.includes('embedded-region-data'), false, 'no embedded board fallback remains');
 });
 
-test('rank changes are opt-in for AI/online games and disabled in campaign levels 1-8', () => {
-  campaignBoards.forEach((board) => {
+test('campaign farms use rule-backed building levels and villages remain optional', () => {
+  const configuredRegions = campaignBoards.flatMap((board) =>
+    (board.blocks || []).flatMap((block) => block.regions || [])
+  );
+  const configuredFarms = configuredRegions.filter((region) =>
+    Object.hasOwn(region, 'farmBuildingLevel') ||
+    Object.hasOwn(region, 'farmProductionPerTurn')
+  );
+  assert.ok(configuredFarms.length > 0);
+  configuredFarms.forEach((region) => {
+    assert.ok(Number.isInteger(region.farmBuildingLevel), region.name);
+    assert.equal(Object.hasOwn(region, 'farmProductionPerTurn'), false, region.name);
+  });
+  assert.equal(configuredRegions.some((region) =>
+    Object.hasOwn(region, 'villageBuildingLevel')
+  ), false, 'no villages are assigned to campaign regions yet');
+  assert.match(html, /id="region-village"/);
+  assert.match(gameClient, /icon\.dataset\.level = String\(level\)/);
+  assert.match(gameClient, /levelLabel\.textContent = String\(level\)/);
+  assert.match(gameClient, /getVillageCoinIncome\(currentTeam\)/);
+});
+
+test('rank changes are opt-in for AI/online games and enabled for Level 9 only', () => {
+  campaignBoards.slice(0, 8).forEach((board) => {
     assert.equal(board.campaign.upgradeDowngradeEnabled, false, board.campaign.id);
   });
+  assert.equal(levelNineBoard.campaign.upgradeDowngradeEnabled, true);
   assert.match(html, /id="upgrade-downgrade-enabled" type="checkbox"/);
   assert.match(gameClient,
     /upgradeDowngradeOption\.classList\.toggle\('is-hidden',\s*!?\['ai', 'online'\]\.includes\(gameMode\)\)/);
+  assert.match(gameClient,
+    /upgradeDowngradeEnabled = save\.upgradeDowngradeEnabled === true &&\s*\(!isCampaignGame\(\) \|\| activeCampaignLevel\?\.upgradeDowngradeEnabled === true\)/);
   assert.match(gameClient,
     /upgradeDowngradeEnabled = isCampaignGame\(\)\s*\?\s*activeCampaignLevel\.upgradeDowngradeEnabled === true\s*:\s*\['ai', 'online'\]\.includes\(gameMode\) && upgradeDowngradeCheckbox\.checked/);
   assert.match(gameClient, /regionRankChanges:/);
@@ -112,7 +142,13 @@ test('Android and server builds package all external client resources', () => {
     'utf8'
   );
   const serverGradle = fs.readFileSync(path.join(root, 'server-app', 'build.gradle'), 'utf8');
-  const resources = ['game.css', 'game-client.js', 'game-rules.js', 'will-of-many-ai.js'];
+  const resources = [
+    'game.css',
+    'game-client.js',
+    'game-rules.js',
+    'will-of-many-ai.js',
+    'random-map-generator.js'
+  ];
 
   resources.forEach((resource) => {
     assert.ok(androidGradle.includes(`include("${resource}")`), `Android includes ${resource}`);
@@ -134,7 +170,8 @@ test('Android and server builds package all external client resources', () => {
     'tabuleiro-05.json',
     'tabuleiro-06.json',
     'tabuleiro-07.json',
-    'tabuleiro-08.json'
+    'tabuleiro-08.json',
+    'tabuleiro-09.json'
   ].forEach((resource) => {
     assert.ok(serverGradle.includes(`include "${resource}"`), `server includes ${resource}`);
   });
@@ -148,6 +185,8 @@ test('Android and server builds package all external client resources', () => {
     'Android permits reading the Level 7 board asset');
   assert.match(androidMainActivity, /"tabuleiro-08\.json"\.equals\(fileName\)/,
     'Android permits reading the Level 8 board asset');
+  assert.match(androidMainActivity, /"tabuleiro-09\.json"\.equals\(fileName\)/,
+    'Android permits reading the Level 9 board asset');
   assert.match(androidMainActivity, /"will-of-many-ai-config\.json"\.equals\(fileName\)/,
     'Android permits reading the editable AI strategy asset');
   assert.match(gameClient, /if \(!configJson\) \{\s*throw new Error\(`O Android não encontrou \$\{fileName\}/,
@@ -224,16 +263,80 @@ test('campaign keeps blue assigned to the AI and blocks human actions during its
   assert.match(gameClient, /const playerLabel = isAiTeamTurn\s*\?\s*`IA \$\{currentTeam === 'orange' \? 'LARANJA' : 'AZUL'\}`/);
 });
 
-test('Level 8 debug controls toggle AI and show desirability and all region distances', () => {
+test('random campaign levels are unlocked after Level 9 and their maps are saved for replay', () => {
+  assert.match(gameClient, /const randomCampaignLevelsPerPage = 5/);
+  assert.match(gameClient, /const initialRandomCampaignRegions = 60/);
+  assert.match(gameClient, /const randomCampaignRegionsPerLevel = 5/);
+  assert.match(gameClient, /const maxRandomCampaignRegions = 900/);
+  assert.match(gameClient, /initialRandomCampaignRegions \+ \(number - firstRandomCampaignLevel\) \* randomCampaignRegionsPerLevel/);
+  assert.match(gameClient, /Math\.min\(\s*maxRandomCampaignRegions/);
+  assert.match(gameClient, /function getCampaignTrailPage\(levelNumber\)/);
+  assert.match(gameClient, /function getCampaignTrailLevelNumbers\(page\)/);
+  assert.match(gameClient, /const campaignAllLevelsUnlockedForTesting = false/);
+  assert.match(gameClient, /'will-of-many-random-campaign-maps'/);
+  assert.match(gameClient, /window\.indexedDB\.open\(randomCampaignMapDatabaseName, 1\)/);
+  assert.match(gameClient, /function migrateLegacyRandomCampaignMaps\(database\)/);
+  assert.match(gameClient, /function loadRandomCampaignBoard\(levelId\)/);
+  assert.match(gameClient, /storedBoard\.randomMap\.targetRegions === level\.targetRegions/);
+  assert.match(gameClient, /storedRegionCount === level\.targetRegions/);
+  assert.match(gameClient, /generatedBoardData: currentBoardData\?\.randomMap/);
+  assert.match(gameClient, /applyRegionData\(message\.state\.generatedBoardData\)/);
+  assert.match(html, /id="campaign-trail-switch"/);
+  assert.match(html, /id="campaign-trail-next"/);
+  assert.match(gameCss, /\.campaign-trail-screen\.is-random-campaign \.campaign-trail-map/);
+});
+
+test('online random maps are configured by the orange host and synchronized in saved state', () => {
+  assert.match(html, /id="online-random-map-enabled" type="checkbox"/);
+  assert.match(html, /id="online-random-map-target" type="number" min="25" max="900"/);
+  assert.match(html, /id="online-random-map-rotations-enabled" type="checkbox"/);
+  assert.match(gameClient, /gameMode === 'online' && onlineRandomMapCheckbox\.checked/);
+  assert.match(gameClient, /onlineRandomMapRotationsCheckbox\.checked/);
+  assert.match(gameClient, /sendOnlineMessage\(\{\s*type: 'game_start',\s*state: JSON\.parse\(localStorage\.getItem\('will-of-many-save'\)\)/);
+  const receiveStart = gameClient.indexOf(
+    "if (message.type === 'game_start' || message.type === 'game_state')"
+  );
+  const receiveEnd = gameClient.indexOf("if (message.type === 'war_request'", receiveStart);
+  const receiveState = gameClient.slice(receiveStart, receiveEnd);
+  assert.ok(receiveState.indexOf('applyRegionData(message.state.generatedBoardData)') <
+    receiveState.indexOf("localStorage.setItem('will-of-many-save'"));
+  assert.ok(receiveState.indexOf("localStorage.setItem('will-of-many-save'") <
+    receiveState.indexOf('if (!loadSavedGame())'));
+  assert.match(gameClient, /if \(saved\?\.generatedBoardData\) \{[\s\S]*?applyRegionData\(saved\.generatedBoardData\)/);
+});
+
+test('random maps can be sized for AI games and retain the game coordinate dimensions', () => {
+  assert.match(html, /id="ai-random-map-enabled" type="checkbox"/);
+  assert.match(html, /id="ai-random-map-target" type="number" min="25" max="900"/);
+  assert.match(html, /id="ai-random-map-rotations-enabled" type="checkbox"/);
+  assert.match(gameClient, /gameMode === 'ai' && aiRandomMapCheckbox\.checked/);
+  assert.match(gameClient, /aiRandomMapRotationsCheckbox\.checked/);
+  assert.match(gameClient, /gameMode === 'online' \? onlineRandomMapTarget\.value : aiRandomMapTarget\.value/);
+  assert.match(gameClient, /const width = Number\(block\.L1\);\s*const height = Number\(block\.L2\);/);
+  assert.match(gameClient, /applyRegionData\(createRandomBoardData\(targetRegions, null, rotationsEnabled\)\)/);
+  assert.match(gameClient, /aiRandomMapSizeLabel\.classList\.toggle\('is-hidden', !aiRandomMapCheckbox\.checked\)/);
+});
+
+test('random campaign levels enable rotations and use non-accumulating tiered coin economies', () => {
+  assert.match(gameClient, /rotationEnabled: true,\s*aiActionsEnabled: true/);
+  assert.match(gameClient, /initialCoins: level\.number <= 15 \? 40 : level\.number <= 20 \? 60 : 80/);
+  assert.match(gameClient, /coinsPerTurn: level\.number <= 15 \? 10 : level\.number <= 20 \? 15 : 20/);
+  assert.match(gameClient, /preserveCoinsBetweenTurns: false/);
+  assert.match(gameClient, /storedBoard\.randomMap\.rotationsEnabled === true/);
+  assert.match(gameClient, /block\.linearRotationEnabled === \[3, 5\]\.includes\(block\.matrixSize\)/);
+});
+
+test('Level 8 AI controls and Level 8/9 desirability data are available', () => {
   assert.match(html, /id="level-eight-ai-toggle"[^>]*>Desativar IA/);
   assert.match(html, /id="level-eight-view-data"[^>]*>Ver dados/);
   assert.match(html, /id="level-eight-data-modal"[^]*?id="level-eight-ranking-table-container"[^]*?id="level-eight-distance-table-container"/);
   assert.match(gameClient, /levelEightAiToggle\.addEventListener\('click'/);
   assert.match(gameClient, /levelEightViewDataButton\.addEventListener\('click'/);
   assert.match(gameClient, /function isCircularBoardDebugMode\(\) \{\s*return !isCampaignGame\(\) && currentBoardData\?\.boardType === 'circular';/);
-  assert.match(gameClient, /const showDesirabilityData = showAiToggle \|\| isCircularBoardDebugMode\(\);/);
+  assert.match(gameClient, /function isLevelNineCampaign\(\) \{\s*return isCampaignGame\(\) && activeCampaignLevel\.id === 'tabuleiro-09';/);
+  assert.match(gameClient, /const showDesirabilityData = showAiToggle \|\| isLevelNineCampaign\(\) \|\| isCircularBoardDebugMode\(\);/);
   assert.match(gameClient, /levelEightAiToggle\.classList\.toggle\('is-hidden', !showAiToggle\)/);
-  assert.match(gameClient, /if \(!isLevelEightCampaign\(\) && !isCircularBoardDebugMode\(\)\) return;/);
+  assert.match(gameClient, /if \(!isLevelEightCampaign\(\) && !isLevelNineCampaign\(\) && !isCircularBoardDebugMode\(\)\) return;/);
   assert.match(gameClient, /ai\.calculateCurrentDesirability\(snapshot, config\?\.desirability\)/);
   assert.match(gameClient, /Math\.hypot\(selectedX - x, selectedY - y\)/);
   assert.match(gameClient, /'Desejabilidade interna'[\s\S]*?'Desejabilidade externa'[\s\S]*?'Desejabilidade total'[\s\S]*?'Maior distância do tabuleiro'/);
@@ -963,8 +1066,8 @@ test('Level 8 defines unique regions, fixed singleton cells, rotating rings, and
   assert.deepEqual(initialPieces['L8-7'], [{ team: 'orange', stage: 'g' }]);
   assert.deepEqual(initialPieces['L8-8'], [{ team: 'blue', stage: 'g' }]);
   const farms = Object.fromEntries(regions
-    .filter((region) => region.farmProductionPerTurn)
-    .map((region) => [region.code, region.farmProductionPerTurn]));
+    .filter((region) => region.farmBuildingLevel)
+    .map((region) => [region.code, gameRules.farmProductionByLevel[region.farmBuildingLevel]]));
   assert.deepEqual(farms, {
     'L8-3': 250,
     'L8-4': 250,
@@ -972,14 +1075,63 @@ test('Level 8 defines unique regions, fixed singleton cells, rotating rings, and
     'L8-6': 250
   });
   assert.match(gameClient, /function isWheatEnabled\(\) \{\s*return !isCampaignGame\(\) \|\| activeCampaignLevel\.wheatEnabled === true;/);
-  assert.match(gameClient, /farmProductionPerTurn: Math\.max\([\s\S]*?wheatEnabled: isWheatEnabled\(\),\s*wheatTotalsByTeam:/);
+  assert.match(gameClient,
+    /farmBuildingLevel: gameRules\.getFarmBuildingLevel\(geometry\),[\s\S]*?wheatEnabled: isWheatEnabled\(\),\s*wheatTotalsByTeam:/);
   assert.equal((gameClient.match(/const wheatReport = isWheatEnabled\(\)/g) || []).length, 2);
   assert.match(gameClient, /function appendCampaignFarmIcon\([\s\S]*?geometry\.shape === 'circular'[\s\S]*?appendCampaignFarmIcon\(renderLayer, code, geometry/);
-  assert.match(gameClient, /window\.WillOfManyRules\.farmProductionByLevel/);
-  assert.match(gameClient, /const tierIndex = farmTiers\.findIndex/);
-  assert.doesNotMatch(gameClient, /const farmTiers = \[250, 1000, 4000, 16000, 50000\]/);
+  assert.match(gameClient, /gameRules\.farmProductionByLevel\[level\]/);
+  assert.match(gameClient, /const tier = level/);
   assert.deepEqual(levelEightBoard.campaign.objectiveRegions.slice().sort(), regionCodes.slice().sort());
   assert.equal(levelEightBoard.campaign.objective.type, 'captureAllRegions');
+});
+
+test('Level 9 defines its fixed 6x6 matrix, starting armies, farms, and income', () => {
+    const block = levelNineBoard.blocks[0];
+    const regions = block.regions;
+    const regionCodes = regions.map((region) => region.code);
+    const initialPieces = Object.fromEntries(regions
+      .filter((region) => region.initialPieces.length)
+      .map((region) => [region.code, region.initialPieces]));
+    const farms = Object.fromEntries(regions
+      .filter((region) => region.farmBuildingLevel)
+      .map((region) => [region.code, gameRules.farmProductionByLevel[region.farmBuildingLevel]]));
+
+    assert.equal(levelNineBoard.campaign.id, 'tabuleiro-09');
+    assert.equal(levelNineBoard.campaign.initialCoins, 100);
+    assert.equal(levelNineBoard.campaign.coinsPerTurn, 100);
+    assert.equal(levelNineBoard.campaign.aiActionsEnabled, true);
+    assert.equal(levelNineBoard.campaign.upgradeDowngradeEnabled, true);
+    assert.equal(levelNineBoard.campaign.preserveCoinsBetweenTurns, false);
+    assert.equal(levelNineBoard.campaign.aiActionsEnabled, true);
+    assert.equal(levelNineBoard.campaign.rotationEnabled, false);
+    assert.equal(levelNineBoard.blocks.length, 1);
+    assert.equal(block.matrixSize, 6);
+    assert.equal(block.rotationEnabled, false);
+    assert.equal(block.linearRotationEnabled, false);
+    assert.deepEqual(block.matrix, [
+      [null, null, 'L8-1', null, null, null],
+      [null, 'L7-1', 'L7-2', 'L7-3', null, null],
+      ['L6-1', 'L6-2', 'L6-3', 'L6-4', 'L6-5', null],
+      ['L6-6', 'L6-7', 'L6-8', 'L6-9', 'L6-10', null],
+      [null, 'L7-4', 'L7-5', 'L7-6', null, null],
+      [null, null, 'L8-2', null, null, null]
+    ]);
+    assert.equal(regions.length, 18);
+    assert.equal(new Set(regionCodes).size, 18);
+    assert.ok(regions.every((region) =>
+      block.matrix[region.positions[0][0] - 1][region.positions[0][1] - 1] === region.code));
+    assert.deepEqual(Object.keys(farms).sort(),
+      ['L6-1', 'L6-2', 'L6-3', 'L6-6', 'L6-7', 'L6-8', 'L8-1', 'L8-2']);
+    assert.ok(['L6-1', 'L6-2', 'L6-3', 'L6-6', 'L6-7', 'L6-8']
+      .every((code) => farms[code] === 1000));
+    assert.equal(farms['L8-1'], 250);
+    assert.equal(farms['L8-2'], 250);
+    assert.deepEqual(initialPieces, {
+      'L8-1': [{ team: 'blue', stage: 'g' }],
+      'L8-2': [{ team: 'orange', stage: 'g' }]
+    });
+    assert.deepEqual(levelNineBoard.campaign.objectiveRegions.slice().sort(), regionCodes.slice().sort());
+    assert.match(gameClient, /'tabuleiro-09': 'tabuleiro-09\.json'/);
 });
 
 test('campaign guide scripts and presentation settings are configured per level', () => {
@@ -1141,14 +1293,15 @@ test('campaign mode opens a custom illustrated trail with data-driven unlocked l
   assert.match(html, /stroke-dasharray="3 15"/);
   assert.match(html, /id="game-mode-options"[\s\S]*?data-mode="campaign"/);
   assert.match(html, /id="campaign-trail-levels"/);
-  assert.match(gameClient, /function renderCampaignTrail\(\)/);
-  assert.match(gameClient, /getCampaignLevelOrder\(\)/);
-  assert.match(gameClient, /const campaignAllLevelsUnlockedForTesting = true;/);
-  assert.match(gameClient, /const unlockedThrough = campaignAllLevelsUnlockedForTesting\s*\?\s*levels\.length - 1\s*:\s*levels\.indexOf\(getUnlockedCampaignLevelId\(\)\)/);
+  assert.match(gameClient, /function renderCampaignTrail\(page = selectedCampaignTrailPage\)/);
+  assert.match(gameClient, /getCampaignLevelNumber\(getUnlockedCampaignLevelId\(\)\)/);
+  assert.match(gameClient, /const campaignAllLevelsUnlockedForTesting = false;/);
+  assert.match(gameClient, /const unlockedThrough = campaignAllLevelsUnlockedForTesting\s*\?\s*Number\.POSITIVE_INFINITY\s*:\s*getCampaignLevelNumber\(getUnlockedCampaignLevelId\(\)\)/);
   assert.match(gameClient, /button\.disabled = !isUnlocked/);
   assert.match(gameClient, /button\.dataset\.levelId = levelId/);
   assert.match(gameClient, /function getCampaignTrailPosition\(index\)/);
   assert.match(gameClient, /function showCampaignTrail\(\)/);
+  assert.match(gameClient, /campaignTrailNextButton\.addEventListener\('click'/);
   assert.match(gameClient, /document\.querySelectorAll\('#game-mode-options button'\)\.forEach\(\(button\) => \{[\s\S]*?gameMode = button\.dataset\.mode;[\s\S]*?if \(gameMode === 'campaign'\) \{[\s\S]*?showCampaignTrail\(\)/);
   assert.match(gameClient, /campaignTrailLevels\.addEventListener\('click', async \(event\) => \{[\s\S]*?selectedCampaignLevelId = levelButton\.dataset\.levelId;[\s\S]*?beginConfiguredGame\(\)/);
   assert.match(gameCss, /\.campaign-trail-map \{[^}]*height:clamp\(220px,54vh,470px\)/);

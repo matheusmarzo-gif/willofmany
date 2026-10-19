@@ -27,6 +27,13 @@
     4: 16000,
     5: 50000
   });
+  const villageCoinProductionByLevel = Object.freeze({
+    1: 10,
+    2: 50,
+    3: 250,
+    4: 1000,
+    5: 4000
+  });
   const promotionCostBySourceLayer = Object.freeze({
     8: 3,
     7: 9,
@@ -46,6 +53,26 @@
       minimumSoldiersBySourceLayer: Object.freeze({ 7: 35, 6: 24, 5: 20, 4: 12, 3: 9, 2: 7, 1: 6 })
     })
   });
+
+  function getFarmBuildingLevel(region) {
+    const explicitLevel = Number(region?.farmBuildingLevel ?? region?.farmLevel);
+    if (Number.isInteger(explicitLevel) &&
+        Object.prototype.hasOwnProperty.call(farmProductionByLevel, explicitLevel)) {
+      return explicitLevel;
+    }
+    const production = Math.max(0, Number(region?.farmProductionPerTurn) || 0);
+    if (!production) return 0;
+    return Object.keys(farmProductionByLevel).map(Number).sort((first, second) => first - second)
+      .find((level) => production <= farmProductionByLevel[level]) || 5;
+  }
+
+  function getVillageBuildingLevel(region) {
+    const level = Number(region?.villageBuildingLevel);
+    return Number.isInteger(level) &&
+      Object.prototype.hasOwnProperty.call(villageCoinProductionByLevel, level)
+      ? level
+      : 0;
+  }
 
   function mergeTeamCounts(counts) {
     for (const stage of ascendingStages.slice(0, -1)) {
@@ -432,6 +459,9 @@
     soldierWeights,
     stageOrder,
     farmProductionByLevel,
+    villageCoinProductionByLevel,
+    getFarmBuildingLevel,
+    getVillageBuildingLevel,
     promotionCostBySourceLayer,
     rankChangeRules,
     mergeTeamCounts,

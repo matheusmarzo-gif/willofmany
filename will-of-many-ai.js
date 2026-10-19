@@ -346,17 +346,11 @@
   }
 
   function getFarmLevel(region) {
-    var explicitLevel = Number(region.farmLevel);
-    if (Number.isFinite(explicitLevel) && explicitLevel > 0) {
-      return Math.min(5, Math.floor(explicitLevel));
-    }
-    var production = Math.max(0, Number(region.farmProductionPerTurn) || 0);
-    if (!production) return 0;
-    return Object.keys(farmProductionByLevel).map(Number).sort(function (first, second) {
-      return first - second;
-    }).find(function (level) {
-      return production <= Number(farmProductionByLevel[level]);
-    }) || 5;
+    return rules.getFarmBuildingLevel(region);
+  }
+
+  function getFarmProduction(region) {
+    return Number(farmProductionByLevel[getFarmLevel(region)]) || 0;
   }
 
   function getActivePenaltyEntries(snapshot) {
@@ -511,7 +505,7 @@
       }
 
       var region = object(regions[code]);
-      var farmProduction = Math.max(0, Number(region.farmProductionPerTurn) || 0);
+      var farmProduction = getFarmProduction(region);
       if (farmProduction > 0) {
         var farmLevel = getFarmLevel(region);
         var farmBonus = Number(farmBonuses[farmLevel]) || 0;
@@ -912,7 +906,7 @@
       var farms = [];
       codes.forEach(function (code) {
         var regionData = object(regions[code]);
-        var production = Number(regionData.farmProductionPerTurn);
+        var production = getFarmProduction(regionData);
         if (Number.isFinite(production) && production > 0) {
           farms.push({ code: code, production: production });
         }
@@ -943,7 +937,7 @@
       codes.forEach(function (code) {
         if (owns(code, team)) {
           var regionData = object(regions[code]);
-          var farmProd = Number(regionData.farmProductionPerTurn);
+          var farmProd = getFarmProduction(regionData);
           if (Number.isFinite(farmProd) && farmProd > 0) production += farmProd;
 
           var stageCnts = stageCounts(code, team);
@@ -1137,7 +1131,7 @@
         }
       }
 
-      if (force(source, team) < 2 || !keepsLayerBalance(source, 1) ||
+        if (force(source, team) < 2 || !keepsLayerBalance(source, 1) ||
           !transferPreservesComposition(source, target, team, 1) ||
           (hop.isMove && isReverseMoveBlocked(source, target, 1)) ||
           (!hop.isMove && promotionBudget(source) < 1)) {
@@ -1389,8 +1383,11 @@
       var sourceLayer = layer(source);
       var purchaseCost = directRecruitmentCost(source, stage);
       var promotionCost = (promotionCosts[sourceLayer] || Infinity) * amount;
-      if (!Number.isFinite(purchaseCost + promotionCost) ||
-          Number(points) < purchaseCost + promotionCost) return null;
+      var replacementCost = purchaseCost + promotionCost;
+      var canAffordReplacement = Number.isFinite(replacementCost) &&
+        Number(points) >= replacementCost;
+      if (!Number.isFinite(promotionCost) || !Number.isFinite(Number(points)) ||
+          Number(points) < promotionCost) return null;
 
       var targetOwner = object(regions[target]).dominator || object(regions[target]).owner;
       if (owns(target, human) ||
@@ -1405,9 +1402,27 @@
           (!targetCompactsForbiddenG && targetCounts.f >= 3) ||
           pieceCount(targetAfter) > regionPieceLimit(target)) return null;
 
-      var purchase = getPurchaseAction(source, stage, true);
+      var purchase = canAffordReplacement
+        ? getPurchaseAction(source, stage, true)
+        : null;
       if (!purchase) {
         if (pieceCount(stageCounts(source, team)) >= regionPieceLimit(source)) {
+          var directAmount = Math.min(
+            Number(requestedAmount) || 0,
+            promotionBudget(source),
+            Math.max(0, force(source, team) - 1),
+            Math.floor(Number(points) / (promotionCosts[sourceLayer] || Infinity))
+          );
+          if (directAmount > 0) {
+            var sourceAfterDirect = compositionAfterTransfer(source, team, directAmount, false);
+            var targetAfterDirect = compositionAfterTransfer(target, team, directAmount, true);
+            if (keepsLayerBalance(source, directAmount) &&
+                transferPreservesComposition(source, target, team, directAmount) &&
+                pieceCount(sourceAfterDirect) <= regionPieceLimit(source) &&
+                pieceCount(targetAfterDirect) <= regionPieceLimit(target)) {
+              return { type: 'promote', source: source, target: target, amount: directAmount };
+            }
+          }
           return recycleForPurchase(source);
         }
         return null;
@@ -1449,7 +1464,8 @@
             ? pendingTargetLayer === pendingLayer
             : pendingTargetLayer === pendingLayer - 1) &&
           force(pendingFollowUp.source, team) > pendingAmount &&
-          keepsLayerBalance(pendingFollowUp.source, pendingAmount) &&
+          (pendingTargetOwner === 'free' || !pendingTargetOwner ||
+            keepsLayerBalance(pendingFollowUp.source, pendingAmount)) &&
           (pendingFollowUp.type !== 'promote' || promotionBudget(pendingFollowUp.source) >= pendingAmount) &&
           transferPreservesComposition(pendingFollowUp.source, pendingFollowUp.target, team, pendingAmount) &&
           pieceCount(compositionAfterTransfer(pendingFollowUp.target, team, pendingAmount, true)) <=
@@ -1647,9 +1663,25 @@
       }
 
       if (sourceLayer === targetLayer + 1) {
+        var freeTarget = !owner || owner === 'free';
+        if (freeTarget && pieceCount(stageCounts(source, team)) >= regionPieceLimit(source)) {
+          var maximumDirectAmount = Math.min(
+            promotionBudget(source),
+            Math.max(0, force(source, team) - 1),
+            Math.floor(Number(points) / (promotionCosts[sourceLayer] || Infinity))
+          );
+          if (maximumDirectAmount > 0) {
+            var directPromotion = getPromotionPurchaseAction(
+              source,
+              target,
+              maximumDirectAmount
+            );
+            if (directPromotion?.type === 'promote') return directPromotion;
+          }
+        }
         var promotionShortfall = Math.max(
           promotionSoldierShortfall(sourceLayer),
-          layerBalanceSoldierShortfall(sourceLayer)
+          freeTarget ? 0 : layerBalanceSoldierShortfall(sourceLayer)
         );
         var missingForPromotion = Math.max(
           promotionShortfall,
@@ -1662,7 +1694,8 @@
             });
         }
         if (canReceivePromotionUnit(target) && force(source, team) > 1 &&
-            promotionBudget(source) > 0 && keepsLayerBalance(source, 1) &&
+          promotionBudget(source) > 0 &&
+          (freeTarget || keepsLayerBalance(source, 1)) &&
             transferPreservesComposition(source, target, team, 1) &&
             Number(points) >= (promotionCosts[sourceLayer] || Infinity)) {
           return getPromotionPurchaseAction(source, target, 1);

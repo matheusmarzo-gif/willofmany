@@ -195,7 +195,8 @@ public final class MainActivity extends Activity {
                 !"tabuleiro-05.json".equals(fileName) &&
                 !"tabuleiro-06.json".equals(fileName) &&
                 !"tabuleiro-07.json".equals(fileName) &&
-                !"tabuleiro-08.json".equals(fileName)) {
+                !"tabuleiro-08.json".equals(fileName) &&
+                !"tabuleiro-09.json".equals(fileName)) {
                 Log.w(TAG, "Rejeitando recurso não permitido: " + fileName);
                 return "";
             }

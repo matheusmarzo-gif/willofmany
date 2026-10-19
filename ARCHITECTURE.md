@@ -45,12 +45,13 @@ ou de integração puderem afetá-lo.
 | `index.html` | Entrada e marcação do jogo web. | Alterar a estrutura da página ou a ordem dos recursos do cliente. |
 | `game.css` | Estilos de desktop, mobile, campanha e tabuleiro. | Alteração visual ou responsiva. |
 | `game-client.js` | Estado de partida, interações, desenho do tabuleiro, menus, campanha e integrações web. Carregado depois dos módulos de regras/IA. | Mecânica ou fluxo do cliente ainda não extraído. |
-| `game-rules.js` | Funções puras compartilhadas de composição, contagem, custo, reembolso e agrupamento de conflitos; também define a tabela factual `farmProductionByLevel` (nível 1=250, 2=1000, 3=4000, 4=16000, 5=50000). Expõe `WillOfManyRules` no navegador e CommonJS para testes. | Alterar regras determinísticas sem acesso ao DOM. |
+| `game-rules.js` | Funções puras compartilhadas de composição, contagem, custo, reembolso e agrupamento de conflitos; também define as tabelas factuais `farmProductionByLevel` e `villageCoinProductionByLevel`. Expõe `WillOfManyRules` no navegador e CommonJS para testes. | Alterar regras determinísticas sem acesso ao DOM. |
 | `will-of-many-ai.js` | Escolha e análise de ações da IA; exporta `window.WillOfManyAI.chooseAction(snapshot)` e `calculateDesirability(snapshot)`. Calcula desejabilidade interna, externa e total por região, depois escolhe uma região própria ou fronteiriça e planeja compras, movimento, promoção, rebaixamento, reciclagem ou rotação. | Comportamento do oponente automático. |
+| `random-map-generator.js` | Bundle do núcleo TypeScript de `cartografo-estrategico`, carregado pelo cliente clássico antes de `game-client.js`; exporta `WillOfManyMapGenerator.generateRandomBoard(targetRegions, rotationsEnabled)`. | Gerar um tabuleiro quadricular compartilhado em campanha, Contra IA e partidas online. |
 | `will-of-many-ai-config.json` | Valores editáveis de desejabilidade por rank/ocupação, faixas de força relativa, bônus de fazenda/suporte, proporções de tropas, kernel de distância, penalidades temporárias e critérios de reciclagem, incluindo a regra de turno acionada por saldo inicial alto e o limite de ações por turno. Custos e legalidade permanecem definidos pelo motor/regras. | Ajustar estratégia sem alterar `will-of-many-ai.js`. |
 | `tests/game-rules.test.js` | Testes de caracterização do módulo de regras, usando `node:test` sem dependências adicionais. | Validar composição, conversões de unidades, custos e reembolsos. |
-| `tests/asset-entrypoints.test.js` | Garante a ordem dos recursos de entrada e sua inclusão nos builds Android e servidor. | Alterar caminhos, módulos web externos ou configurações de empacotamento. |
-| `tabuleiro-01.json`–`tabuleiro-08.json` | Configuração de campanha por nível: regiões, blocos, peças iniciais, moedas, objetivo, escala de exibição/foco, rotação, limite de turnos e `campaign.guide`. O guia configura introdução, mensagens, sequência (`next`), estados de espera, foco/seleção de regiões, destaques (`highlight`), ações permitidas/alvos, dicas, efeitos de apresentação e gatilhos declarativos em `transitions`. `objectiveRegions` lista os territórios que o jogador precisa conquistar; `objectiveText` personaliza o texto do objetivo; `preserveCoinsBetweenTurns` mantém o saldo ao passar o turno; `aiActionsEnabled: false` faz a IA passar automaticamente; `wheatEnabled: true` habilita trigo em uma campanha; `initialWheat` define o estoque inicial de cada equipe antes do primeiro consumo. `farmProductionPerTurn` configura a produção da fazenda em cada região; `turnLimitCurrentTurn` define um limite pelo número exibido do turno; blocos quadriculares podem definir `rotationArea`, `rotationSteps` ou `linearRotationEnabled` para personalizar a rotação. O Level 7 replica o tabuleiro do Level 6 com os times das peças iniciais invertidos e mantém um guia próprio. O Level 8 tem 16 blocos quadriculares, com códigos de região únicos em todo o tabuleiro. Para testes, `campaignAllLevelsUnlockedForTesting` em `game-client.js` libera temporariamente todos os botões da trilha; volte-o para `false` após os testes para restaurar o desbloqueio por progresso. Consulte `AGENTE-CAMPANHA.txt` para o formato de autoria. | Criar ou ajustar um nível de campanha, seu roteiro do Agente e a qual disco cada região pertence. |
+| `tests/asset-entrypoints.test.js`, `tests/random-map-generator.test.js` | Verificam a ordem/empacotamento dos assets e o formato e limites dos mapas gerados. | Alterar recursos de entrada ou o adaptador do Cartógrafo. |
+| `tabuleiro-01.json`–`tabuleiro-09.json` e Levels 10+ | Os níveis estáticos configuram regiões, peças iniciais, moedas, objetivo, rotação e guia. A partir do Level 10, os mapas são gerados com exatamente `min(900, 60 + 5 × (level − 10))` regiões, em páginas de cinco níveis. Os níveis aleatórios habilitam rotação em anel em todos os blocos e rotação linear em matrizes 3×3 e 5×5. Cada mapa fica salvo por level no IndexedDB local para manter o mesmo mapa ao rejogar; mapas antigos sem essas regras de rotação são regenerados. A economia não acumula saldo: Levels 10–15 começam com 40 moedas e recebem 10 por turno; Levels 16–20, 60 e 15; Level 21 em diante, 80 e 20. | Alterar campanha estática ou progressão dos mapas aleatórios. |
 | `regioes-will-of-many-circular.json`, `regioes-will-of-many.json`, `will-of-many-final.json` | Máscaras/regiões usadas para compor o tabuleiro e derivar geometria e vizinhança. O tabuleiro circular é a fonte padrão para todos os modos não campanha; os outros JSONs são apenas fallbacks de carregamento inicial. No tabuleiro circular atual, `disco` identifica o anel rotativo de cada região. | Geometria, regiões, dados-base e vizinhança do tabuleiro padrão. |
 | `regioes-will-of-many-l8.json` | Dados auxiliares de regiões L8 usados por ferramentas/edição. Confirme os pontos de leitura antes de tratá-lo como fonte do tabuleiro ativo. | Investigação de geometria e edição de regiões L8. |
 | `editor-regioes.html` | Ferramenta visual de edição/inspeção de regiões e dados auxiliares. | Ajustar ou depurar máscaras e caixas de região. |
@@ -70,9 +71,9 @@ junto com uma mecânica sem necessidade.
 
 ## Mapa do cliente
 
-`index.html` carrega `game.css`, `game-rules.js`, `will-of-many-ai.js` e
-`game-client.js`, nessa ordem. Preserve a ordem: o cliente depende de
-`window.WillOfManyRules` e `window.WillOfManyAI`. As máscaras principais são
+`index.html` carrega `game.css`, `game-rules.js`, `will-of-many-ai.js`,
+`random-map-generator.js` e `game-client.js`, nessa ordem. Preserve a ordem: o cliente depende de
+`window.WillOfManyRules`, `window.WillOfManyAI` e `window.WillOfManyMapGenerator`. As máscaras principais são
 carregadas de `regioes-will-of-many-circular.json` no Android e como primeiro
 candidato nos demais clientes; arquivos externos alternativos são tentados se
 esse carregamento falhar. O módulo de regras é CommonJS no Node para testes e
@@ -89,8 +90,8 @@ Para encontrar um ponto de entrada, use a busca do editor pelo nome da função:
 | Carregamento de tabuleiro | `loadRegionMasks`, `loadBoardFile`, `applyRegionData`, `normalizeImportedRegionGeometry` | Carregamento inicial das máscaras e carregamento explícito de níveis. |
 | Geometria e vizinhança | `regionGeometryByCode`, `regionNeighborCache`, `recomputeNeighborCacheForLayer`, `getRegionCalculationOrder`, `getRegionFocusPoint` | Geometria, rotação e vizinhança também alimentam regras e destaques. O foco de regiões quadriculares usa os limites das células desenhadas para centralizar a mesma forma que aparece na tela, sem depender das máscaras rasterizadas. |
 | Compra e composição | `renderPiecePurchaseButtons`, `addPiece`, `mergeRegionTeam`, `refreshRegionVisuals` | A compra altera o estado lógico e depois atualiza peças, forças e painéis. |
-| Upgrade/Downgrade de regiões | `getRankChangeOptionsForRegion`, `performRankChange`, `regionRankChanges` em `game-client.js`; `chooseRankChangeAction` em `will-of-many-ai.js`; `rankChange` em `will-of-many-ai-config.json` | A opção é configurável na criação de partidas contra IA/online. Cada JSON de campanha pode habilitá-la por `campaign.upgradeDowngradeEnabled` (levels 1–8 começam desativados). As regras verificam propriedade exclusiva, tropas mínimas e moedas; a conversão preserva a geometria e cria o próximo código disponível no rank de destino. `regionRankChanges` persiste a identidade visual/lógica no save e é replicado junto do estado Bluetooth/online. A IA só considera regiões instáveis, prefere conversões que as estabilizem e limita o contingente de uma operação a 5% das tropas e da força final azul. Os pesos da prioridade e da agressividade ficam configuráveis; os controles flutuantes recolhem para um ícone após três segundos. |
-| Economia da campanha | `getCampaignCoinsPerTurn`, `passTurnToNextPlayer`, `activeCampaignLevel.preserveCoinsBetweenTurns` | Configure renda, moedas iniciais e persistência do saldo nos metadados do JSON do nível. No Level 5, o saldo inicial é 12, e cada turno de 1 a 5 começa com 4 moedas. |
+| Upgrade/Downgrade de regiões | `getRankChangeOptionsForRegion`, `performRankChange`, `regionRankChanges` em `game-client.js`; `chooseRankChangeAction` em `will-of-many-ai.js`; `rankChange` em `will-of-many-ai-config.json` | A opção é configurável na criação de partidas contra IA/online. Os levels 1–8 de campanha a desativam; o Level 9 a ativa pela configuração `campaign.upgradeDowngradeEnabled`. Ao retomar campanhas, a configuração do level prevalece sobre saves antigos. As regras verificam propriedade exclusiva, tropas mínimas e moedas; a conversão preserva a geometria e cria o próximo código disponível no rank de destino. `regionRankChanges` persiste a identidade visual/lógica no save e é replicado junto do estado Bluetooth/online. A IA só considera regiões instáveis, prefere conversões que as estabilizem e limita o contingente de uma operação a 5% das tropas e da força final azul. Os pesos da prioridade e da agressividade ficam configuráveis; os controles flutuantes recolhem para um ícone após três segundos. |
+| Economia da campanha | `getCampaignCoinsPerTurn`, `getVillageCoinIncome`, `passTurnToNextPlayer`, `activeCampaignLevel.preserveCoinsBetweenTurns` | Configure renda, moedas iniciais e persistência do saldo nos metadados do JSON do nível. Povoados geram moedas por turno conforme o nível e pagam somente à equipe que controla a região. Nos mapas aleatórios, o saldo não acumula: Levels 10–15 usam 40 moedas iniciais e 10 por turno; Levels 16–20, 60 e 15; Levels 21+, 80 e 20. |
 | Guia de turnos do Level 5 | `showTurnTransition`, `level5-turn3-tip`, `level5-turn5-tip`, `focusStrongestRegionForTeam` | Após a animação de início do turno 3, o guia explica a equivalência E/F com foco em L8-12; no turno 5, recomenda posicionar uma tropa G contra L8-2 com foco conjunto em L8-2, L8-1 e na região vizinha à esquerda naquele momento. Os dois avisos restauram o foco da região laranja mais forte ao fechar e preservam o passo anterior do guia. |
 | Sacos de moedas | `regionGeometryByCode[regionCode].bagCoins`, `campaignCollectedBags`, `updateSelectedRegionPanel`, `collectCampaignBagAtRegion` | O painel da região selecionada mostra o valor de um saco ainda não coletado; ao coletá-lo, o indicador some junto com o ícone do tabuleiro. |
 | Movimento e descarte | `beginPieceDrag`, `finishPieceDrag`, `getDragTargets`, `performRelegation`, `performRecycle` | O arraste usa hit-testing, alvos válidos e uma camada visual própria. |
@@ -129,8 +130,9 @@ calcula a participação relativa de tropas como
 `(tropas_da_região / tropas_do_rank) / (1 / regiões_ocupadas_no_rank) * 100`
 e soma o ajuste da faixa configurada. Fazendas recebem o bônus pelo nível e,
 quando produção não cobre consumo, o bônus adicional de trigo. Um nível de
-fazenda explícito é preferido; quando ausente, a IA classifica pela tabela
-factual compartilhada de produção máxima por nível em `game-rules.js`. Regiões com vizinho imediato de rank numérico
+nível de construção explícito é preferido; quando ausente, a IA classifica
+valores legados de produção pela tabela factual compartilhada em
+`game-rules.js`. Regiões com vizinho imediato de rank numérico
 `X-1` ainda com unidades livres temporárias recebem o bônus de falta de suporte.
 Se a força azul estiver abaixo da proporção entre ranks adjacentes, regiões do
 rank externo defasado recebem o bônus de necessidade de tropas.
@@ -164,10 +166,11 @@ recalcula a vizinhança/desejabilidade; a direção aleatória é uma solução
 provisória, autorizada para esta implementação e sujeita a refinamento.
 
 Os níveis de fazenda são definidos pela tabela compartilhada
-`WillOfManyRules.farmProductionByLevel`, usada tanto pelos ícones do tabuleiro
-quanto pela análise da IA. Uma produção de 250 por turno é nível 1; os demais
-níveis correspondem a 1000, 4000, 16000 e 50000. Isso é uma regra factual do
-jogo, não um peso configurável.
+`WillOfManyRules.farmProductionByLevel`, usada pelos ícones do tabuleiro e pela
+análise da IA. Os níveis de povoado são definidos por
+`WillOfManyRules.villageCoinProductionByLevel`; a produção correspondente é
+somada às moedas do turno da equipe que controla cada região. Essas são regras
+factuais do jogo, não pesos configuráveis.
 
 `will-of-many-ai-config.json` contém os pesos, limites do modelo e o máximo de
 ações que a IA executa por turno (35 no fallback interno; o JSON pode ajustar
@@ -182,19 +185,29 @@ do motor.
 
 1. A página carrega as máscaras de região e aplica os dados com `applyRegionData`.
    Para uma partida nova, qualquer modo fora de campanha deve carregar
-   `regioes-will-of-many-circular.json`; campanha carrega o arquivo indicado por
-   `campaignLevelFiles`. Mantenha essa decisão centralizada em
-   `getNewGameBoardFile` e atualize os testes se a configuração mudar.
+   `regioes-will-of-many-circular.json`; os Levels 1–9 usam seus JSONs estáticos.
+   A partir do Level 10, `random-map-generator.js` gera regiões 2× mais largas
+   que altas e persiste cada mapa no IndexedDB antes do início da partida.
 2. Ao selecionar um modo não campanha no fluxo **Jogo novo**, o cliente carrega o
    tabuleiro circular e volta a confirmá-lo em `beginConfiguredGame`; isso cobre
    também os caminhos diretos de início por Bluetooth e Online.
 3. No modo campanha, `beginConfiguredGame` carrega o JSON do nível antes de
-   preparar peças iniciais, objetivo e estado do guia.
-   O mapa `campaignLevelFiles` mantém a ordem de desbloqueio dos níveis. Configure
+   preparar peças iniciais, objetivo e estado do guia; nos Levels 10+, carrega o
+   mapa armazenado ou gera e salva um novo antes da partida. Os níveis aleatórios
+   avançam cinco regiões por level, de 60 até o teto de 900, e a trilha abre uma
+   nova página de cinco níveis após concluir a página atual. Mapas antigos
+   armazenados em `will-of-many-random-campaign-maps` são migrados para IndexedDB;
+   mapas cujo alvo ou contagem real não corresponde à regra atual são regenerados.
+   `getCampaignLevelNumber` e `getCampaignTrailPage` mantêm a sequência e as
+   páginas sem uma lista limitada de níveis. Configure
    `initialCoins`, `coinsPerTurn`, `coinsPerTurnStopAtTurn`,
    `preserveCoinsBetweenTurns` e `aiActionsEnabled` no bloco `campaign`, sem
    criar exceções por número de level no fluxo de turnos. `coinsPerTurnStopAtTurn`
    é opcional e zera a renda ao iniciar o turno indicado.
+   Mapas aleatórios de campanha habilitam rotação em anel em todos os blocos e
+   rotação linear somente em matrizes 3×3 e 5×5. Em mapas aleatórios contra IA
+   ou online, o criador escolhe se habilita as rotações; o estado segue salvo e
+   sincronizado junto do tabuleiro.
 4. Ações como comprar, mover, promover, descartar, girar ou resolver uma guerra
    atualizam `regionPiecesByRegion` e estruturas relacionadas.
 5. As ações que alteram a composição/posição atualizam forças, visuais, controles
@@ -214,7 +227,7 @@ do motor.
    em conjunto. Blocos quadriculares rotativos são selecionados um por vez e
    aplicam a rotação recursiva dos anéis da matriz apenas ao bloco escolhido.
    Nas matrizes quadriculares, as colunas crescem para a direita (eixo X, passo
-   `L2`) e as linhas crescem para baixo (eixo Y, passo `L1`); mantenha essa
+   `L1`) e as linhas crescem para baixo (eixo Y, passo `L2`); mantenha essa
    convenção ao derivar geometria, vizinhos e destaques de rotação.
    `rotateQuadrilateralBlocksForLayer` reaplica o tabuleiro após atualizar a
    matriz; `applyRegionData` recompõe máscaras e recalcula as vizinhanças de
@@ -261,7 +274,10 @@ do motor.
    Reiniciar um level também reinicia o passo do guia e limpa bloqueios e
    animações de rotação pendentes.
 7. O JSON de nível descreve dados da campanha; o estado vivo da partida e seu save
-   ficam no cliente. O servidor online mantém estado/mensagens da partida online.
+   ficam no cliente. O save inclui `generatedBoardData` somente para mapas
+   aleatórios, permitindo retomada local e sincronização/reconexão online. O
+   anfitrião Laranja escolhe a meta online; `game_start` e os estados seguintes
+   carregam o mesmo tabuleiro para o adversário sem alterar o handshake existente.
 
 Não confunda `regionPiecesByRegion` (composição de peças) com `regionStats`
 (contagens auxiliares) ou `regionForceStats` (resultado calculado). Ao adicionar
@@ -300,8 +316,8 @@ Durante a mudança:
 Depois da mudança:
 
 1. Execute `git diff --check` e revise o diff completo.
-2. Para as regras puras e os pontos de entrada do cliente, execute
-   `node --test tests/game-rules.test.js tests/asset-entrypoints.test.js`.
+2. Para as regras, o gerador e os pontos de entrada do cliente, execute
+   `node --test tests/game-rules.test.js tests/asset-entrypoints.test.js tests/random-map-generator.test.js`.
 3. Para o servidor, execute `server-app\gradlew.bat test`.
 4. Para qualquer alteração em HTML, JavaScript do jogo, código Android, manifesto
    ou dependências Android, compile o APK a partir de `android-app` com
@@ -354,7 +370,8 @@ incluídos pelo Spring Boot. Não basta o módulo funcionar em um único ambient
   CSS, JavaScript, PNG, JSON e SVG da raiz; a trilha da campanha é SVG inline no
   HTML e não depende de uma imagem externa.
 - `server-app/build.gradle` empacota explicitamente `index.html`, `game.css`,
-  `game-client.js`, `game-rules.js`, `will-of-many-ai.js`, PNG e SVG. Ao adicionar
+  `game-client.js`, `game-rules.js`, `will-of-many-ai.js`,
+  `random-map-generator.js`, PNG e SVG. Ao adicionar
   outro recurso web, avalie também esse filtro.
 - `MainActivity.java` contém mais de uma integração nativa, incluindo o
   encerramento da Activity solicitado pelo menu “Sair”. Alterações de WebView

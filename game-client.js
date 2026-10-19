@@ -1,6 +1,7 @@
     const stage = document.querySelector('#stage');
     const rankChangeFloatingControls = document.querySelector('#rank-change-floating-controls');
     const app = document.querySelector('.app');
+    app.appendChild(rankChangeFloatingControls);
     app.classList.toggle('is-android-webview', !!window.AndroidBluetooth);
     const startScreen = document.querySelector('#start-screen');
     const startMenu = document.querySelector('#start-menu');
@@ -13,6 +14,11 @@
     const campaignTrailScreen = document.querySelector('#campaign-trail-screen');
     const campaignTrailLevels = document.querySelector('#campaign-trail-levels');
     const campaignTrailBackButton = document.querySelector('#campaign-trail-back');
+    const campaignTrailSwitchButton = document.querySelector('#campaign-trail-switch');
+    const campaignTrailNextButton = document.querySelector('#campaign-trail-next');
+    const campaignTrailEyebrow = document.querySelector('#campaign-trail-eyebrow');
+    const campaignTrailTitle = document.querySelector('#campaign-trail-title');
+    const campaignTrailDescription = document.querySelector('#campaign-trail-description');
     const tutorialModal = document.querySelector('#tutorial-modal');
     const tutorialOpenButton = document.querySelector('#tutorial-open-button');
     const tutorialCloseButton = document.querySelector('#tutorial-close-button');
@@ -29,6 +35,18 @@
     const bluetoothSearchButton = document.querySelector('#bluetooth-search-button');
     const bluetoothDevices = document.querySelector('#bluetooth-devices');
     const onlineOptions = document.querySelector('#online-options');
+    const onlineRandomMapCheckbox = document.querySelector('#online-random-map-enabled');
+    const onlineRandomMapTarget = document.querySelector('#online-random-map-target');
+    const onlineRandomMapTargetValue = document.querySelector('#online-random-map-target-value');
+    const onlineRandomMapSizeLabel = document.querySelector('#online-random-map-size-label');
+    const onlineRandomMapRotationsCheckbox = document.querySelector('#online-random-map-rotations-enabled');
+    const onlineRandomMapRotationsLabel = document.querySelector('#online-random-map-rotations-label');
+    const aiRandomMapCheckbox = document.querySelector('#ai-random-map-enabled');
+    const aiRandomMapTarget = document.querySelector('#ai-random-map-target');
+    const aiRandomMapTargetValue = document.querySelector('#ai-random-map-target-value');
+    const aiRandomMapSizeLabel = document.querySelector('#ai-random-map-size-label');
+    const aiRandomMapRotationsCheckbox = document.querySelector('#ai-random-map-rotations-enabled');
+    const aiRandomMapRotationsLabel = document.querySelector('#ai-random-map-rotations-label');
     const onlineNameInput = document.querySelector('#online-name');
     const googleSignIn = document.querySelector('#google-sign-in');
     const onlineProfile = document.querySelector('#online-profile');
@@ -119,6 +137,7 @@
     const regionSoldierCounts = document.querySelector('#region-soldier-counts');
     const regionBagCoins = document.querySelector('#region-bag-coins');
     const regionFarm = document.querySelector('#region-farm');
+    const regionVillage = document.querySelector('#region-village');
     const regionForce = document.querySelector('#region-force');
     const regionFinalForce = document.querySelector('#region-final-force');
     const regionConflictEnergy = document.querySelector('#region-conflict-energy');
@@ -255,6 +274,7 @@
     let campaignObjectiveRegions = [];
     let campaignResetPending = false;
     let selectedCampaignLevelId = 'tabuleiro-01';
+    let selectedCampaignTrailPage = 1;
     let campaignNextLevelId = null;
     let campaignGuideStep = 'complete';
     let campaignGuideStepBeforeLevel5TurnThreeTip = null;
@@ -278,8 +298,18 @@
       'tabuleiro-05': 'tabuleiro-05.json',
       'tabuleiro-06': 'tabuleiro-06.json',
       'tabuleiro-07': 'tabuleiro-07.json',
-      'tabuleiro-08': 'tabuleiro-08.json'
+      'tabuleiro-08': 'tabuleiro-08.json',
+      'tabuleiro-09': 'tabuleiro-09.json'
     };
+    const randomCampaignLevelsPerPage = 5;
+    const firstRandomCampaignLevel = 10;
+    const initialRandomCampaignRegions = 60;
+    const randomCampaignRegionsPerLevel = 5;
+    const maxRandomCampaignRegions = 900;
+    const randomCampaignMapStorageKey = 'will-of-many-random-campaign-maps';
+    const randomCampaignMapDatabaseName = 'will-of-many-campaign-maps';
+    const randomCampaignMapObjectStore = 'maps';
+    let randomCampaignMapDatabasePromise = null;
     const levelThreeRegionCodeMigration = {
       'L8-8': 'L8-10',
       'L8-9': 'L8-11',
@@ -288,7 +318,7 @@
     };
     const defaultNonCampaignBoardFile = 'regioes-will-of-many-circular.json';
     const campaignProgressStorageKey = 'will-of-many-campaign-unlocked-level';
-    const campaignAllLevelsUnlockedForTesting = true;
+    const campaignAllLevelsUnlockedForTesting = false;
     const boardLayerElements = new Map();
     const probeBoxSize = 30;
     let debugZoom = 1;
@@ -368,8 +398,43 @@
       return turnPointSchedule[Math.min(Math.max(1, turnNumber), turnPointSchedule.length) - 1] * gameSpeed;
     }
 
-    function getCampaignLevelOrder() {
-      return Object.keys(campaignLevelFiles);
+    function getCampaignLevelNumber(levelId) {
+      const staticLevelIndex = Object.keys(campaignLevelFiles).indexOf(String(levelId || ''));
+      if (staticLevelIndex >= 0) return staticLevelIndex + 1;
+      const match = /^random-(\d+)$/.exec(String(levelId || ''));
+      if (!match) return null;
+      const number = Number(match[1]);
+      return Number.isSafeInteger(number) && number >= firstRandomCampaignLevel ? number : null;
+    }
+
+    function getCampaignLevelId(levelNumber) {
+      if (!Number.isSafeInteger(levelNumber) || levelNumber < 1) return null;
+      const staticLevelId = Object.keys(campaignLevelFiles)[levelNumber - 1];
+      return staticLevelId || (levelNumber >= firstRandomCampaignLevel ? `random-${levelNumber}` : null);
+    }
+
+    function getCampaignTrailPage(levelNumber) {
+      return levelNumber < firstRandomCampaignLevel
+        ? 1
+        : 2 + Math.floor((levelNumber - firstRandomCampaignLevel) / randomCampaignLevelsPerPage);
+    }
+
+    function getCampaignTrailLevelNumbers(page) {
+      if (page === 1) return Object.keys(campaignLevelFiles).map((_, index) => index + 1);
+      const firstLevel = firstRandomCampaignLevel + (page - 2) * randomCampaignLevelsPerPage;
+      return Array.from({ length: randomCampaignLevelsPerPage }, (_, index) => firstLevel + index);
+    }
+
+    function getRandomCampaignLevelInfo(levelId) {
+      const number = getCampaignLevelNumber(levelId);
+      if (number === null || number < firstRandomCampaignLevel) return null;
+      return {
+        number,
+        targetRegions: Math.min(
+          maxRandomCampaignRegions,
+          initialRandomCampaignRegions + (number - firstRandomCampaignLevel) * randomCampaignRegionsPerLevel
+        )
+      };
     }
 
     function getNewGameBoardFile() {
@@ -380,21 +445,18 @@
 
     function getUnlockedCampaignLevelId() {
       const progress = localStorage.getItem(campaignProgressStorageKey);
-      return campaignLevelFiles[progress] ? progress : 'tabuleiro-01';
+      return getCampaignLevelNumber(progress) !== null ? progress : 'tabuleiro-01';
     }
 
     function getNextCampaignLevelId(levelId) {
-      const levels = getCampaignLevelOrder();
-      const nextIndex = levels.indexOf(levelId) + 1;
-      return nextIndex > 0 ? levels[nextIndex] || null : null;
+      const levelNumber = getCampaignLevelNumber(levelId);
+      return levelNumber === null ? null : getCampaignLevelId(levelNumber + 1);
     }
 
     function unlockNextCampaignLevel(levelId) {
       const nextLevelId = getNextCampaignLevelId(levelId);
       if (!nextLevelId) return null;
-      const currentUnlockedIndex = getCampaignLevelOrder().indexOf(getUnlockedCampaignLevelId());
-      const nextUnlockedIndex = getCampaignLevelOrder().indexOf(nextLevelId);
-      if (nextUnlockedIndex > currentUnlockedIndex) {
+      if (getCampaignLevelNumber(nextLevelId) > getCampaignLevelNumber(getUnlockedCampaignLevelId())) {
         localStorage.setItem(campaignProgressStorageKey, nextLevelId);
       }
       return nextLevelId;
@@ -410,25 +472,56 @@
       return [10 + ((extraIndex * 17) % 80), 20 + ((extraIndex * 23) % 62)];
     }
 
-    function renderCampaignTrail() {
-      const levels = getCampaignLevelOrder();
+    function renderCampaignTrail(page = selectedCampaignTrailPage) {
+      selectedCampaignTrailPage = Math.max(1, Math.floor(Number(page) || 1));
       const unlockedThrough = campaignAllLevelsUnlockedForTesting
-        ? levels.length - 1
-        : levels.indexOf(getUnlockedCampaignLevelId());
+        ? Number.POSITIVE_INFINITY
+        : getCampaignLevelNumber(getUnlockedCampaignLevelId());
+      const levelNumbers = getCampaignTrailLevelNumbers(selectedCampaignTrailPage);
+      const randomChapter = selectedCampaignTrailPage > 1;
+      const firstLevel = levelNumbers[0];
+      const lastLevel = levelNumbers[levelNumbers.length - 1];
+      campaignTrailScreen.classList.toggle('is-random-campaign', randomChapter);
+      campaignTrailEyebrow.textContent = randomChapter ? 'Cartógrafo estratégico' : 'Iter Romanus';
+      campaignTrailTitle.textContent = randomChapter
+        ? `Fronteira estratégica · página ${selectedCampaignTrailPage - 1}`
+        : 'Trilha da campanha';
+      campaignTrailDescription.textContent = randomChapter
+        ? `Levels ${firstLevel}–${lastLevel}: mapas gerados e guardados neste aparelho.`
+        : 'Escolha um level desbloqueado para continuar sua jornada.';
+      campaignTrailSwitchButton.classList.toggle('is-hidden', selectedCampaignTrailPage === 1);
+      campaignTrailSwitchButton.textContent = 'Página anterior';
+      campaignTrailNextButton.classList.toggle(
+        'is-hidden',
+        selectedCampaignTrailPage === 1
+          ? unlockedThrough < firstRandomCampaignLevel
+          : unlockedThrough <= lastLevel
+      );
+      campaignTrailNextButton.textContent = `Levels ${selectedCampaignTrailPage === 1
+        ? firstRandomCampaignLevel
+        : lastLevel + 1}–${selectedCampaignTrailPage === 1
+        ? firstRandomCampaignLevel + randomCampaignLevelsPerPage - 1
+        : lastLevel + randomCampaignLevelsPerPage}`;
       campaignTrailLevels.replaceChildren();
-      levels.forEach((levelId, index) => {
+      levelNumbers.forEach((levelNumber, chapterIndex) => {
+        const levelId = getCampaignLevelId(levelNumber);
         const button = document.createElement('button');
-        const isUnlocked = index <= unlockedThrough;
+        const isUnlocked = levelNumber <= unlockedThrough;
         button.type = 'button';
-        button.className = `campaign-trail-level${isUnlocked ? '' : ' is-locked'}${index === unlockedThrough ? ' is-current' : ''}`;
+        button.className = `campaign-trail-level${isUnlocked ? '' : ' is-locked'}${levelNumber === unlockedThrough ? ' is-current' : ''}`;
         button.dataset.levelId = levelId;
-        button.textContent = `L${index + 1}`;
+        button.textContent = `L${levelNumber}`;
         button.setAttribute('aria-label', isUnlocked
-          ? `Iniciar Level ${index + 1}`
-          : `Level ${index + 1} bloqueado`);
-        button.title = isUnlocked ? `Iniciar Level ${index + 1}` : 'Conclua o level anterior para desbloquear';
+          ? `Jogar${getRandomCampaignLevelInfo(levelId) ? ' ou rejogar' : ''} Level ${levelNumber}`
+          : `Level ${levelNumber} bloqueado`);
+        button.title = isUnlocked
+          ? `Jogar${getRandomCampaignLevelInfo(levelId) ? ' ou rejogar com o mesmo mapa' : ''} Level ${levelNumber}`
+          : 'Conclua o level anterior para desbloquear';
         button.disabled = !isUnlocked;
-        const [left, top] = getCampaignTrailPosition(index);
+        const randomPositions = [[14, 73], [33, 34], [51, 67], [71, 31], [89, 70]];
+        const [left, top] = randomChapter
+          ? randomPositions[chapterIndex]
+          : getCampaignTrailPosition(levelNumber - 1);
         button.style.left = `${left}%`;
         button.style.top = `${top}%`;
         campaignTrailLevels.appendChild(button);
@@ -437,11 +530,175 @@
 
     function showCampaignTrail() {
       selectedCampaignLevelId = getUnlockedCampaignLevelId();
+      selectedCampaignTrailPage = getCampaignTrailPage(getCampaignLevelNumber(selectedCampaignLevelId));
       renderCampaignTrail();
       newGameOptions.classList.add('is-hidden');
       campaignTrailScreen.classList.remove('is-hidden');
       startMessage.textContent = '';
       campaignTrailBackButton.focus({ preventScroll: true });
+    }
+
+    function openRandomCampaignMapDatabase() {
+      if (!window.indexedDB) {
+        throw new Error('o armazenamento local de mapas aleatórios não está disponível neste aparelho');
+      }
+      if (!randomCampaignMapDatabasePromise) {
+        randomCampaignMapDatabasePromise = new Promise((resolve, reject) => {
+          const request = window.indexedDB.open(randomCampaignMapDatabaseName, 1);
+          request.onupgradeneeded = () => {
+            if (!request.result.objectStoreNames.contains(randomCampaignMapObjectStore)) {
+              request.result.createObjectStore(randomCampaignMapObjectStore);
+            }
+          };
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error || new Error('falha ao abrir o armazenamento de mapas'));
+          request.onblocked = () => reject(new Error('a atualização do armazenamento de mapas está bloqueada'));
+        }).catch((error) => {
+          randomCampaignMapDatabasePromise = null;
+          throw error;
+        });
+      }
+      return randomCampaignMapDatabasePromise;
+    }
+
+    function runRandomCampaignMapTransaction(database, mode, operation) {
+      return new Promise((resolve, reject) => {
+        const transaction = database.transaction(randomCampaignMapObjectStore, mode);
+        let result;
+        transaction.oncomplete = () => resolve(result);
+        transaction.onerror = () => reject(transaction.error || new Error('falha no armazenamento de mapas'));
+        transaction.onabort = () => reject(transaction.error || new Error('o armazenamento de mapas foi cancelado'));
+        result = operation(
+          transaction.objectStore(randomCampaignMapObjectStore),
+          (value) => { result = value; }
+        );
+      });
+    }
+
+    async function migrateLegacyRandomCampaignMaps(database) {
+      const storedMaps = localStorage.getItem(randomCampaignMapStorageKey);
+      if (!storedMaps) return;
+      let maps;
+      try {
+        maps = JSON.parse(storedMaps);
+      } catch (error) {
+        throw new Error(`Não foi possível ler os mapas aleatórios salvos: ${error.message}`);
+      }
+      if (!maps || typeof maps !== 'object' || Array.isArray(maps)) {
+        throw new Error('Não foi possível ler os mapas aleatórios salvos: formato inválido');
+      }
+      const entries = Object.entries(maps);
+      entries.forEach(([levelId, boardData]) => {
+        if (!isGeneratedBoardData(boardData) || boardData.randomMap.campaignLevelId !== levelId) {
+          throw new Error(`o mapa salvo do ${levelId} está inválido`);
+        }
+      });
+      await runRandomCampaignMapTransaction(database, 'readwrite', (store) => {
+        entries.forEach(([levelId, boardData]) => store.put(boardData, levelId));
+      });
+      localStorage.removeItem(randomCampaignMapStorageKey);
+    }
+
+    async function readRandomCampaignMap(levelId) {
+      const database = await openRandomCampaignMapDatabase();
+      await migrateLegacyRandomCampaignMaps(database);
+      return runRandomCampaignMapTransaction(database, 'readonly', (store, setResult) => {
+        const request = store.get(levelId);
+        request.onsuccess = () => {
+          setResult(request.result || null);
+        };
+        return null;
+      });
+    }
+
+    async function saveRandomCampaignMap(levelId, boardData) {
+      const database = await openRandomCampaignMapDatabase();
+      await migrateLegacyRandomCampaignMaps(database);
+      await runRandomCampaignMapTransaction(database, 'readwrite', (store) => store.put(boardData, levelId));
+    }
+
+    function isGeneratedBoardData(data) {
+      return data?.boardType === 'quadrilateral' &&
+        data?.randomMap?.generator === 'cartografo-estrategico' &&
+        Array.isArray(data.blocks);
+    }
+
+    function createRandomBoardData(targetRegions, campaignLevelId = null, rotationsEnabled = false) {
+      const generator = window.WillOfManyMapGenerator;
+      if (typeof generator?.generateRandomBoard !== 'function') {
+        throw new Error('o gerador de mapas aleatórios não foi carregado');
+      }
+      const shouldEnableRotations = campaignLevelId ? true : rotationsEnabled;
+      const boardData = generator.generateRandomBoard(targetRegions, shouldEnableRotations);
+      if (!isGeneratedBoardData(boardData)) {
+        throw new Error('o gerador retornou um mapa incompatível com o jogo');
+      }
+      boardData.randomMap.id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      boardData.randomMap.campaignLevelId = campaignLevelId;
+      if (!campaignLevelId) return boardData;
+
+      const level = getRandomCampaignLevelInfo(campaignLevelId);
+      if (!level) throw new Error(`level aleatório inválido: ${campaignLevelId}`);
+      const objectiveRegions = boardData.blocks.flatMap((block) =>
+        block.regions.map((region) => region.code || region.name)
+      );
+      if (objectiveRegions.length < 25 ||
+          objectiveRegions.some((code) => typeof code !== 'string') ||
+          new Set(objectiveRegions).size !== objectiveRegions.length) {
+        throw new Error('o mapa gerado tem regiões ausentes ou identificadores duplicados');
+      }
+      boardData.campaign = {
+        id: campaignLevelId,
+        name: `Level ${level.number} · Fronteira estratégica`,
+        objectiveRegions,
+        objectiveText: 'conquiste todas as regiões',
+        upgradeDowngradeEnabled: true,
+        rotationEnabled: true,
+        aiActionsEnabled: true,
+        wheatEnabled: true,
+        initialCoins: level.number <= 15 ? 40 : level.number <= 20 ? 60 : 80,
+        coinsPerTurn: level.number <= 15 ? 10 : level.number <= 20 ? 15 : 20,
+        initialWheat: { orange: 100, blue: 100 },
+        preserveCoinsBetweenTurns: false,
+      };
+      return boardData;
+    }
+
+    async function loadRandomCampaignBoard(levelId) {
+      const level = getRandomCampaignLevelInfo(levelId);
+      if (!level) throw new Error(`level aleatório inválido: ${levelId}`);
+      const storedBoard = await readRandomCampaignMap(levelId);
+      if (storedBoard) {
+        if (!isGeneratedBoardData(storedBoard) ||
+            storedBoard.randomMap.campaignLevelId !== levelId ||
+            storedBoard.blocks.some((block) => !Array.isArray(block?.regions))) {
+          throw new Error(`o mapa salvo do Level ${level.number} está inválido`);
+        }
+        const storedRegionCount = storedBoard.blocks.reduce(
+          (count, block) => count + block.regions.length,
+          0
+        );
+        const rotationSettingsMatch = storedBoard.blocks.every((block) =>
+          block.rotationEnabled === true &&
+          block.linearRotationEnabled === [3, 5].includes(block.matrixSize)
+        );
+        if (storedBoard.randomMap.targetRegions === level.targetRegions &&
+            storedBoard.randomMap.actualRegions === level.targetRegions &&
+            storedRegionCount === level.targetRegions &&
+            storedBoard.randomMap.rotationsEnabled === true &&
+            rotationSettingsMatch) {
+          applyRegionData(storedBoard);
+          return;
+        }
+      }
+
+      const boardData = createRandomBoardData(level.targetRegions, levelId);
+      applyRegionData(boardData);
+      try {
+        await saveRandomCampaignMap(levelId, boardData);
+      } catch (error) {
+        throw new Error(`Não foi possível guardar o mapa do Level ${level.number} neste aparelho: ${error.message}`);
+      }
     }
 
     function hideCampaignTrail() {
@@ -455,6 +712,23 @@
       const zeroIncomeAtTurn = Number(level?.coinsPerTurnStopAtTurn);
       if (Number.isFinite(zeroIncomeAtTurn) && turn >= zeroIncomeAtTurn) return 0;
       return Number.isFinite(coinsPerTurn) ? Math.max(0, coinsPerTurn) : 4;
+    }
+
+    function getFarmProductionPerTurn(geometry) {
+      const level = gameRules.getFarmBuildingLevel(geometry);
+      return Number(gameRules.farmProductionByLevel[level]) || 0;
+    }
+
+    function getVillageCoinProductionPerTurn(geometry) {
+      const level = gameRules.getVillageBuildingLevel(geometry);
+      return Number(gameRules.villageCoinProductionByLevel[level]) || 0;
+    }
+
+    function getVillageCoinIncome(team) {
+      return getRegionCalculationOrder().reduce((income, regionCode) => {
+        if (getRegionDominador(regionCode) !== team) return income;
+        return income + getVillageCoinProductionPerTurn(regionGeometryByCode[regionCode]);
+      }, 0);
     }
 
     function resetGameState() {
@@ -574,6 +848,9 @@
         gameMode, humanTeam, aiTeam, gameSpeed, currentTeam, currentTurn,
         aiTurnStartingPoints,
         campaignLevelId: activeCampaignLevel?.id || null,
+        generatedBoardData: currentBoardData?.randomMap
+          ? JSON.parse(JSON.stringify(currentBoardData))
+          : null,
         levelThreeRegionMapVersion: activeCampaignLevel?.id === 'tabuleiro-03' ? 1 : 0,
         boardRotationConfigVersion: 4,
         campaignCollectedBags: [...campaignCollectedBags],
@@ -603,6 +880,10 @@
 
     function isLevelEightCampaign() {
       return isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-08';
+    }
+
+    function isLevelNineCampaign() {
+      return isCampaignGame() && activeCampaignLevel.id === 'tabuleiro-09';
     }
 
     function isCircularBoardDebugMode() {
@@ -650,10 +931,8 @@
           layer: getRegionLayer(code),
           owner,
           force,
-          farmProductionPerTurn: Math.max(
-            0,
-            Number(regionGeometryByCode[code]?.farmProductionPerTurn) || 0
-          )
+          farmBuildingLevel: gameRules.getFarmBuildingLevel(regionGeometryByCode[code]),
+          villageBuildingLevel: gameRules.getVillageBuildingLevel(regionGeometryByCode[code])
         };
         if (includePieceComposition) regions[code].pieces = pieces;
       });
@@ -1113,13 +1392,10 @@
             blue: getTeamSoldierCount(code, 'blue'),
             orangeForce: getTeamSoldierCount(code, 'orange'),
             blueForce: getTeamSoldierCount(code, 'blue'),
-            farmProductionPerTurn: Math.max(
-              0,
-              Number(regionGeometryByCode[code]?.farmProductionPerTurn) || 0
-            ),
+            farmBuildingLevel: gameRules.getFarmBuildingLevel(geometry),
+            villageBuildingLevel: gameRules.getVillageBuildingLevel(geometry),
             centerX: Number(geometry.desirabilityCenterX ?? geometry.centerX),
             centerY: Number(geometry.desirabilityCenterY ?? geometry.centerY),
-            farmLevel: Number(geometry.farmLevel) || 0,
             dominator: getRegionDominador(code)
           };
           rotationTargetsByRegion[code] = getRotationTargetsForRegion(code).map((target) => ({
@@ -2075,7 +2351,7 @@
     }
 
     function getWheatRegionMetrics(regionCode) {
-      const productionPerTurn = Math.max(0, Number(regionGeometryByCode[regionCode]?.farmProductionPerTurn) || 0);
+      const productionPerTurn = getFarmProductionPerTurn(regionGeometryByCode[regionCode]);
       const dominator = getRegionDominador(regionCode);
       const production = { orange: 0, blue: 0 };
       if (productionPerTurn && (dominator === 'orange' || dominator === 'blue')) {
@@ -3516,7 +3792,7 @@
 
     function updateLevelEightDebugControls() {
       const showAiToggle = isLevelEightCampaign();
-      const showDesirabilityData = showAiToggle || isCircularBoardDebugMode();
+      const showDesirabilityData = showAiToggle || isLevelNineCampaign() || isCircularBoardDebugMode();
       levelEightDebugActions.classList.toggle('is-hidden', !showDesirabilityData);
       levelEightDebugActions.classList.toggle('is-single-action', !showAiToggle);
       levelEightAiToggle.classList.toggle('is-hidden', !showAiToggle);
@@ -4207,6 +4483,16 @@
         rankChangeFloatingControls.classList.remove('is-hidden');
         rankChangeFloatingControls.appendChild(expandButton);
         positionCollapsedRankChangeControl(regionCode, expandButton);
+        evaluateCampaignGuideTransitions({
+          type: 'rankChangeAvailable',
+          team: currentTeam,
+          region: regionCode
+        });
+        evaluateCampaignGuideTransitions({
+          type: 'rankChangeAvailable',
+          team: currentTeam,
+          region: regionCode
+        });
         return;
       }
       rankChangeFloatingControls.classList.remove('is-collapsed');
@@ -4397,7 +4683,9 @@
       const forceState = regionCode ? (regionForceStats[regionCode] || { forca: 0, unidades_livres_temp: soldierTotal }) : { forca: 0, unidades_livres_temp: 0 };
       const dominator = getRegionDominador(regionCode);
       const selectedLayer = getRegionLayer(regionCode);
-      const farmProduction = Math.max(0, Number(regionGeometryByCode[regionCode]?.farmProductionPerTurn) || 0);
+      const selectedGeometry = regionCode ? regionGeometryByCode[regionCode] : null;
+      const farmProduction = getFarmProductionPerTurn(selectedGeometry);
+      const villageProduction = getVillageCoinProductionPerTurn(selectedGeometry);
       const bagCoins = Math.max(0, Number(regionGeometryByCode[regionCode]?.bagCoins) || 0);
       const hasUncollectedBag = bagCoins > 0 && !campaignCollectedBags.includes(regionCode);
       const layerFinalForces = { orange: 0, blue: 0 };
@@ -4417,7 +4705,6 @@
       const inferiorText = neighborSummary.inferior.length ? neighborSummary.inferior.join(', ') : 'nenhuma';
       const sameRankText = neighborSummary.sameRank.length ? neighborSummary.sameRank.join(', ') : 'nenhuma';
       regionName.textContent = code;
-      const selectedGeometry = regionCode ? regionGeometryByCode[regionCode] : null;
       const regionBlock = selectedGeometry?.block
         ? quadrilateralBoard?.blocks.find((block) => String(block.name) === selectedGeometry.block)
         : null;
@@ -4543,6 +4830,10 @@
       regionFarm.classList.toggle('is-hidden', farmProduction <= 0);
       regionFarm.textContent = farmProduction > 0
         ? `Fazenda: ${formatStatisticsNumber(farmProduction)} trigo/turno · ${dominator === 'orange' ? 'laranja' : dominator === 'blue' ? 'azul' : 'sem dono'}`
+        : '';
+      regionVillage.classList.toggle('is-hidden', villageProduction <= 0);
+      regionVillage.textContent = villageProduction > 0
+        ? `Povoado nível ${gameRules.getVillageBuildingLevel(selectedGeometry)}: ${formatStatisticsNumber(villageProduction)} moedas/turno · ${dominator === 'orange' ? 'laranja' : dominator === 'blue' ? 'azul' : 'sem dono'}`
         : '';
       regionForce.textContent = `Força: ${Number(forceState.forca || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
       regionFinalForce.textContent = `Força final: ${Number(forceState.forca_final || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
@@ -6176,8 +6467,8 @@
           throw new Error('bloco quadricular inválido');
         }
         const size = Number(block.matrixSize || block.matrix.length);
-        const height = Number(block.L1);
-        const width = Number(block.L2);
+        const width = Number(block.L1);
+        const height = Number(block.L2);
         const initialCenter = block.C_inicial || block.initialCenter;
         const centerX = Number(initialCenter?.x ?? initialCenter?.c_x_inicial);
         const centerY = Number(initialCenter?.y ?? initialCenter?.c_y_inicial);
@@ -6347,7 +6638,8 @@
           centerY: cells.reduce((sum, cell) => sum + cell.y, 0) / cells.length,
           cells,
           maxPieces: Number(definition.maxPieces) || definition.layer,
-          farmProductionPerTurn: Number(definition.farmProductionPerTurn) || 0,
+          farmBuildingLevel: gameRules.getFarmBuildingLevel(definition),
+          villageBuildingLevel: gameRules.getVillageBuildingLevel(definition),
           bagCoins: Math.max(0, Number(definition.bagCoins) || 0),
           initialPieces: definition.initialPieces
         };
@@ -6579,7 +6871,8 @@
             ...regionGeometry,
             desirabilityCenterX: desirabilityCenter.x,
             desirabilityCenterY: desirabilityCenter.y,
-            farmProductionPerTurn: Number(region.farmProductionPerTurn) || 0,
+            farmBuildingLevel: gameRules.getFarmBuildingLevel(region),
+            villageBuildingLevel: gameRules.getVillageBuildingLevel(region),
             bagCoins: Math.max(0, Number(region.bagCoins) || 0),
             initialPieces: Array.isArray(region.initialPieces) ? region.initialPieces.map((piece) => {
               if (!piece || !['orange', 'blue'].includes(piece.team) ||
@@ -7513,11 +7806,11 @@
       layerElement.appendChild(icon);
     }
 
-    function appendCampaignFarmIcon(layerElement, code, geometry, svgNamespace, iconScale, farmTiers) {
-      const production = Math.max(0, Number(geometry.farmProductionPerTurn) || 0);
+    function appendCampaignFarmIcon(layerElement, code, geometry, svgNamespace, iconScale) {
+      const level = gameRules.getFarmBuildingLevel(geometry);
+      const production = Number(gameRules.farmProductionByLevel[level]) || 0;
       if (!production) return;
-      const tierIndex = farmTiers.findIndex((value) => production <= value);
-      const tier = tierIndex === -1 ? farmTiers.length : tierIndex + 1;
+      const tier = level;
       const angle = ((geometry.startAngle + geometry.endAngle) / 2) * Math.PI / 180;
       const radius = (geometry.innerRadius + geometry.outerRadius) / 2;
       const centerX = geometry.shape === 'circular'
@@ -7574,11 +7867,70 @@
       layerElement.appendChild(icon);
     }
 
+    function appendCampaignVillageIcon(layerElement, code, geometry, svgNamespace, iconScale) {
+      const level = gameRules.getVillageBuildingLevel(geometry);
+      const production = Number(gameRules.villageCoinProductionByLevel[level]) || 0;
+      if (!production) return;
+      const angle = ((geometry.startAngle + geometry.endAngle) / 2) * Math.PI / 180;
+      const radius = (geometry.innerRadius + geometry.outerRadius) / 2;
+      const centerX = geometry.shape === 'circular'
+        ? geometry.centerX + radius * Math.cos(angle)
+        : geometry.centerX;
+      const centerY = geometry.shape === 'circular'
+        ? geometry.centerY - radius * Math.sin(angle)
+        : geometry.centerY;
+      const icon = document.createElementNS(svgNamespace, 'g');
+      icon.setAttribute('transform', `translate(${centerX + 16} ${centerY}) scale(${iconScale * 0.8})`);
+      icon.setAttribute('aria-label',
+        `Povoado nível ${level}: ${formatStatisticsNumber(production)} moedas por turno`);
+      icon.setAttribute('pointer-events', 'none');
+      icon.dataset.region = code;
+      icon.dataset.level = String(level);
+
+      const background = document.createElementNS(svgNamespace, 'circle');
+      background.setAttribute('r', '12');
+      background.setAttribute('fill', ['#f6e3a5', '#edcf73', '#e4b943', '#dca52b', '#c98720'][level - 1]);
+      background.setAttribute('stroke', '#634c1d');
+      background.setAttribute('stroke-width', '1.5');
+      icon.appendChild(background);
+
+      const house = document.createElementNS(svgNamespace, 'path');
+      house.setAttribute('d', 'M-8 0 L0-7 8 0 V7 H-8 Z M-2 7 V2 H2 V7');
+      house.setAttribute('fill', '#fff7df');
+      house.setAttribute('stroke', '#65451f');
+      house.setAttribute('stroke-width', '1.5');
+      house.setAttribute('stroke-linejoin', 'round');
+      icon.appendChild(house);
+
+      const levelBadge = document.createElementNS(svgNamespace, 'circle');
+      levelBadge.setAttribute('cx', '10');
+      levelBadge.setAttribute('cy', '-10');
+      levelBadge.setAttribute('r', '7');
+      levelBadge.setAttribute('fill', '#49331f');
+      levelBadge.setAttribute('stroke', '#fff7df');
+      levelBadge.setAttribute('stroke-width', '1.5');
+      icon.appendChild(levelBadge);
+
+      const levelLabel = document.createElementNS(svgNamespace, 'text');
+      levelLabel.setAttribute('x', '10');
+      levelLabel.setAttribute('y', '-10');
+      levelLabel.setAttribute('fill', '#fff');
+      levelLabel.setAttribute('font-size', '8');
+      levelLabel.setAttribute('font-weight', '800');
+      levelLabel.setAttribute('text-anchor', 'middle');
+      levelLabel.setAttribute('dominant-baseline', 'central');
+      levelLabel.textContent = String(level);
+      icon.appendChild(levelLabel);
+
+      const title = document.createElementNS(svgNamespace, 'title');
+      title.textContent =
+        `Povoado em ${code}, nível ${level}: ${formatStatisticsNumber(production)} moedas por turno`;
+      icon.appendChild(title);
+      layerElement.appendChild(icon);
+    }
+
     function renderBoardLayers() {
       const svgNamespace = 'http://www.w3.org/2000/svg';
-      const farmTiers = Object.keys(window.WillOfManyRules.farmProductionByLevel)
-        .sort((first, second) => Number(first) - Number(second))
-        .map((level) => window.WillOfManyRules.farmProductionByLevel[level]);
       const iconScale = 908 / ((stagePanel.getBoundingClientRect().width || 780) * Math.max(1, stageZoom));
       boardLayerElements.forEach((layerElement, layer) => {
         if (getCircularBlocks().length) layerElement.style.transform = 'rotate(0deg)';
@@ -7632,8 +7984,8 @@
 
         regions.forEach(([code, geometry]) => {
           const renderLayer = getRegionRenderLayer(geometry);
-          const production = Math.max(0, Number(geometry.farmProductionPerTurn) || 0);
-          appendCampaignFarmIcon(renderLayer, code, geometry, svgNamespace, iconScale, farmTiers);
+          appendCampaignFarmIcon(renderLayer, code, geometry, svgNamespace, iconScale);
+          appendCampaignVillageIcon(renderLayer, code, geometry, svgNamespace, iconScale);
           appendCampaignBagIcon(renderLayer, code, geometry, svgNamespace, iconScale);
         });
       });
@@ -8130,7 +8482,7 @@
         campaignVictoryReplayButton.classList.toggle('is-hidden', !isLevelEightCampaign());
         campaignNextLevelButton.classList.toggle('is-hidden', !campaignNextLevelId);
         if (campaignNextLevelId) {
-          const nextLevelNumber = getCampaignLevelOrder().indexOf(campaignNextLevelId) + 1;
+          const nextLevelNumber = getCampaignLevelNumber(campaignNextLevelId);
           campaignNextLevelButton.textContent = `Continuar para o Level ${nextLevelNumber}`;
         }
         finalModal.classList.add('is-hidden');
@@ -8286,6 +8638,7 @@
         regionRotationIndicator,
         regionRotationBlockName,
         trashDropZone,
+        rankChangeButton: rankChangeFloatingControls,
         promotionButton: openPromotionButton,
         relegationButton: openRelegationButton,
         rotationPassPanelTitle,
@@ -8444,6 +8797,10 @@
         const region = when.region;
         return !!region && campaignCollectedBags.includes(region) &&
           (!when.team || getRegionDominador(region) === when.team);
+      }
+      if (when.type === 'rankChangeAvailable') {
+        return event?.type === 'rankChangeAvailable' &&
+          (!when.team || when.team === event.team);
       }
       if (!event || event.type !== when.type) return false;
       if (when.type === 'regionCaptured') {
@@ -9347,6 +9704,7 @@
           ? getCampaignCoinsPerTurn(activeCampaignLevel, currentTurn)
           : getTurnPointIncome(currentTurn);
       }
+      pontosDoTurn[currentTeam] += getVillageCoinIncome(currentTeam);
       aiTurnStartingPoints = currentTeam === aiTeam ? pontosDoTurn[currentTeam] : null;
       const wheatReport = isWheatEnabled() ? applyWheatForTurn(currentTeam) : null;
       renderPiecePurchaseButtons();
@@ -9781,7 +10139,7 @@
       if (levelEightAiEnabled && currentTeam === aiTeam) scheduleAiTurn();
     });
     levelEightViewDataButton.addEventListener('click', () => {
-      if (!isLevelEightCampaign() && !isCircularBoardDebugMode()) return;
+      if (!isLevelEightCampaign() && !isLevelNineCampaign() && !isCircularBoardDebugMode()) return;
       renderLevelEightDesirabilityData();
       levelEightDataModal.classList.remove('is-hidden');
       levelEightDataModal.setAttribute('aria-hidden', 'false');
@@ -10481,6 +10839,20 @@
           return;
         }
         gameMode = 'online';
+        if (message.state.generatedBoardData) {
+          try {
+            if (!isGeneratedBoardData(message.state.generatedBoardData)) {
+              throw new Error('o estado recebido contém um mapa aleatório inválido');
+            }
+            if (currentBoardData?.randomMap?.id !==
+                message.state.generatedBoardData.randomMap.id) {
+              applyRegionData(message.state.generatedBoardData);
+            }
+          } catch (error) {
+            onlineStatus.textContent = `Não foi possível carregar o mapa recebido: ${error.message}`;
+            return;
+          }
+        }
         localStorage.setItem('will-of-many-save', JSON.stringify({
           ...message.state,
           gameMode: 'online',
@@ -10901,10 +11273,32 @@
 
     async function beginConfiguredGame() {
       try {
-        await loadBoardFile(getNewGameBoardFile());
+        const randomCampaignLevel = gameMode === 'campaign'
+          ? getRandomCampaignLevelInfo(selectedCampaignLevelId)
+          : null;
+        if (randomCampaignLevel) {
+          await loadRandomCampaignBoard(selectedCampaignLevelId);
+        } else if ((gameMode === 'online' && onlineRandomMapCheckbox.checked) ||
+                   (gameMode === 'ai' && aiRandomMapCheckbox.checked)) {
+          const targetRegions = Number(
+            gameMode === 'online' ? onlineRandomMapTarget.value : aiRandomMapTarget.value
+          );
+          const rotationsEnabled = gameMode === 'online'
+            ? onlineRandomMapRotationsCheckbox.checked
+            : aiRandomMapRotationsCheckbox.checked;
+          if (!Number.isInteger(targetRegions) || targetRegions < 25 || targetRegions > 900) {
+            throw new Error('escolha uma meta de 25 a 900 regiões para o mapa aleatório');
+          }
+          applyRegionData(createRandomBoardData(targetRegions, null, rotationsEnabled));
+        } else {
+          await loadBoardFile(getNewGameBoardFile());
+        }
       } catch (error) {
         startMessage.textContent = gameMode === 'campaign'
-          ? `Não foi possível carregar o level da campanha: ${error.message}`
+          ? `Não foi possível preparar o level da campanha: ${error.message}`
+          : ((gameMode === 'online' && onlineRandomMapCheckbox.checked) ||
+             (gameMode === 'ai' && aiRandomMapCheckbox.checked))
+            ? `Não foi possível preparar o mapa aleatório: ${error.message}`
           : `Não foi possível carregar o tabuleiro padrão: ${error.message}`;
         return;
       }
@@ -10947,6 +11341,7 @@
         pontosDoTurn.blue = activeCampaignLevel.aiActionsEnabled === false
           ? 0
           : campaignStartingBalance;
+        pontosDoTurn[currentTeam] += getVillageCoinIncome(currentTeam);
         if (activeCampaignLevel.initialWheat && typeof activeCampaignLevel.initialWheat === 'object') {
           for (const team of ['orange', 'blue']) {
             const balance = Number(activeCampaignLevel.initialWheat[team]);
@@ -10994,6 +11389,11 @@
       localModeHint.classList.toggle('is-hidden', gameMode !== 'local');
       bluetoothOptions.classList.toggle('is-hidden', gameMode !== 'bluetooth');
       onlineOptions.classList.toggle('is-hidden', gameMode !== 'online');
+      onlineRandomMapSizeLabel.classList.toggle('is-hidden', !onlineRandomMapCheckbox.checked);
+      onlineRandomMapRotationsLabel.classList.toggle('is-hidden', !onlineRandomMapCheckbox.checked);
+      document.querySelector('#ai-random-map-option').classList.toggle('is-hidden', gameMode !== 'ai');
+      aiRandomMapSizeLabel.classList.toggle('is-hidden', !aiRandomMapCheckbox.checked);
+      aiRandomMapRotationsLabel.classList.toggle('is-hidden', !aiRandomMapCheckbox.checked);
       document.querySelector('#speed-options').classList.toggle('is-hidden', gameMode === 'online' || gameMode === 'campaign');
       document.querySelector('#speed-choice-label').classList.toggle('is-hidden', gameMode === 'online' || gameMode === 'campaign');
       startGameButton.classList.toggle('is-hidden', gameMode === 'bluetooth' || gameMode === 'online');
@@ -11015,12 +11415,34 @@
         startMessage.textContent = 'Uma partida Bluetooth desconectada não pode ser retomada. Inicie uma nova sala.';
         return;
       }
-      if (saved?.gameMode === 'campaign') {
-        selectedCampaignLevelId = campaignLevelFiles[saved.campaignLevelId]
-          ? saved.campaignLevelId
-          : getUnlockedCampaignLevelId();
+      if (saved?.gameMode === 'campaign' && getCampaignLevelNumber(saved.campaignLevelId) !== null) {
+        selectedCampaignLevelId = saved.campaignLevelId;
+      }
+      if (saved?.generatedBoardData) {
         try {
-          await loadBoardFile(campaignLevelFiles[selectedCampaignLevelId]);
+          if (!isGeneratedBoardData(saved.generatedBoardData)) {
+            throw new Error('o mapa aleatório salvo tem um formato inválido');
+          }
+          applyRegionData(saved.generatedBoardData);
+        } catch (error) {
+          startMessage.textContent = `Não foi possível carregar o mapa salvo: ${error.message}`;
+          return;
+        }
+      } else if (saved?.gameMode === 'campaign') {
+        if (getCampaignLevelNumber(saved.campaignLevelId) === null) {
+          selectedCampaignLevelId = getUnlockedCampaignLevelId();
+        }
+        try {
+          const randomLevel = getRandomCampaignLevelInfo(selectedCampaignLevelId);
+          if (randomLevel) {
+            const storedBoard = await readRandomCampaignMap(selectedCampaignLevelId);
+            if (!isGeneratedBoardData(storedBoard)) {
+              throw new Error(`o mapa do Level ${randomLevel.number} não está salvo neste aparelho`);
+            }
+            applyRegionData(storedBoard);
+          } else {
+            await loadBoardFile(campaignLevelFiles[selectedCampaignLevelId]);
+          }
         } catch (error) {
           startMessage.textContent = `Não foi possível carregar o level salvo: ${error.message}`;
           return;
@@ -11202,6 +11624,20 @@
         startGameButton.disabled = !selectedStartSpeed || (gameMode === 'ai' && !selectedStartColor);
       });
     });
+    onlineRandomMapCheckbox.addEventListener('change', () => {
+      onlineRandomMapSizeLabel.classList.toggle('is-hidden', !onlineRandomMapCheckbox.checked);
+      onlineRandomMapRotationsLabel.classList.toggle('is-hidden', !onlineRandomMapCheckbox.checked);
+    });
+    onlineRandomMapTarget.addEventListener('input', () => {
+      onlineRandomMapTargetValue.value = onlineRandomMapTarget.value;
+    });
+    aiRandomMapCheckbox.addEventListener('change', () => {
+      aiRandomMapSizeLabel.classList.toggle('is-hidden', !aiRandomMapCheckbox.checked);
+      aiRandomMapRotationsLabel.classList.toggle('is-hidden', !aiRandomMapCheckbox.checked);
+    });
+    aiRandomMapTarget.addEventListener('input', () => {
+      aiRandomMapTargetValue.value = aiRandomMapTarget.value;
+    });
     startGameButton.addEventListener('click', beginConfiguredGame);
     campaignMenuButton.addEventListener('click', returnCampaignToMenu);
     campaignRestartButton.addEventListener('click', restartCampaignLevel);
@@ -11288,6 +11724,21 @@
       startMessage.textContent = '';
     });
     campaignTrailBackButton.addEventListener('click', hideCampaignTrail);
+    campaignTrailSwitchButton.addEventListener('click', () => {
+      if (selectedCampaignTrailPage <= 1) return;
+      renderCampaignTrail(selectedCampaignTrailPage - 1);
+    });
+    campaignTrailNextButton.addEventListener('click', () => {
+      const unlockedThrough = campaignAllLevelsUnlockedForTesting
+        ? Number.POSITIVE_INFINITY
+        : getCampaignLevelNumber(getUnlockedCampaignLevelId());
+      const pageLevels = getCampaignTrailLevelNumbers(selectedCampaignTrailPage);
+      const lastLevel = pageLevels[pageLevels.length - 1];
+      if (selectedCampaignTrailPage === 1
+        ? unlockedThrough < firstRandomCampaignLevel
+        : unlockedThrough <= lastLevel) return;
+      renderCampaignTrail(selectedCampaignTrailPage + 1);
+    });
     campaignTrailLevels.addEventListener('click', async (event) => {
       const levelButton = event.target.closest('button[data-level-id]');
       if (!levelButton || levelButton.disabled) return;
