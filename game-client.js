@@ -6094,8 +6094,16 @@
       if (!point) return;
       const layer = getRegionLayer(regionCode);
       const rect = stagePanel.getBoundingClientRect();
-      const scale = Number(focusScale) || Number(currentBoardData?.regionFocusScale) || 1.8;
-      if (currentBoardData?.boardType === 'mixed' ||
+      const isRandomMap = currentBoardData?.randomMap?.generator === 'cartografo-estrategico';
+      const minimumScale = Number(currentBoardData?.regionFocusScale) || 1.8;
+      const scale = Number(focusScale) || (isRandomMap
+        ? gameRules.getQuadrilateralCellFocusScale(
+          regionGeometryByCode[regionCode]?.cells,
+          rect.width,
+          minimumScale
+        )
+        : minimumScale);
+      if (currentBoardData?.boardType === 'mixed' || isRandomMap ||
           ['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08']
             .includes(currentBoardData?.campaign?.id)) {
         stageZoom = scale;
@@ -6245,21 +6253,14 @@
     function getSafeSlots(layerNumber, regionNumber, applyRotation = true) {
       const regionCode = `L${layerNumber}-${regionNumber}`;
       const geometry = regionGeometryByCode[regionCode];
-      if (['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08']
-        .includes(currentBoardData?.campaign?.id) &&
+      const isRandomMap = currentBoardData?.randomMap?.generator === 'cartografo-estrategico';
+      if ((isRandomMap || ['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08']
+        .includes(currentBoardData?.campaign?.id)) &&
           geometry?.shape === 'quadrilateral' && Array.isArray(geometry.cells)) {
-        return geometry.cells.flatMap((cell) => {
-          const slots = [];
-          for (let row = 0; row < 2; row += 1) {
-            for (let column = 0; column < 4; column += 1) {
-              slots.push({
-                x: (cell.x + ((column + 0.5) / 4 - 0.5) * cell.width) / 908 * 100,
-                y: (cell.y + ((row + 0.5) / 2 - 0.5) * cell.height) / 908 * 100
-              });
-            }
-          }
-          return slots;
-        }).slice(0, 8);
+        return gameRules.getQuadrilateralCellSlots(
+          geometry.cells,
+          isRandomMap ? Number(geometry.maxPieces) || 8 : 8
+        );
       }
 
       const tiles = Array.isArray(allRegionMasks?.[layerNumber]?.[String(regionNumber)]) ? allRegionMasks[layerNumber][String(regionNumber)] : [];
@@ -6467,8 +6468,10 @@
           throw new Error('bloco quadricular inválido');
         }
         const size = Number(block.matrixSize || block.matrix.length);
-        const width = Number(block.L1);
-        const height = Number(block.L2);
+        const { width, height } = gameRules.getQuadrilateralCellDimensions(
+          block,
+          data?.randomMap?.generator === 'cartografo-estrategico'
+        );
         const initialCenter = block.C_inicial || block.initialCenter;
         const centerX = Number(initialCenter?.x ?? initialCenter?.c_x_inicial);
         const centerY = Number(initialCenter?.y ?? initialCenter?.c_y_inicial);

@@ -46,9 +46,9 @@ ou de integração puderem afetá-lo.
 | `game.css` | Estilos de desktop, mobile, campanha e tabuleiro. | Alteração visual ou responsiva. |
 | `game-client.js` | Estado de partida, interações, desenho do tabuleiro, menus, campanha e integrações web. Carregado depois dos módulos de regras/IA. | Mecânica ou fluxo do cliente ainda não extraído. |
 | `game-rules.js` | Funções puras compartilhadas de composição, contagem, custo, reembolso e agrupamento de conflitos; também define as tabelas factuais `farmProductionByLevel` e `villageCoinProductionByLevel`. Expõe `WillOfManyRules` no navegador e CommonJS para testes. | Alterar regras determinísticas sem acesso ao DOM. |
-| `will-of-many-ai.js` | Escolha e análise de ações da IA; exporta `window.WillOfManyAI.chooseAction(snapshot)` e `calculateDesirability(snapshot)`. Calcula desejabilidade interna, externa e total por região, depois escolhe uma região própria ou fronteiriça e planeja compras, movimento, promoção, rebaixamento, reciclagem ou rotação. | Comportamento do oponente automático. |
+| `will-of-many-ai.js` | Escolha e análise de ações da IA; exporta `window.WillOfManyAI.chooseAction(snapshot)` e `calculateDesirability(snapshot)`. Calcula desejabilidade interna, externa e total por região, avalia o valor econômico descontado de povoados alcançáveis e planeja compras, movimento, promoção, rebaixamento, reciclagem, busca de fazendas e rotação. | Comportamento do oponente automático. |
 | `random-map-generator.js` | Bundle do núcleo TypeScript de `cartografo-estrategico`, carregado pelo cliente clássico antes de `game-client.js`; exporta `WillOfManyMapGenerator.generateRandomBoard(targetRegions, rotationsEnabled)`. | Gerar um tabuleiro quadricular compartilhado em campanha, Contra IA e partidas online. |
-| `will-of-many-ai-config.json` | Valores editáveis de desejabilidade por rank/ocupação, faixas de força relativa, bônus de fazenda/suporte, proporções de tropas, kernel de distância, penalidades temporárias e critérios de reciclagem, incluindo a regra de turno acionada por saldo inicial alto e o limite de ações por turno. Custos e legalidade permanecem definidos pelo motor/regras. | Ajustar estratégia sem alterar `will-of-many-ai.js`. |
+| `will-of-many-ai-config.json` | Valores editáveis de desejabilidade por rank/ocupação, faixas de força relativa, bônus de fazenda/suporte, proporções de tropas, kernel de distância, penalidades temporárias e critérios de reciclagem, incluindo a regra de saldo inicial alto, limite de ações, horizonte econômico dos povoados e reserva preventiva de trigo. Custos e legalidade permanecem definidos pelo motor/regras. | Ajustar estratégia sem alterar `will-of-many-ai.js`. |
 | `tests/game-rules.test.js` | Testes de caracterização do módulo de regras, usando `node:test` sem dependências adicionais. | Validar composição, conversões de unidades, custos e reembolsos. |
 | `tests/asset-entrypoints.test.js`, `tests/random-map-generator.test.js` | Verificam a ordem/empacotamento dos assets e o formato e limites dos mapas gerados. | Alterar recursos de entrada ou o adaptador do Cartógrafo. |
 | `tabuleiro-01.json`–`tabuleiro-09.json` e Levels 10+ | Os níveis estáticos configuram regiões, peças iniciais, moedas, objetivo, rotação e guia. A partir do Level 10, os mapas são gerados com exatamente `min(900, 60 + 5 × (level − 10))` regiões, em páginas de cinco níveis. Os níveis aleatórios habilitam rotação em anel em todos os blocos e rotação linear em matrizes 3×3 e 5×5. Cada mapa fica salvo por level no IndexedDB local para manter o mesmo mapa ao rejogar; mapas antigos sem essas regras de rotação são regenerados. A economia não acumula saldo: Levels 10–15 começam com 40 moedas e recebem 10 por turno; Levels 16–20, 60 e 15; Level 21 em diante, 80 e 20. | Alterar campanha estática ou progressão dos mapas aleatórios. |
@@ -136,6 +136,12 @@ valores legados de produção pela tabela factual compartilhada em
 `X-1` ainda com unidades livres temporárias recebem o bônus de falta de suporte.
 Se a força azul estiver abaixo da proporção entre ranks adjacentes, regiões do
 rank externo defasado recebem o bônus de necessidade de tropas.
+Povoados livres ou inimigos recebem um bônus econômico calculado pela renda
+futura descontada no horizonte configurado, descontando custo estimado pelo
+número de passos na vizinhança e limitando o resultado ao máximo configurado.
+O planejador de trigo antecipa a busca por fazendas quando o estoque projetado
+se esgotaria dentro de `proactiveReserveTurns`; saves antigos sem saldo de trigo
+continuam usando o comportamento imediato de déficit.
 
 Penalidades temporárias são tipadas e configuráveis individualmente. A de
 inacessibilidade só é aplicada quando não existe vizinho geométrico de rank
@@ -207,7 +213,12 @@ do motor.
    Mapas aleatórios de campanha habilitam rotação em anel em todos os blocos e
    rotação linear somente em matrizes 3×3 e 5×5. Em mapas aleatórios contra IA
    ou online, o criador escolhe se habilita as rotações; o estado segue salvo e
-   sincronizado junto do tabuleiro.
+   sincronizado junto do tabuleiro. As regiões quadriculares aleatórias usam
+   posições de peças em grade 4×2, limitadas por `maxPieces`. Ao selecionar
+   uma região, o zoom é calculado conforme o tamanho da célula e a largura do
+   painel, garantindo ao menos 128×64 px para regiões que comportam oito peças;
+   isso mantém a distribuição legível em telas pequenas sem reduzir ainda mais
+   a visão global.
 4. Ações como comprar, mover, promover, descartar, girar ou resolver uma guerra
    atualizam `regionPiecesByRegion` e estruturas relacionadas.
 5. As ações que alteram a composição/posição atualizam forças, visuais, controles
@@ -226,9 +237,12 @@ do motor.
    o seletor pede primeiro o bloco. Geometria, peças e vizinhança são atualizadas
    em conjunto. Blocos quadriculares rotativos são selecionados um por vez e
    aplicam a rotação recursiva dos anéis da matriz apenas ao bloco escolhido.
-   Nas matrizes quadriculares, as colunas crescem para a direita (eixo X, passo
-   `L1`) e as linhas crescem para baixo (eixo Y, passo `L2`); mantenha essa
-   convenção ao derivar geometria, vizinhos e destaques de rotação.
+   Nos mapas gerados pelo Cartógrafo, as colunas crescem para a direita (eixo X,
+   passo `L1`) e as linhas para baixo (eixo Y, passo `L2`). Os tabuleiros
+   estáticos da campanha (Levels 1–9) preservam a convenção legada: `L2` é a
+   largura horizontal e `L1` a altura vertical. A conversão é selecionada pelo
+   marcador `randomMap.generator`; não aplique a convenção do gerador aos
+   tabuleiros estáticos.
    `rotateQuadrilateralBlocksForLayer` reaplica o tabuleiro após atualizar a
    matriz; `applyRegionData` recompõe máscaras e recalcula as vizinhanças de
    todas as camadas. Regiões quadriculares de blocos distintos também podem ser

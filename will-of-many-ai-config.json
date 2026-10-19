@@ -55,9 +55,20 @@
   "_rankChange_readme": "Pesos da busca por UPGRADE/DOWNGRADE: minimumPriority maior deixa a IA menos agressiva; instabilityWeight pontua qualquer regiao instavel; extremeInstabilityBonus favorece regioes sem vizinhos dos ranks adjacentes; stabilizationBonus favorece a conversao que torna a regiao estavel; downgradeTieBreakWeight desempata quando ambas as direcoes estabilizam. O limite de comprometimento e fixo: cada operacao pode envolver no maximo 5% das tropas totais e 5% da forca final total da IA.",
 
   "wheat": {
-    "seekFarmsWhenDeficit": true
+    "seekFarmsWhenDeficit": true,
+    "proactiveReserveTurns": 2
   },
-  "_wheat_readme": "Quando o consumo de trigo da IA superar a producao, seekFarmsWhenDeficit=true faz a IA priorizar avancar e comprar tropas na direcao da fazenda livre mais proxima.",
+  "_wheat_readme": "Quando o consumo de trigo superar a producao, a IA antecipa a busca por fazendas se o estoque atual nao cobrir proactiveReserveTurns turnos de deficit. seekFarmsWhenDeficit=true habilita essa protecao.",
+
+  "povoados": {
+    "enabled": true,
+    "discountFactor": 0.85,
+    "evaluationHorizonTurns": 8,
+    "captureCostPerStep": 4,
+    "desirabilityWeight": 0.5,
+    "maxDesirabilityBonus": 500
+  },
+  "_povoados_readme": "A IA estima o valor presente da renda futura dos povoados alcancaveis pela vizinhanca do tabuleiro e adiciona o bonus limitado a maxDesirabilityBonus a desejabilidade do alvo. Os valores reais das construcoes continuam definidos em game-rules.js.",
 
   "desirability": {
     "baseScoreByLayer": {

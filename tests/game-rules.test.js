@@ -6,6 +6,8 @@ const rules = require('../game-rules.js');
 const aiConfig = require('../will-of-many-ai-config.json');
 const circularBoard = require('../regioes-will-of-many-circular.json');
 const levelFiveBoard = require('../tabuleiro-05.json');
+const campaignBoards = Array.from({ length: 9 }, (_, index) =>
+  require(`../tabuleiro-${String(index + 1).padStart(2, '0')}.json`));
 require('../will-of-many-ai.js');
 const gameAI = globalThis.WillOfManyAI;
 
@@ -20,6 +22,35 @@ test('piece stage weights preserve the current soldier values', () => {
     a: 5040
   });
   assert.deepEqual(rules.stageOrder, ['a', 'b', 'c', 'd', 'e', 'f', 'g']);
+});
+
+test('quadrilateral random-map regions get eight slots and enough focus zoom at 800x400', () => {
+  const redRegionCell = { x: 454, y: 454, width: 18.5, height: 9.25 };
+  const slots = rules.getQuadrilateralCellSlots([redRegionCell], 8);
+  const focusScale = rules.getQuadrilateralCellFocusScale([redRegionCell], 400);
+
+  assert.equal(slots.length, 8);
+  assert.equal(new Set(slots.map(({ x, y }) => `${x},${y}`)).size, 8);
+  assert.ok(focusScale > 1.8);
+  assert.ok(redRegionCell.width * 400 / 908 * focusScale >= 128);
+  assert.ok(redRegionCell.height * 400 / 908 * focusScale >= 64);
+  assert.equal(rules.getQuadrilateralCellSlots([redRegionCell], 3).length, 3);
+});
+
+test('static campaign boards keep their original cell axes while random maps use generator axes', () => {
+  campaignBoards.forEach((board) => {
+    board.blocks.filter((block) => block.type === 'quadrilateral').forEach((block) => {
+      assert.deepEqual(rules.getQuadrilateralCellDimensions(block), {
+        width: Number(block.L2),
+        height: Number(block.L1)
+      }, `${board.campaign.id}/${block.name}`);
+    });
+  });
+
+  assert.deepEqual(rules.getQuadrilateralCellDimensions({ L1: 1000, L2: 500 }, true), {
+    width: 1000,
+    height: 500
+  });
 });
 
 test('rank change requirements cover every supported source layer', () => {

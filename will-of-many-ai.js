@@ -1,8 +1,8 @@
 (function (root, rules) {
   'use strict';
 
-  if (!rules || !rules.farmProductionByLevel) {
-    throw new Error('WillOfManyRules.farmProductionByLevel must be loaded before the AI.');
+  if (!rules || !rules.farmProductionByLevel || !rules.villageCoinProductionByLevel) {
+    throw new Error('WillOfManyRules building production tables must be loaded before the AI.');
   }
   var farmProductionByLevel = rules.farmProductionByLevel;
   var weights = { g: 1, f: 7, e: 42, d: 210, c: 840, b: 2520, a: 5040 };
@@ -33,7 +33,15 @@
       stabilizationBonus: 2,
       downgradeTieBreakWeight: 0.01
     },
-    wheat: { seekFarmsWhenDeficit: true },
+    wheat: { seekFarmsWhenDeficit: true, proactiveReserveTurns: 2 },
+    povoados: {
+      enabled: true,
+      discountFactor: 0.85,
+      evaluationHorizonTurns: 8,
+      captureCostPerStep: 4,
+      desirabilityWeight: 0.5,
+      maxDesirabilityBonus: 500
+    },
     desirability: {
       baseScoreByLayer: {
       8: { free: 50, allied: 30, enemy: 150 },
@@ -173,6 +181,50 @@
       return typeof neighbor === 'string' && neighbor !== code &&
         result.indexOf(neighbor) === index;
     });
+  }
+
+  function getDistancesFromOwnedRegions(snapshot, team, human, codes) {
+    var distances = {};
+    var queue = [];
+    codes.forEach(function (code) {
+      if (getRegionOwner(snapshot, code, team, human) !== team) return;
+      distances[code] = 0;
+      queue.push(code);
+    });
+    for (var index = 0; index < queue.length; index += 1) {
+      var code = queue[index];
+      getSnapshotNeighbors(snapshot, code).forEach(function (neighbor) {
+        if (distances[neighbor] !== undefined) return;
+        distances[neighbor] = distances[code] + 1;
+        queue.push(neighbor);
+      });
+    }
+    return distances;
+  }
+
+  function calculatePovoadoNetPresentValue(production, distance, settings) {
+    settings = object(settings);
+    var horizon = Math.max(1, Math.floor(Number(settings.evaluationHorizonTurns) || 8));
+    var discountFactor = Number(settings.discountFactor);
+    if (!Number.isFinite(discountFactor) || discountFactor < 0 || discountFactor > 1) {
+      discountFactor = 0.85;
+    }
+    var distanceTurns = Math.max(0, Math.floor(Number(distance) || 0));
+    var discountedIncome = 0;
+    for (var turn = distanceTurns + 1; turn <= horizon; turn += 1) {
+      discountedIncome += production * Math.pow(discountFactor, turn);
+    }
+    var captureCost = distanceTurns *
+      Math.max(0, Number(settings.captureCostPerStep) || 0);
+    return Math.max(0, discountedIncome - captureCost);
+  }
+
+  function shouldSeekFarmForWheat(snapshot, team, balanceInfo, reserveTurns) {
+    var balance = Number(balanceInfo && balanceInfo.balance);
+    if (!Number.isFinite(balance) || balance >= 0) return false;
+    var stock = Number(object(object(snapshot).wheatBalances)[team]);
+    var turns = Math.max(0, Number(reserveTurns) || 0);
+    return !Number.isFinite(stock) || turns === 0 || stock + balance * turns <= 0;
   }
 
   function getSnapshotFreeUnits(snapshot, code, side) {
@@ -478,6 +530,10 @@
 
     var wheatDeficit = snapshot.wheatEnabled === true &&
       getSnapshotWheatBalance(snapshot, team) < 0;
+    var povoadoSettings = object(config.povoados);
+    var villageDistances = povoadoSettings.enabled === true
+      ? getDistancesFromOwnedRegions(snapshot, team, human, codes)
+      : {};
     var farmBonuses = object(settings.farmBonusByLevel);
     var wheatFarmBonus = Number(settings.wheatDeficitFarmBonus) || 0;
     var unsupportedBonus = Number(settings.unsupportedNeighborBonus) || 0;
@@ -524,6 +580,28 @@
               value: wheatFarmBonus
             });
           }
+        }
+      }
+      var villageLevel = Number(region.villageBuildingLevel);
+      var villageProduction = Number(rules.villageCoinProductionByLevel[villageLevel]) || 0;
+      var villageDistance = villageDistances[code];
+      if (villageProduction > 0 && score.owner !== team &&
+          Number.isFinite(villageDistance)) {
+        var villageValue = calculatePovoadoNetPresentValue(
+          villageProduction,
+          villageDistance,
+          povoadoSettings
+        ) * Math.max(0, Number(povoadoSettings.desirabilityWeight) || 0);
+        var villageBonus = Math.min(
+          Math.max(0, Number(povoadoSettings.maxDesirabilityBonus) || 0),
+          villageValue
+        );
+        score.internal += villageBonus;
+        if (villageBonus !== 0) {
+          score.internalBreakdown.push({
+            label: 'Povoado nível ' + villageLevel + ' (valor econômico descontado)',
+            value: villageBonus
+          });
         }
       }
       if (rankDeficits[score.layer]) {
@@ -1079,7 +1157,12 @@
     function planWheatEmergencyAction() {
       if (!config.wheat.seekFarmsWhenDeficit) return null;
       var balanceInfo = getWheatBalance();
-      if (balanceInfo.balance >= 0) return null;
+      if (!shouldSeekFarmForWheat(
+        snapshot,
+        team,
+        balanceInfo,
+        object(config.wheat).proactiveReserveTurns
+      )) return null;
 
       var farms = findFarmRegions().filter(function (farm) { return !owns(farm.code, team); });
       if (!farms.length) return null;
@@ -2525,6 +2608,7 @@
     chooseRankChangeAction: chooseRankChangeAction,
     calculateDesirability: calculateDesirability,
     calculateCurrentDesirability: calculateCurrentDesirability,
+    shouldSeekFarmForWheat: shouldSeekFarmForWheat,
     setConfig: setConfig,
     getConfig: getConfig
   };

@@ -143,3 +143,47 @@ test('rank 8 can upgrade when downgrade is not a legal rank', () => {
     target: 'L7-1'
   });
 });
+
+test('desirability values reachable villages using discounted income and graph distance', () => {
+  const snapshot = {
+    aiTeam: 'blue',
+    humanTeam: 'orange',
+    wheatEnabled: false,
+    regions: {
+      'L8-1': { layer: 8, dominator: 'blue', blue: 100, orange: 0 },
+      'L8-2': { layer: 8, dominator: 'free', blue: 0, orange: 0, villageBuildingLevel: 1 },
+      'L8-3': { layer: 8, dominator: 'free', blue: 0, orange: 0, villageBuildingLevel: 5 },
+      'L8-4': { layer: 8, dominator: 'free', blue: 0, orange: 0 }
+    },
+    regionNeighborCache: {
+      'L8-1': { right: ['L8-2'] },
+      'L8-2': { left: ['L8-1'], right: ['L8-3'] },
+      'L8-3': { left: ['L8-2'], right: ['L8-4'] },
+      'L8-4': { left: ['L8-3'] }
+    }
+  };
+  const result = ai.calculateDesirability(snapshot, aiConfig.desirability);
+  const villageBonus = (code) => result.regions[code].internalBreakdown
+    .find((entry) => entry.label.includes('valor econômico descontado'))?.value || 0;
+
+  assert.ok(villageBonus('L8-2') > 0);
+  assert.ok(villageBonus('L8-3') > villageBonus('L8-2'),
+    'the higher-yield village is more desirable even when one graph step farther away');
+  assert.ok(villageBonus('L8-3') <= aiConfig.povoados.maxDesirabilityBonus);
+  assert.equal(villageBonus('L8-4'), 0, 'regions without a settlement get no settlement bonus');
+});
+
+test('wheat planner starts before projected reserves are exhausted', () => {
+  const deficit = { production: 0, consumption: 100, balance: -100 };
+
+  assert.equal(ai.shouldSeekFarmForWheat({ wheatBalances: { blue: 201 } }, 'blue', deficit, 2), false);
+  assert.equal(ai.shouldSeekFarmForWheat({ wheatBalances: { blue: 200 } }, 'blue', deficit, 2), true);
+  assert.equal(ai.shouldSeekFarmForWheat({ wheatBalances: { blue: 0 } }, 'blue', deficit, 2), true);
+  assert.equal(ai.shouldSeekFarmForWheat({}, 'blue', deficit, 2), true,
+    'legacy snapshots without a stock value retain immediate deficit handling');
+  assert.equal(ai.shouldSeekFarmForWheat({ wheatBalances: { blue: 0 } }, 'blue', {
+    production: 100,
+    consumption: 100,
+    balance: 0
+  }, 2), false);
+});

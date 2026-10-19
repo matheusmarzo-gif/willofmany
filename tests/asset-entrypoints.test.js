@@ -312,9 +312,16 @@ test('random maps can be sized for AI games and retain the game coordinate dimen
   assert.match(gameClient, /gameMode === 'ai' && aiRandomMapCheckbox\.checked/);
   assert.match(gameClient, /aiRandomMapRotationsCheckbox\.checked/);
   assert.match(gameClient, /gameMode === 'online' \? onlineRandomMapTarget\.value : aiRandomMapTarget\.value/);
-  assert.match(gameClient, /const width = Number\(block\.L1\);\s*const height = Number\(block\.L2\);/);
+  assert.match(gameClient, /gameRules\.getQuadrilateralCellDimensions\(\s*block,\s*data\?\.randomMap\?\.generator === 'cartografo-estrategico'\s*\)/);
   assert.match(gameClient, /applyRegionData\(createRandomBoardData\(targetRegions, null, rotationsEnabled\)\)/);
   assert.match(gameClient, /aiRandomMapSizeLabel\.classList\.toggle\('is-hidden', !aiRandomMapCheckbox\.checked\)/);
+});
+
+test('random-map quadrilateral regions use piece slots and adaptive focus zoom', () => {
+  assert.match(gameClient, /const isRandomMap = currentBoardData\?\.randomMap\?\.generator === 'cartografo-estrategico';\s*if \(\(isRandomMap \|\|/);
+  assert.match(gameClient, /gameRules\.getQuadrilateralCellSlots\(\s*geometry\.cells,\s*isRandomMap \? Number\(geometry\.maxPieces\) \|\| 8 : 8\s*\)/);
+  assert.match(gameClient, /gameRules\.getQuadrilateralCellFocusScale\(\s*regionGeometryByCode\[regionCode\]\?\.cells,\s*rect\.width,\s*minimumScale\s*\)/);
+  assert.match(gameClient, /currentBoardData\?\.boardType === 'mixed' \|\| isRandomMap \|\|/);
 });
 
 test('random campaign levels enable rotations and use non-accumulating tiered coin economies', () => {
@@ -407,7 +414,8 @@ test('Level 3 board preserves its campaign rules and all configured block placem
     gameClient,
     /function getRegionFocusPoint\(regionCode, applyRotation = true\) \{[\s\S]*?geometry\?\.shape === 'quadrilateral' &&\s*Array\.isArray\(geometry\.cells\)[\s\S]*?cell\.x - cell\.width \/ 2[\s\S]*?cell\.x \+ cell\.width \/ 2[\s\S]*?return \{\s*x: \(\(bounds\.left \+ bounds\.right\) \/ 2 \/ 908\) \* 100/
   );
-  assert.match(gameClient, /const scale = Number\(focusScale\) \|\| Number\(currentBoardData\?\.regionFocusScale\) \|\| 1\.8;/);
+  assert.match(gameClient, /const minimumScale = Number\(currentBoardData\?\.regionFocusScale\) \|\| 1\.8;/);
+  assert.match(gameClient, /const scale = Number\(focusScale\) \|\| \(isRandomMap/);
   assert.match(gameClient, /function getRotatableQuadrilateralBlocks\(\)/);
   assert.match(gameClient, /function updateQuadrilateralRotationBlockPicker\(blocks\)/);
   assert.match(gameClient, /function rotateQuadrilateralBlock\(\s*blockName,\s*direction,\s*keepBlockFocus = false,\s*rotationPath = null,\s*passType = 'global'/);
@@ -762,11 +770,11 @@ test('Level 5 defines its four blocks, campaign economy, deadline, and doubled B
   );
   assert.match(
     gameClient,
-    /if \(\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)[\s\S]*?for \(let row = 0; row < 2; row \+= 1\)[\s\S]*?for \(let column = 0; column < 4; column \+= 1\)[\s\S]*?\.slice\(0, 8\)/
+    /if \(\(isRandomMap \|\| \['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)\) &&[\s\S]*?gameRules\.getQuadrilateralCellSlots\(/
   );
   assert.match(
     gameClient,
-    /if \(currentBoardData\?\.boardType === 'mixed' \|\|\s*\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;\s*stageZoomOffset = \{\s*x: \(\(50 - point\.x\) \/ 100\) \* rect\.width \* scale,\s*y: \(\(50 - point\.y\) \/ 100\) \* rect\.height \* scale/
+    /if \(currentBoardData\?\.boardType === 'mixed' \|\| isRandomMap \|\|\s*\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;\s*stageZoomOffset = \{\s*x: \(\(50 - point\.x\) \/ 100\) \* rect\.width \* scale,\s*y: \(\(50 - point\.y\) \/ 100\) \* rect\.height \* scale/
   );
   assert.match(gameClient, /gameRules\.rotateQuadrilateralMatrixPath\(matrix, direction, rotationPath\)/);
   assert.match(gameClient, /function getQuadrilateralRegionRotationPath\(block, region, target\)[\s\S]*?target\.rotationType === 'linear'[\s\S]*?getQuadrilateralMatrixLinearPaths/);
@@ -972,13 +980,13 @@ test('Level 6 defines its complete 5x5 board, no-income campaign, and ring/linea
   );
   assert.match(
     gameClient,
-    /if \(currentBoardData\?\.boardType === 'mixed' \|\|\s*\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;/
+    /if \(currentBoardData\?\.boardType === 'mixed' \|\| isRandomMap \|\|\s*\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)\) \{\s*stageZoom = scale;/
   );
   assert.match(
     gameClient,
-    /if \(\['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\) &&\s*geometry\?\.shape === 'quadrilateral'/
+    /if \(\(isRandomMap \|\| \['tabuleiro-03', 'tabuleiro-05', 'tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\s*\.includes\(currentBoardData\?\.campaign\?\.id\)\) &&\s*geometry\?\.shape === 'quadrilateral'/
   );
-  assert.match(gameClient, /function focusRegion\(regionCode, focusScale = null\)[\s\S]*?Number\(focusScale\) \|\| Number\(currentBoardData\?\.regionFocusScale\)/);
+  assert.match(gameClient, /function focusRegion\(regionCode, focusScale = null\)[\s\S]*?Number\(focusScale\) \|\| \(isRandomMap/);
   assert.match(
     gameClient,
     /const restoreCampaignWarView = isCampaignGame\(\) &&\s*\['tabuleiro-06', 'tabuleiro-07', 'tabuleiro-08'\]\.includes\(activeCampaignLevel\.id\)[\s\S]*?focusRegion\(block\.regionCode, restoreCampaignWarView \? 2 : null\)[\s\S]*?if \(restoreCampaignWarView\) restoreStageView\(\);\s*else resetStageZoom\(\)/

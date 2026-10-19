@@ -438,6 +438,51 @@
     return Math.floor(cost / 2);
   }
 
+  function getQuadrilateralCellDimensions(block, useCartographerAxes = false) {
+    const firstAxis = Number(block?.L1);
+    const secondAxis = Number(block?.L2);
+    return useCartographerAxes
+      ? { width: firstAxis, height: secondAxis }
+      : { width: secondAxis, height: firstAxis };
+  }
+
+  function getQuadrilateralCellSlots(cells, maxSlots = 8) {
+    const slotLimit = Math.min(8, Math.max(0, Math.floor(Number(maxSlots) || 0)));
+    if (!Array.isArray(cells) || !slotLimit) return [];
+    return cells.flatMap((cell) => {
+      if (![cell?.x, cell?.y, cell?.width, cell?.height].every(Number.isFinite) ||
+          cell.width <= 0 || cell.height <= 0) return [];
+      const slots = [];
+      for (let row = 0; row < 2; row += 1) {
+        for (let column = 0; column < 4; column += 1) {
+          slots.push({
+            x: (cell.x + ((column + 0.5) / 4 - 0.5) * cell.width) / 908 * 100,
+            y: (cell.y + ((row + 0.5) / 2 - 0.5) * cell.height) / 908 * 100
+          });
+        }
+      }
+      return slots;
+    }).slice(0, slotLimit);
+  }
+
+  function getQuadrilateralCellFocusScale(cells, panelWidth, minimumScale = 1.8) {
+    const cell = Array.isArray(cells) ? cells.find((candidate) =>
+      [candidate?.width, candidate?.height].every(Number.isFinite) &&
+      candidate.width > 0 && candidate.height > 0) : null;
+    const availableWidth = Number(panelWidth);
+    const scaleFloor = Number.isFinite(Number(minimumScale)) && Number(minimumScale) > 0
+      ? Number(minimumScale)
+      : 1.8;
+    if (!cell || !Number.isFinite(availableWidth) || availableWidth <= 0) return scaleFloor;
+    const minCellWidth = 128;
+    const minCellHeight = 64;
+    return Math.max(
+      scaleFloor,
+      minCellWidth * 908 / (cell.width * availableWidth),
+      minCellHeight * 908 / (cell.height * availableWidth)
+    );
+  }
+
   function getAnnularSectorCentroid({ centerX, centerY, innerRadius, outerRadius, startAngle, endAngle }) {
     if (![centerX, centerY, innerRadius, outerRadius, startAngle, endAngle].every(Number.isFinite) ||
         innerRadius < 0 || outerRadius <= innerRadius ||
@@ -485,6 +530,9 @@
     getRecruitmentCost,
     getRelegationRefund,
     getRecycleRefund,
+    getQuadrilateralCellDimensions,
+    getQuadrilateralCellSlots,
+    getQuadrilateralCellFocusScale,
     getAnnularSectorCentroid
   });
 });
