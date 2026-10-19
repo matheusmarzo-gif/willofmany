@@ -227,6 +227,36 @@
     return !Number.isFinite(stock) || turns === 0 || stock + balance * turns <= 0;
   }
 
+  function shouldDeclareWar(snapshot) {
+    snapshot = object(snapshot);
+    var team = snapshot.aiTeam || snapshot.aiPlayer || snapshot.team || snapshot.currentTeam;
+    var campaignLevelMatch = /^random-(\d+)$/.exec(String(snapshot.campaignLevelId || ''));
+    if ((team !== 'orange' && team !== 'blue') ||
+        !campaignLevelMatch || Number(campaignLevelMatch[1]) < 10) return false;
+
+    var expectedCaptures = 0;
+    var expectedLosses = 0;
+    (Array.isArray(snapshot.warConflicts) ? snapshot.warConflicts : [])
+      .forEach(function (conflict) {
+        var attacker = conflict.attacker;
+        if (attacker !== 'orange' && attacker !== 'blue') return;
+        var alliedRegions = Array.isArray(conflict.alliedRegions) ? conflict.alliedRegions : [];
+        var enemyRegions = Array.isArray(conflict.enemyRegions) ? conflict.enemyRegions : [];
+        if (!alliedRegions.length || !enemyRegions.length) return;
+
+        var aiRegions = attacker === team ? alliedRegions : enemyRegions;
+        var opponentRegions = attacker === team ? enemyRegions : alliedRegions;
+        var aiForce = Number(conflict[team + 'Force']);
+        var opponent = team === 'orange' ? 'blue' : 'orange';
+        var opponentForce = Number(conflict[opponent + 'Force']);
+        if (!Number.isFinite(aiForce) || !Number.isFinite(opponentForce)) return;
+
+        if (aiForce > opponentForce) expectedCaptures += opponentRegions.length;
+        else if (aiForce < opponentForce) expectedLosses += aiRegions.length;
+      });
+    return expectedCaptures > expectedLosses;
+  }
+
   function getSnapshotFreeUnits(snapshot, code, side) {
     var forceStats = object(object(snapshot.regionForceStats)[code]);
     var teamStats = object(object(forceStats.byTeam)[side]);
@@ -2609,6 +2639,7 @@
     calculateDesirability: calculateDesirability,
     calculateCurrentDesirability: calculateCurrentDesirability,
     shouldSeekFarmForWheat: shouldSeekFarmForWheat,
+    shouldDeclareWar: shouldDeclareWar,
     setConfig: setConfig,
     getConfig: getConfig
   };

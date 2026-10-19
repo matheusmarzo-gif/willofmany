@@ -251,6 +251,22 @@ test('AI spends remaining actions after rotating the board', () => {
   assert.doesNotMatch(schedule, /pontosDoTurn\[aiTeam\] >= pointsBefore && !recycleSucceeded/);
 });
 
+test('random campaign AI evaluates and starts favorable wars after its actions', () => {
+  const scheduleStart = gameClient.indexOf('async function scheduleAiTurn()');
+  const scheduleEnd = gameClient.indexOf('async function passTurnToNextPlayer()', scheduleStart);
+  const schedule = gameClient.slice(scheduleStart, scheduleEnd);
+  const actionsComplete = schedule.indexOf('if (!isGameOver && aiRotationApplied && pontosDoTurn[aiTeam] > 0)');
+  const warDecision = schedule.indexOf('window.WillOfManyAI.shouldDeclareWar(warSnapshot)');
+  const turnPass = schedule.lastIndexOf('await passTurnToNextPlayer(true)');
+
+  assert.ok(actionsComplete >= 0);
+  assert.ok(warDecision > actionsComplete);
+  assert.ok(turnPass > warDecision);
+  assert.match(schedule, /getRandomCampaignLevelInfo\(activeCampaignLevel\?\.id\)/);
+  assert.match(schedule, /warSnapshot\.warConflicts = getCurrentWarConflicts\(\)\.map/);
+  assert.match(schedule, /await startWar\(false\)/);
+});
+
 test('campaign keeps blue assigned to the AI and blocks human actions during its turn', () => {
   assert.match(gameClient, /humanTeam = gameMode === 'campaign'\s*\?\s*'orange'/);
   assert.match(gameClient, /: gameMode === 'campaign' \? 'blue' : null/);
@@ -314,6 +330,7 @@ test('random maps can be sized for AI games and retain the game coordinate dimen
   assert.match(gameClient, /gameMode === 'online' \? onlineRandomMapTarget\.value : aiRandomMapTarget\.value/);
   assert.match(gameClient, /gameRules\.getQuadrilateralCellDimensions\(\s*block,\s*data\?\.randomMap\?\.generator === 'cartografo-estrategico'\s*\)/);
   assert.match(gameClient, /applyRegionData\(createRandomBoardData\(targetRegions, null, rotationsEnabled\)\)/);
+  assert.match(gameClient, /startingPieces\.length !== 2[\s\S]*?new Set\(startingPieces\.map\(\(\{ piece \}\) => piece\.team\)\)\.size !== 2[\s\S]*?piece\.stage !== 'g'/);
   assert.match(gameClient, /aiRandomMapSizeLabel\.classList\.toggle\('is-hidden', !aiRandomMapCheckbox\.checked\)/);
 });
 
@@ -322,6 +339,51 @@ test('random-map quadrilateral regions use piece slots and adaptive focus zoom',
   assert.match(gameClient, /gameRules\.getQuadrilateralCellSlots\(\s*geometry\.cells,\s*isRandomMap \? Number\(geometry\.maxPieces\) \|\| 8 : 8\s*\)/);
   assert.match(gameClient, /gameRules\.getQuadrilateralCellFocusScale\(\s*regionGeometryByCode\[regionCode\]\?\.cells,\s*rect\.width,\s*minimumScale\s*\)/);
   assert.match(gameClient, /currentBoardData\?\.boardType === 'mixed' \|\| isRandomMap \|\|/);
+  assert.match(gameClient, /gameRules\.getQuadrilateralCellPieceSize\(\s*geometry\.cells,\s*rect\.width,\s*rect\.height,\s*stageZoom\s*\)/);
+  assert.match(gameClient, /gameRules\.getQuadrilateralBuildingIconScale\(\s*geometry\.cells,\s*iconScale\s*\)/);
+  assert.match(gameClient, /translate\(\$\{centerX\} \$\{centerY\}\) scale\(\$\{iconScale \* 0\.8\}\)/);
+  assert.match(gameClient, /outerOutline\.style\.strokeWidth = `\$\{strokeWidth \/ outlineScale\}px`/);
+  assert.match(gameClient, /outerOutline\.style\.filter =\s*`drop-shadow\(0 0 \$\{shadowRadius \/ outlineScale\}px \$\{shadowColor\}\)`/);
+  assert.match(gameClient, /if \(currentBoardData\?\.randomMap\?\.generator === 'cartografo-estrategico' &&\s*focusedRegionCode\) updateBoardFocusOverlay\(\)/);
+  assert.match(gameClient, /gameRules\.getQuadrilateralRegionStrokeWidth\(stageZoom\)/);
+  assert.match(gameClient, /shape\.removeAttribute\('vector-effect'\)/);
+  assert.match(gameClient, /spotlightRegions\.length \|\| conflictSimulation \|\|\s*\(quadrilateralRotationMode && !isRandomMap\) \? '' : 'none'/);
+});
+
+test('board supports touch pinch and mouse-wheel zoom without shrinking piece source boxes', () => {
+  assert.match(gameClient, /stagePanel\.addEventListener\('pointerdown', startStagePinch, true\)/);
+  assert.match(gameClient, /stagePanel\.addEventListener\('pointermove', moveStagePinch, true\)/);
+  assert.match(gameClient, /stagePanel\.addEventListener\('wheel', zoomStageFromWheel, \{ passive: false \}\)/);
+  assert.match(gameClient, /Math\.exp\(-event\.deltaY \* 0\.001\)/);
+  assert.match(gameClient, /gameRules\.getStageZoomOffsetAtPoint\(/);
+  assert.match(gameClient, /gameRules\.clampStageZoom\(requestedZoom\)/);
+  assert.match(gameClient, /piece\.style\.width = `\$\{size\}px`/);
+  assert.match(gameClient, /piece\.style\.width = `\$\{pieceSize\}px`/);
+  assert.match(gameClient, /scale\(\$\{1 \/ Math\.max\(1, stageZoom\)\}\)/);
+  assert.match(gameClient, /const dragPieceSize = getPieceScreenSize\(sourceCode\)[\s\S]*?document\.body\.appendChild\(dragPiece\)/);
+  assert.match(gameClient, /dragPiece\.style\.left = `\$\{clientX\}px`/);
+  assert.match(gameClient, /dragPiece\.style\.top = `\$\{clientY\}px`/);
+  assert.doesNotMatch(gameClient, /dragPiece\.style\.transform[\s\S]{0,100}stageZoom/);
+  assert.match(gameClient, /function drawDragOverlay\(targetCodes = \[\]\)[\s\S]*?currentBoardData\?\.randomMap\?\.generator === 'cartografo-estrategico'[\s\S]*?boardLayerElements\.get\(geometry\?\.layer\)[\s\S]*?querySelectorAll\('path\[data-region\], circle\[data-region\]'\)[\s\S]*?regionShape\.classList\.add\('drag-target-available'\)[\s\S]*?randomMapDragTargetElements\.push\(regionShape\)/);
+  assert.match(gameClient, /stage\.classList\.toggle\('is-random-map-dragging', isRandomMap && targetCodes\.length > 0\)/);
+  assert.match(gameCss, /\.stage\.is-random-map-dragging::after \{[^}]*background:rgba\(0,0,0,\.74\)/);
+  assert.match(gameCss, /\.stage\.is-random-map-dragging \.layer \[data-region\]:not\(\.drag-target-available\) \{[^}]*filter:brightness\(\.28\)/);
+  assert.match(gameClient, /randomMapDragTargetElements\.forEach\(\(element\) => element\.classList\.remove\('drag-target-available'\)\)/);
+  assert.match(gameCss, /\.layer \.drag-target-available \{[^}]*filter:brightness\(1\.22\);[^}]*stroke:#65cb8b !important;/);
+  assert.match(gameCss, /\.piece \{[^}]*aspect-ratio:1;[^}]*object-fit:contain;/);
+  assert.match(gameCss, /\.drag-piece \{[^}]*position:fixed;[^}]*z-index:1000;/);
+  assert.doesNotMatch(gameCss, /\.stage\.is-dragging \.drag-overlay \{[^}]*backdrop-filter/);
+  assert.match(gameClient, /if \(beginPieceDrag\(event, regionCode\)\) return;\s*if \(startStagePan\(event, regionCode\)\) return;/);
+  assert.match(gameClient, /function startStagePan\(event, regionCode\)[\s\S]*?event\.button !== 0 \|\| pieceDragState/);
+  assert.match(gameClient, /function endStagePan\(event, cancelled = false\)[\s\S]*?if \(cancelled \|\| moved\) return true;/);
+  assert.match(gameClient, /if \(startStagePan\(event, null\)\) return;/);
+  assert.match(gameClient, /if \(moveStagePan\(event\)\) return;/);
+  assert.match(gameClient, /if \(endStagePan\(event, true\)\) return;/);
+  assert.match(gameClient, /function scheduleStagePanRender\(\)[\s\S]*?window\.requestAnimationFrame[\s\S]*?translate3d/);
+  assert.match(gameClient, /function showGameBoard\(\)[\s\S]*?currentBoardData\?\.randomMap\?\.generator !== 'cartografo-estrategico'[\s\S]*?focusStrongestRegionForTeam\(currentTeam\)/);
+  assert.match(gameCss, /\.stage \{ cursor:grab; \}/);
+  assert.match(gameCss, /\.stage\.is-panning \{ cursor:grabbing; transition:none; \}/);
+  assert.match(gameCss, /\.stage\.is-zoomed,\.stage\.is-panning \{ filter:none; \}/);
 });
 
 test('random campaign levels enable rotations and use non-accumulating tiered coin economies', () => {

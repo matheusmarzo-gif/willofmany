@@ -231,6 +231,7 @@
     dragOverlayTargets.classList.add('drag-target-outlines');
     dragOverlay.append(dragOverlayDefs, dragOverlayDim, dragOverlayTargets);
     stage.appendChild(dragOverlay);
+    const randomMapDragTargetElements = [];
     const gameRules = window.WillOfManyRules;
     if (!gameRules) throw new Error('O módulo de regras do jogo não foi carregado.');
     const rotations = Array(8).fill(0);
@@ -334,6 +335,11 @@
     let focusedRegionCode = null;
     let stageZoom = 1;
     let stageZoomOffset = { x: 0, y: 0 };
+    let stagePanState = null;
+    let stagePanRenderFrame = null;
+    const stageZoomPointers = new Map();
+    let stagePinchState = null;
+    let stageZoomInteractionTimeout = null;
     let currentTeam = 'orange';
     let currentTurn = 1;
     let aiTurnStartingPoints = null;
@@ -633,6 +639,16 @@
       if (!isGeneratedBoardData(boardData)) {
         throw new Error('o gerador retornou um mapa incompatível com o jogo');
       }
+      const startingPieces = boardData.blocks.flatMap((block) =>
+        block.regions.flatMap((region) =>
+          (region.initialPieces || []).map((piece) => ({ code: region.code, piece }))));
+      if (startingPieces.length !== 2 ||
+          new Set(startingPieces.map(({ piece }) => piece.team)).size !== 2 ||
+          new Set(startingPieces.map(({ code }) => code)).size !== 2 ||
+          startingPieces.some(({ code, piece }) =>
+            !/^L8-\d+$/.test(code) || piece.stage !== 'g')) {
+        throw new Error('o mapa gerado precisa conter dois starting points L8 opostos, um para cada equipe, com peça G');
+      }
       boardData.randomMap.id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       boardData.randomMap.campaignLevelId = campaignLevelId;
       if (!campaignLevelId) return boardData;
@@ -791,6 +807,14 @@
       focusedRegionCode = null;
       stageZoom = 1;
       stageZoomOffset = { x: 0, y: 0 };
+      if (stagePanRenderFrame !== null) {
+        window.cancelAnimationFrame(stagePanRenderFrame);
+        stagePanRenderFrame = null;
+      }
+      stagePanState = null;
+      stage.style.transform = '';
+      stage.classList.remove('is-panning', 'is-zoomed');
+      stagePanel.classList.remove('is-focused', 'is-pan-enabled');
       pontosDoTurn.orange = getTurnPointIncome(1);
       pontosDoTurn.blue = getTurnPointIncome(1);
       aiTurnStartingPoints = currentTeam === aiTeam ? pontosDoTurn[currentTeam] : null;
@@ -2228,6 +2252,222 @@
       );
     }
 
+    function applyStageZoomAtPoint(startPoint, currentPoint, requestedZoom) {
+      const nextZoom = gameRules.clampStageZoom(requestedZoom);
+      if (nextZoom === stageZoom) return false;
+      stageZoomOffset = gameRules.getStageZoomOffsetAtPoint(
+        stageZoomOffset,
+        stageZoom,
+        nextZoom,
+        startPoint,
+        currentPoint
+      );
+      stageZoom = nextZoom;
+      updateStageZoom();
+      return true;
+    }
+
+    function markStageZoomInteraction(active, hold = false) {
+      if (stageZoomInteractionTimeout) {
+        window.clearTimeout(stageZoomInteractionTimeout);
+        stageZoomInteractionTimeout = null;
+      }
+      stage.classList.toggle('is-user-zooming', active);
+      if (!active || hold) return;
+      stageZoomInteractionTimeout = window.setTimeout(() => {
+        stage.classList.remove('is-user-zooming');
+        stageZoomInteractionTimeout = null;
+      }, 140);
+    }
+
+    function cancelStagePan() {
+      if (!stagePanState) return;
+      if (stagePanRenderFrame !== null) {
+        window.cancelAnimationFrame(stagePanRenderFrame);
+        stagePanRenderFrame = null;
+        stage.style.transform =
+          `translate3d(${stageZoomOffset.x}px, ${stageZoomOffset.y}px, 0) scale(${stageZoom})`;
+      }
+      stagePanState = null;
+      stage.classList.remove('is-panning');
+      stagePanel.classList.toggle('is-pan-enabled', stageZoom > 1);
+      markStageZoomInteraction(false);
+    }
+
+    function scheduleStagePanRender() {
+      if (stagePanRenderFrame !== null) return;
+      stagePanRenderFrame = window.requestAnimationFrame(() => {
+        stagePanRenderFrame = null;
+        if (!stagePanState?.moved) return;
+        stage.style.transform =
+          `translate3d(${stageZoomOffset.x}px, ${stageZoomOffset.y}px, 0) scale(${stageZoom})`;
+      });
+    }
+
+    function startStagePan(event, regionCode) {
+      if (event.button !== 0 || pieceDragState ||
+          quadrilateralRotationMode || conflictSimulation || isDebugModeActive() ||
+          stagePinchState) return false;
+      stagePanState = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        initialOffset: { ...stageZoomOffset },
+        regionCode,
+        moved: false
+      };
+      try {
+        stage.setPointerCapture(event.pointerId);
+      } catch (error) {
+        // Pointer capture is optional when simulating gestures.
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      return true;
+    }
+
+    function moveStagePan(event) {
+      if (!stagePanState || stagePanState.pointerId !== event.pointerId) return false;
+      const deltaX = event.clientX - stagePanState.startX;
+      const deltaY = event.clientY - stagePanState.startY;
+      if (!stagePanState.moved && Math.hypot(deltaX, deltaY) < 6) return true;
+      stagePanState.moved = true;
+      stage.classList.add('is-panning');
+      stagePanel.classList.add('is-pan-enabled');
+      stagePanel.classList.add('is-focused');
+      markStageZoomInteraction(true, true);
+      stageZoomOffset = {
+        x: stagePanState.initialOffset.x + deltaX,
+        y: stagePanState.initialOffset.y + deltaY
+      };
+      scheduleStagePanRender();
+      event.preventDefault();
+      event.stopPropagation();
+      return true;
+    }
+
+    function endStagePan(event, cancelled = false) {
+      if (!stagePanState || stagePanState.pointerId !== event.pointerId) return false;
+      const { moved, regionCode } = stagePanState;
+      if (stagePanRenderFrame !== null) {
+        window.cancelAnimationFrame(stagePanRenderFrame);
+        stagePanRenderFrame = null;
+        stage.style.transform =
+          `translate3d(${stageZoomOffset.x}px, ${stageZoomOffset.y}px, 0) scale(${stageZoom})`;
+      }
+      stagePanState = null;
+      stage.classList.remove('is-panning');
+      stagePanel.classList.toggle('is-pan-enabled', stageZoom > 1);
+      markStageZoomInteraction(false);
+      event.preventDefault();
+      event.stopPropagation();
+      if (cancelled || moved) return true;
+      if (!regionCode) {
+        selectedRegionCode = null;
+        updateSelectedRegionPanel();
+        updateMobileRotationControls();
+        return true;
+      }
+      selectedRegionCode = regionCode;
+      updateSelectedRegionPanel(selectedRegionCode);
+      updateMobileRotationControls();
+      focusRegion(regionCode);
+      return true;
+    }
+
+    function getStagePoint(clientX, clientY) {
+      const rect = stagePanel.getBoundingClientRect();
+      return {
+        x: clientX - rect.left - rect.width / 2,
+        y: clientY - rect.top - rect.height / 2
+      };
+    }
+
+    function startStagePinch(event) {
+      if (event.pointerType !== 'touch' || !stage.contains(event.target) ||
+          quadrilateralRotationMode || conflictSimulation || !allRegionMasks) return;
+      if (!stagePinchState && stageZoomPointers.size >= 2) stageZoomPointers.clear();
+      stageZoomPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (stageZoomPointers.size < 2) return;
+      cancelStagePan();
+      const pointers = [...stageZoomPointers.entries()].slice(-2);
+      const [firstId, first] = pointers[0];
+      const [secondId, second] = pointers[1];
+      if (pieceDragState) clearPieceDrag();
+      const startCenter = {
+        x: (first.x + second.x) / 2,
+        y: (first.y + second.y) / 2
+      };
+      stagePinchState = {
+        pointerIds: [firstId, secondId],
+        initialDistance: Math.max(1, Math.hypot(second.x - first.x, second.y - first.y)),
+        initialZoom: stageZoom,
+        initialOffset: { ...stageZoomOffset },
+        startPoint: getStagePoint(startCenter.x, startCenter.y)
+      };
+      markStageZoomInteraction(true, true);
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      pointers.forEach(([pointerId]) => {
+        try {
+          stagePanel.setPointerCapture(pointerId);
+        } catch (error) {
+          // Pointer capture is optional when simulating gestures.
+        }
+      });
+    }
+
+    function moveStagePinch(event) {
+      if (!stagePinchState || !stagePinchState.pointerIds.includes(event.pointerId)) return;
+      const pointer = stageZoomPointers.get(event.pointerId);
+      if (!pointer) return;
+      pointer.x = event.clientX;
+      pointer.y = event.clientY;
+      const first = stageZoomPointers.get(stagePinchState.pointerIds[0]);
+      const second = stageZoomPointers.get(stagePinchState.pointerIds[1]);
+      if (!first || !second) return;
+      const distance = Math.max(1, Math.hypot(second.x - first.x, second.y - first.y));
+      const center = {
+        x: (first.x + second.x) / 2,
+        y: (first.y + second.y) / 2
+      };
+      const nextZoom = gameRules.clampStageZoom(
+        stagePinchState.initialZoom * distance / stagePinchState.initialDistance
+      );
+      stageZoomOffset = gameRules.getStageZoomOffsetAtPoint(
+        stagePinchState.initialOffset,
+        stagePinchState.initialZoom,
+        nextZoom,
+        stagePinchState.startPoint,
+        getStagePoint(center.x, center.y)
+      );
+      stageZoom = nextZoom;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      updateStageZoom();
+    }
+
+    function endStagePinch(event) {
+      stageZoomPointers.delete(event.pointerId);
+      if (!stagePinchState || !stagePinchState.pointerIds.includes(event.pointerId)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      stagePinchState = null;
+      stageZoomPointers.clear();
+      markStageZoomInteraction(false);
+    }
+
+    function zoomStageFromWheel(event) {
+      if (!allRegionMasks || quadrilateralRotationMode || conflictSimulation ||
+          !stage.contains(event.target)) return;
+      const point = getStagePoint(event.clientX, event.clientY);
+      const nextZoom = gameRules.clampStageZoom(stageZoom * Math.exp(-event.deltaY * 0.001));
+      if (nextZoom === stageZoom) return;
+      event.preventDefault();
+      markStageZoomInteraction(true);
+      applyStageZoomAtPoint(point, point, nextZoom);
+    }
+
     function getRecycleRefund(regionCode, stage) {
       return gameRules.getRecycleRefund(getRecruitmentCost(regionCode, stage));
     }
@@ -3351,8 +3591,26 @@
     }
 
     function drawDragOverlay(targetCodes = []) {
+      randomMapDragTargetElements.forEach((element) => element.classList.remove('drag-target-available'));
+      randomMapDragTargetElements.length = 0;
       dragOverlayMaskHoles.replaceChildren();
       dragOverlayTargets.replaceChildren();
+      const isRandomMap = currentBoardData?.randomMap?.generator === 'cartografo-estrategico';
+      stage.classList.toggle('is-random-map-dragging', isRandomMap && targetCodes.length > 0);
+      if (isRandomMap) {
+        dragOverlay.style.display = 'none';
+        targetCodes.forEach((regionCode) => {
+          const geometry = regionGeometryByCode[regionCode];
+          const layerElement = boardLayerElements.get(geometry?.layer);
+          if (!geometry || !layerElement) return;
+          const regionShape = [...layerElement.querySelectorAll('path[data-region], circle[data-region]')]
+            .find((shape) => shape.dataset.region === regionCode);
+          if (!regionShape) return;
+          regionShape.classList.add('drag-target-available');
+          randomMapDragTargetElements.push(regionShape);
+        });
+        return;
+      }
       dragOverlay.style.display = targetCodes.length ? '' : 'none';
       if (!targetCodes.length) return;
       const svgNamespace = 'http://www.w3.org/2000/svg';
@@ -3453,11 +3711,12 @@
       if (!targets.length && !canRecycle) return false;
       const dragPiece = document.createElement('img');
       dragPiece.className = 'drag-piece';
-      dragPiece.style.width = `${30 / Math.max(1, stageZoom)}px`;
-      dragPiece.style.height = `${30 / Math.max(1, stageZoom)}px`;
+      const dragPieceSize = getPieceScreenSize(sourceCode);
+      dragPiece.style.width = `${dragPieceSize}px`;
+      dragPiece.style.height = `${dragPieceSize}px`;
       dragPiece.src = piece.src;
       dragPiece.alt = piece.alt;
-      pieces.appendChild(dragPiece);
+      document.body.appendChild(dragPiece);
       piece.classList.add('is-drag-source');
       pieceDragState = {
         sourceCode,
@@ -3499,12 +3758,8 @@
       if (Math.hypot(clientX - pieceDragState.startX, clientY - pieceDragState.startY) >= 6) {
         pieceDragState.moved = true;
       }
-      const rect = stage.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      const x = ((clientX - rect.left) / rect.width) * 100;
-      const y = ((clientY - rect.top) / rect.height) * 100;
-      pieceDragState.dragPiece.style.left = `${x}%`;
-      pieceDragState.dragPiece.style.top = `${y}%`;
+      pieceDragState.dragPiece.style.left = `${clientX}px`;
+      pieceDragState.dragPiece.style.top = `${clientY}px`;
       trashDropZone.classList.toggle('is-target', isPointerOverTrash(clientX, clientY));
     }
 
@@ -5179,8 +5434,9 @@
                 piece.dataset.pieceKey = pieceKey;
                 pieces.appendChild(piece);
               }
-              piece.style.width = `${30 / Math.max(1, stageZoom)}px`;
-              piece.style.height = `${30 / Math.max(1, stageZoom)}px`;
+              const pieceSize = getPieceScreenSize(regionCode);
+              piece.style.width = `${pieceSize}px`;
+              piece.style.height = `${pieceSize}px`;
               activeKeys.add(pieceKey);
               piece.dataset.layer = String(layerNumber);
               piece.dataset.region = regionCode;
@@ -5192,7 +5448,9 @@
               piece.style.left = `${(rotatedX / 908) * 100}%`;
               piece.style.top = `${(rotatedY / 908) * 100}%`;
               const visualRotation = getRegionVisualRotation(regionCode);
-              piece.style.transform = `translate(-50%,-50%) rotate(${visualRotation}deg)`;
+              piece.dataset.visualRotation = String(visualRotation);
+              piece.style.transform =
+                `translate(-50%,-50%) rotate(${visualRotation}deg) scale(${1 / Math.max(1, stageZoom)})`;
               pieces.appendChild(piece);
               slotIndex += 1;
             }
@@ -5858,25 +6116,50 @@
       if (stageZoom === 1) {
         stageZoomOffset = { x: 0, y: 0 };
         stage.style.transform = '';
+        stage.classList.remove('is-zoomed');
         stagePanel.classList.remove('is-focused');
+        stagePanel.classList.remove('is-pan-enabled');
         updateZoomAwarePieceSizes();
         if (Object.keys(regionGeometryByCode).length) renderBoardLayers();
+        if (currentBoardData?.randomMap?.generator === 'cartografo-estrategico' &&
+            focusedRegionCode) updateBoardFocusOverlay();
         return;
       }
       const rect = stagePanel.getBoundingClientRect();
-      stage.style.transform = `translate(${stageZoomOffset.x}px, ${stageZoomOffset.y}px) scale(${stageZoom})`;
+      stage.style.transform =
+        `translate3d(${stageZoomOffset.x}px, ${stageZoomOffset.y}px, 0) scale(${stageZoom})`;
+      stage.classList.add('is-zoomed');
       stagePanel.classList.add('is-focused');
+      stagePanel.classList.add('is-pan-enabled');
       updateZoomAwarePieceSizes();
       if (Object.keys(regionGeometryByCode).length) renderBoardLayers();
+      if (currentBoardData?.randomMap?.generator === 'cartografo-estrategico' &&
+          focusedRegionCode) updateBoardFocusOverlay();
       if (rect.width <= 0 || rect.height <= 0) return;
     }
 
     function updateZoomAwarePieceSizes() {
-      const size = `${30 / Math.max(1, stageZoom)}px`;
-      pieces.querySelectorAll('.piece, .drag-piece').forEach((piece) => {
-        piece.style.width = size;
-        piece.style.height = size;
+      pieces.querySelectorAll('.piece').forEach((piece) => {
+        const size = getPieceScreenSize(piece.dataset.region);
+        piece.style.width = `${size}px`;
+        piece.style.height = `${size}px`;
+        const rotation = Number(piece.dataset.visualRotation) || 0;
+        piece.style.transform =
+          `translate(-50%,-50%) rotate(${rotation}deg) scale(${1 / Math.max(1, stageZoom)})`;
       });
+    }
+
+    function getPieceScreenSize(regionCode) {
+      const geometry = regionGeometryByCode[regionCode];
+      if (currentBoardData?.randomMap?.generator !== 'cartografo-estrategico' ||
+          geometry?.shape !== 'quadrilateral') return 30;
+      const rect = stagePanel.getBoundingClientRect();
+      return gameRules.getQuadrilateralCellPieceSize(
+        geometry.cells,
+        rect.width,
+        rect.height,
+        stageZoom
+      );
     }
 
     function captureStageView() {
@@ -7686,14 +7969,15 @@
         Object.prototype.hasOwnProperty.call(regionGeometryByCode, selectedRegionCode)
         ? selectedRegionCode
         : null;
+      const isRandomMap = currentBoardData?.randomMap?.generator === 'cartografo-estrategico';
       const focusRegions = [...new Set([
         ...spotlightRegions,
         ...(selectedRegion ? [selectedRegion] : [])
       ])];
       boardFocusMaskHoles.replaceChildren();
       boardFocusOutlines.replaceChildren();
-      boardFocusDim.style.display =
-        spotlightRegions.length || conflictSimulation || quadrilateralRotationMode ? '' : 'none';
+      boardFocusDim.style.display = spotlightRegions.length || conflictSimulation ||
+        (quadrilateralRotationMode && !isRandomMap) ? '' : 'none';
 
       spotlightRegions.forEach((regionCode) => {
         const geometry = regionGeometryByCode[regionCode];
@@ -7713,6 +7997,7 @@
         const isWarRegion = warRegions.includes(regionCode);
         const isSimulationRegion = simulationRegions.includes(regionCode);
         const isPreviewRegion = previewRegions.includes(regionCode);
+        const outlineScale = isRandomMap ? Math.max(1, stageZoom) : 1;
         const highlightType = isWarRegion || isPreviewRegion
           ? 'war'
           : isSimulationRegion
@@ -7729,6 +8014,18 @@
           'class',
           `board-focus-outline is-${highlightType}-outer`
         );
+        if (isRandomMap) {
+          const strokeWidth = highlightType === 'selected' ? 3 : 4;
+          const shadowRadius = highlightType === 'selected' ? 3 : 4;
+          const shadowColor = highlightType === 'selected'
+            ? 'rgba(239,77,202,.95)'
+            : highlightType === 'war'
+              ? 'rgba(255,196,44,.95)'
+              : 'rgba(255,255,255,.95)';
+          outerOutline.style.strokeWidth = `${strokeWidth / outlineScale}px`;
+          outerOutline.style.filter =
+            `drop-shadow(0 0 ${shadowRadius / outlineScale}px ${shadowColor})`;
+        }
         boardFocusOutlines.appendChild(outerOutline);
 
         const innerOutline = document.createElementNS(svgNamespace, 'path');
@@ -7739,6 +8036,9 @@
           'class',
           `board-focus-outline is-${highlightType}-inner`
         );
+        if (isRandomMap) {
+          innerOutline.style.strokeWidth = `${1.5 / outlineScale}px`;
+        }
         boardFocusOutlines.appendChild(innerOutline);
       });
       updateQuadrilateralRotationOverlay();
@@ -7883,7 +8183,7 @@
         ? geometry.centerY - radius * Math.sin(angle)
         : geometry.centerY;
       const icon = document.createElementNS(svgNamespace, 'g');
-      icon.setAttribute('transform', `translate(${centerX + 16} ${centerY}) scale(${iconScale * 0.8})`);
+      icon.setAttribute('transform', `translate(${centerX} ${centerY}) scale(${iconScale * 0.8})`);
       icon.setAttribute('aria-label',
         `Povoado nível ${level}: ${formatStatisticsNumber(production)} moedas por turno`);
       icon.setAttribute('pointer-events', 'none');
@@ -7979,16 +8279,28 @@
           }
           shape.setAttribute('fill', getRankColor(layer));
           shape.setAttribute('stroke', '#000000');
-          shape.setAttribute('stroke-width', '2');
-          shape.setAttribute('vector-effect', 'non-scaling-stroke');
+          if (currentBoardData?.randomMap?.generator === 'cartografo-estrategico') {
+            shape.setAttribute(
+              'stroke-width',
+              String(gameRules.getQuadrilateralRegionStrokeWidth(stageZoom))
+            );
+            shape.removeAttribute('vector-effect');
+          } else {
+            shape.setAttribute('stroke-width', '2');
+            shape.setAttribute('vector-effect', 'non-scaling-stroke');
+          }
           shape.dataset.region = code;
           getRegionRenderLayer(geometry).appendChild(shape);
         });
 
         regions.forEach(([code, geometry]) => {
           const renderLayer = getRegionRenderLayer(geometry);
-          appendCampaignFarmIcon(renderLayer, code, geometry, svgNamespace, iconScale);
-          appendCampaignVillageIcon(renderLayer, code, geometry, svgNamespace, iconScale);
+          const regionIconScale = gameRules.getQuadrilateralBuildingIconScale(
+            geometry.cells,
+            iconScale
+          );
+          appendCampaignFarmIcon(renderLayer, code, geometry, svgNamespace, regionIconScale);
+          appendCampaignVillageIcon(renderLayer, code, geometry, svgNamespace, regionIconScale);
           appendCampaignBagIcon(renderLayer, code, geometry, svgNamespace, iconScale);
         });
       });
@@ -9421,7 +9733,9 @@
       campaignActions.classList.toggle('is-hidden', !isCampaignGame() || !isGameStarted);
       levelEightReplayButton.classList.toggle('is-hidden', !isLevelEightCampaign());
       gameMenuResignButton.classList.toggle('is-hidden', isCampaignGame() || !isGameStarted);
-      focusStrongestRegionForTeam(currentTeam);
+      if (currentBoardData?.randomMap?.generator !== 'cartografo-estrategico') {
+        focusStrongestRegionForTeam(currentTeam);
+      }
       updateSelectedRegionPanel(selectedRegionCode);
       updateTurnState();
       if (isGameOver) return;
@@ -9652,6 +9966,30 @@
       }
       if (!isGameOver && aiRotationApplied && pontosDoTurn[aiTeam] > 0) {
         await runAiActions();
+      }
+      const randomCampaignLevelInfo = isCampaignGame()
+        ? getRandomCampaignLevelInfo(activeCampaignLevel?.id)
+        : null;
+      if (!isGameOver && randomCampaignLevelInfo &&
+          window.WillOfManyAI?.shouldDeclareWar) {
+        recalculateRegionForces();
+        const warSnapshot = getGameSnapshot();
+        warSnapshot.warConflicts = getCurrentWarConflicts().map((block) => ({
+          ...block,
+          ...getConflictSideForces(block)
+        }));
+        if (window.WillOfManyAI.shouldDeclareWar(warSnapshot)) {
+          const decision = { type: 'war' };
+          recordLevelEightReplayAction('aiDecision', {
+            team: aiTeam,
+            decision,
+            coinsAvailable: pontosDoTurn[aiTeam]
+          });
+          saveGame();
+          turnPlayer.textContent = `Vez: ${aiTeam === 'orange' ? 'laranja' : 'azul'} · IA: guerra`;
+          await waitForWarAnimation(500);
+          if (!isGameOver) await startWar(false);
+        }
       }
       isAiTurnRunning = false;
       updateTurnState();
@@ -10190,6 +10528,11 @@
         rotationTarget.key
       );
     });
+    stagePanel.addEventListener('pointerdown', startStagePinch, true);
+    stagePanel.addEventListener('pointermove', moveStagePinch, true);
+    stagePanel.addEventListener('pointerup', endStagePinch, true);
+    stagePanel.addEventListener('pointercancel', endStagePinch, true);
+    stagePanel.addEventListener('wheel', zoomStageFromWheel, { passive: false });
     stage.addEventListener('pointerdown', (event) => {
       if (quadrilateralRotationMode) {
         beginQuadrilateralRotationGesture(event);
@@ -10219,12 +10562,14 @@
       }
       if (conflictPreview) clearConflictPreview();
       if (!regionCode) {
+        if (startStagePan(event, null)) return;
         selectedRegionCode = null;
         updateSelectedRegionPanel();
         updateMobileRotationControls();
         return;
       }
       if (beginPieceDrag(event, regionCode)) return;
+      if (startStagePan(event, regionCode)) return;
       selectedRegionCode = regionCode;
       updateSelectedRegionPanel(selectedRegionCode);
       updateMobileRotationControls();
@@ -10241,12 +10586,14 @@
         continueQuadrilateralRotationGesture(event);
         return;
       }
+      if (moveStagePan(event)) return;
       if (!pieceDragState) return;
       event.preventDefault();
       event.stopPropagation();
       updateDraggedPiece(event.clientX, event.clientY);
     });
     stage.addEventListener('pointerup', (event) => {
+      if (endStagePan(event)) return;
       if (quadrilateralRotationMode) {
         finishQuadrilateralRotationGesture(event);
         return;
@@ -10257,6 +10604,7 @@
       finishPieceDrag(event.clientX, event.clientY);
     });
     stage.addEventListener('pointercancel', (event) => {
+      if (endStagePan(event, true)) return;
       if (quadrilateralRotationMode) {
         finishQuadrilateralRotationGesture(event, true);
         return;

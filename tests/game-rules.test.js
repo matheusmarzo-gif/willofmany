@@ -31,10 +31,55 @@ test('quadrilateral random-map regions get eight slots and enough focus zoom at 
 
   assert.equal(slots.length, 8);
   assert.equal(new Set(slots.map(({ x, y }) => `${x},${y}`)).size, 8);
-  assert.ok(focusScale > 1.8);
-  assert.ok(redRegionCell.width * 400 / 908 * focusScale >= 128);
-  assert.ok(redRegionCell.height * 400 / 908 * focusScale >= 64);
+  assert.ok(redRegionCell.width * 400 / 908 * focusScale >= 180);
+  assert.ok(redRegionCell.height * 400 / 908 * focusScale >= 90);
   assert.equal(rules.getQuadrilateralCellSlots([redRegionCell], 3).length, 3);
+});
+
+test('random-map pieces stay proportional to focused cells and respect the usual size cap', () => {
+  const focusedCell = { width: 128 * 908 / 600 / 17.6, height: 64 * 908 / 400 / 17.6 };
+  const focusedSize = rules.getQuadrilateralCellPieceSize([focusedCell], 600, 400, 17.6);
+  const globalSize = rules.getQuadrilateralCellPieceSize([focusedCell], 600, 400, 1);
+  const spaciousCell = { width: 500, height: 250 };
+
+  assert.ok(globalSize < focusedSize);
+  assert.ok(focusedSize < 24);
+  assert.ok(focusedSize > 20);
+  assert.equal(rules.getQuadrilateralCellPieceSize([spaciousCell], 600, 400, 4), 30);
+});
+
+test('random-map building icons are constrained to the region cell dimensions', () => {
+  const cells = [
+    { width: 16, height: 8 },
+    { width: 20, height: 10 }
+  ];
+  const scale = rules.getQuadrilateralBuildingIconScale(cells, 1.5);
+
+  assert.equal(scale, 8 * 0.8 / 34);
+  assert.ok(34 * scale <= 8 * 0.8);
+  assert.equal(rules.getQuadrilateralBuildingIconScale([], 1.5), 1.5);
+  assert.equal(rules.getQuadrilateralBuildingIconScale(cells, 0), 0);
+});
+
+test('random-map cell borders shrink with focus zoom instead of covering the cells', () => {
+  assert.equal(rules.getQuadrilateralRegionStrokeWidth(1), 2);
+  assert.equal(rules.getQuadrilateralRegionStrokeWidth(17.6), 2 / 17.6);
+});
+
+test('board zoom clamps its range and preserves the point under the zoom gesture', () => {
+  assert.equal(rules.clampStageZoom(0.4), 1);
+  assert.equal(rules.clampStageZoom(45), 40);
+  const offset = rules.getStageZoomOffsetAtPoint(
+    { x: 40, y: -20 },
+    2,
+    4,
+    { x: 140, y: 100 },
+    { x: 200, y: 160 }
+  );
+
+  assert.deepEqual(offset, { x: 0, y: -80 });
+  assert.equal(offset.x + ((140 - 40) / 2) * 4, 200);
+  assert.equal(offset.y + ((100 + 20) / 2) * 4, 160);
 });
 
 test('static campaign boards keep their original cell axes while random maps use generator axes', () => {
@@ -100,6 +145,61 @@ test('AI turn action limit is configurable and defaults to 35', () => {
   } finally {
     gameAI.setConfig(originalConfig);
   }
+});
+
+test('AI declares war in random campaign levels when expected captures exceed losses', () => {
+  assert.equal(gameAI.shouldDeclareWar({
+    aiTeam: 'blue',
+    campaignLevelId: 'random-10',
+    currentTurn: 1,
+    warConflicts: [{
+      attacker: 'orange',
+      alliedRegions: ['L8-1'],
+      enemyRegions: ['L8-2'],
+      orangeForce: 12,
+      blueForce: 18
+    }]
+  }), true);
+});
+
+test('AI skips war when expected territory losses match or exceed captures', () => {
+  assert.equal(gameAI.shouldDeclareWar({
+    aiTeam: 'blue',
+    campaignLevelId: 'random-10',
+    warConflicts: [
+      {
+        attacker: 'orange',
+        alliedRegions: ['L8-1', 'L8-2'],
+        enemyRegions: ['L8-3'],
+        orangeForce: 10,
+        blueForce: 20
+      },
+      {
+        attacker: 'blue',
+        alliedRegions: ['L8-4', 'L8-5'],
+        enemyRegions: ['L8-6', 'L8-7'],
+        orangeForce: 20,
+        blueForce: 10
+      }
+    ]
+  }), false);
+});
+
+test('AI war decision is limited to random campaign Level 10 and later', () => {
+  const snapshot = {
+    aiTeam: 'blue',
+    campaignLevelId: 'random-9',
+    warConflicts: [{
+      attacker: 'orange',
+      alliedRegions: ['L8-1'],
+      enemyRegions: ['L8-2'],
+      orangeForce: 10,
+      blueForce: 20
+    }]
+  };
+
+  assert.equal(gameAI.shouldDeclareWar(snapshot), false);
+  assert.equal(gameAI.shouldDeclareWar({ ...snapshot, campaignLevelId: 'tabuleiro-09' }), false);
 });
 
 test('AI base desirability scores match the editable strategy configuration', () => {

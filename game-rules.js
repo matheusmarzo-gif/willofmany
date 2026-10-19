@@ -474,13 +474,78 @@
       ? Number(minimumScale)
       : 1.8;
     if (!cell || !Number.isFinite(availableWidth) || availableWidth <= 0) return scaleFloor;
-    const minCellWidth = 128;
-    const minCellHeight = 64;
+    const minCellWidth = 180;
+    const minCellHeight = 90;
     return Math.max(
       scaleFloor,
       minCellWidth * 908 / (cell.width * availableWidth),
       minCellHeight * 908 / (cell.height * availableWidth)
     );
+  }
+
+  function getQuadrilateralCellPieceSize(cells, panelWidth, panelHeight, zoom = 1, maxSize = 30) {
+    if (!Array.isArray(cells) || !cells.length) return maxSize;
+    const availableWidth = Number(panelWidth);
+    const availableHeight = Number(panelHeight);
+    const scale = Number(zoom);
+    const limit = Number(maxSize);
+    if (![availableWidth, availableHeight, scale, limit].every(Number.isFinite) ||
+        availableWidth <= 0 || availableHeight <= 0 || scale <= 0 || limit <= 0) {
+      return maxSize;
+    }
+    const validCells = cells.filter((cell) =>
+      [cell?.width, cell?.height].every(Number.isFinite) &&
+      cell.width > 0 && cell.height > 0);
+    if (!validCells.length) return maxSize;
+    const screenCellWidth = Math.min(...validCells.map((cell) =>
+      cell.width * availableWidth / 908 * scale));
+    const screenCellHeight = Math.min(...validCells.map((cell) =>
+      cell.height * availableHeight / 908 * scale));
+    return Math.max(1, Math.min(limit, screenCellWidth / 4 * 0.7, screenCellHeight / 2 * 0.7));
+  }
+
+  function getQuadrilateralBuildingIconScale(cells, defaultScale, maxIconExtent = 34) {
+    const scale = Number(defaultScale);
+    const extent = Number(maxIconExtent);
+    const validCells = Array.isArray(cells) ? cells.filter((cell) =>
+      [cell?.width, cell?.height].every(Number.isFinite) &&
+      cell.width > 0 && cell.height > 0) : [];
+    if (!Number.isFinite(scale) || scale <= 0 || !Number.isFinite(extent) ||
+        extent <= 0 || !validCells.length) return defaultScale;
+    const smallestCellExtent = Math.min(...validCells.flatMap((cell) =>
+      [cell.width, cell.height]));
+    return Math.min(scale, smallestCellExtent * 0.8 / extent);
+  }
+
+  function getQuadrilateralRegionStrokeWidth(zoom, baseWidth = 2) {
+    const scale = Number(zoom);
+    const width = Number(baseWidth);
+    if (!Number.isFinite(scale) || scale <= 0 || !Number.isFinite(width) || width <= 0) return baseWidth;
+    return width / Math.max(1, scale);
+  }
+
+  function clampStageZoom(zoom, minimum = 1, maximum = 40) {
+    const value = Number(zoom);
+    const lower = Number(minimum);
+    const upper = Number(maximum);
+    if (![value, lower, upper].every(Number.isFinite) || lower <= 0 || upper < lower) {
+      return 1;
+    }
+    return Math.max(lower, Math.min(upper, value));
+  }
+
+  function getStageZoomOffsetAtPoint(offset, oldZoom, newZoom, startPoint, currentPoint = startPoint) {
+    const scaleBefore = Number(oldZoom);
+    const scaleAfter = Number(newZoom);
+    if (![offset?.x, offset?.y, scaleBefore, scaleAfter,
+      startPoint?.x, startPoint?.y, currentPoint?.x, currentPoint?.y].every(Number.isFinite) ||
+        scaleBefore <= 0 || scaleAfter <= 0) {
+      return { x: Number(offset?.x) || 0, y: Number(offset?.y) || 0 };
+    }
+    return {
+      x: currentPoint.x - ((startPoint.x - offset.x) / scaleBefore) * scaleAfter,
+      y: currentPoint.y - ((startPoint.y - offset.y) / scaleBefore) * scaleAfter
+    };
   }
 
   function getAnnularSectorCentroid({ centerX, centerY, innerRadius, outerRadius, startAngle, endAngle }) {
@@ -533,6 +598,11 @@
     getQuadrilateralCellDimensions,
     getQuadrilateralCellSlots,
     getQuadrilateralCellFocusScale,
+    getQuadrilateralCellPieceSize,
+    getQuadrilateralBuildingIconScale,
+    getQuadrilateralRegionStrokeWidth,
+    clampStageZoom,
+    getStageZoomOffsetAtPoint,
     getAnnularSectorCentroid
   });
 });

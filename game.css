@@ -127,6 +127,12 @@
     .stage-panel-close { position:absolute; top:10px; right:10px; z-index:40; display:none; width:30px; height:30px; border:1px solid var(--line); background:rgba(255,255,255,.88); font-size:20px; font-weight:400; line-height:1; }
     .stage-panel.is-focused .stage-panel-close { display:block; }
     .stage { position:relative; width:100%; height:100%; aspect-ratio:1; isolation:isolate; filter:drop-shadow(0 24px 28px rgba(48,43,33,.11)); transform-origin:center; transition:transform .42s cubic-bezier(.22,.8,.25,1); touch-action:none; }
+    .stage.is-random-map-dragging::after { content:""; position:absolute; z-index:0; inset:0; background:rgba(0,0,0,.74); pointer-events:none; }
+    .stage.is-random-map-dragging .layer [data-region]:not(.drag-target-available) { filter:brightness(.28); }
+    .stage { cursor:grab; }
+    .stage.is-panning { cursor:grabbing; transition:none; }
+    .stage.is-zoomed,.stage.is-panning { filter:none; }
+    .stage.is-user-zooming { transition:none; }
     .stage.is-level-three-intro-setup { transition:none; }
     .stage.is-level-three-intro-pan { transition-duration:3s; transition-timing-function:linear; }
     .stage.is-level-three-intro-return { transition-duration:2s; transition-timing-function:linear; }
@@ -174,9 +180,9 @@
     .app.is-campaign-guiding .board-focus-outline.is-selected-outer,
     .app.is-campaign-guiding .board-focus-outline.is-selected-inner { display:none; }
     .drag-target-outline { fill:rgba(85,190,132,.16); stroke:#75e0a2; stroke-width:5px; stroke-dasharray:10 6; vector-effect:non-scaling-stroke; filter:drop-shadow(0 0 5px rgba(40,160,95,.9)); }
+    .layer .drag-target-available { filter:brightness(1.22); stroke:#65cb8b !important; }
     .layer [data-circular-rotation-group] { transform-box:view-box; }
     .drag-overlay { position:absolute; inset:0; z-index:15; width:100%; height:100%; pointer-events:none; }
-    .stage.is-dragging .drag-overlay { backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); }
     .trash-drop-zone { position:fixed; z-index:80; display:grid; justify-items:center; align-content:center; width:72px; min-height:80px; padding:7px 5px; border:1px solid rgba(103,45,34,.28); border-radius:12px; background:rgba(255,250,244,.96); box-shadow:0 5px 18px rgba(32,33,31,.24); color:#7c3425; pointer-events:none; transform:translateY(-50%) scale(.88); opacity:0; transition:opacity .16s ease,transform .16s ease,background .16s ease; }
     .trash-drop-zone.is-visible { pointer-events:auto; transform:translateY(-50%) scale(1); opacity:1; }
     .trash-drop-zone.is-guide-visible { display:grid; pointer-events:none; transform:translateY(-50%) scale(1); opacity:1; }
@@ -192,8 +198,8 @@
     .piece-pointer.red::after { bottom:0; border-top:10px solid currentColor; border-right:6px solid transparent; border-left:6px solid transparent; }
     .piece-pointer.black { bottom:-9%; color:#242424; }
     .piece-pointer.black::after { top:0; border-right:6px solid transparent; border-bottom:10px solid currentColor; border-left:6px solid transparent; }
-    .piece { position:absolute; width:30px; height:30px; object-fit:contain; transform:translate(-50%,-50%); animation:piece-in .24s ease-out both; }
-    .drag-piece { position:absolute; z-index:45; width:30px; height:30px; pointer-events:none; object-fit:contain; opacity:.96; filter:drop-shadow(0 4px 5px rgba(0,0,0,.28)); transform:translate(-50%,-50%) scale(1.12); }
+    .piece { position:absolute; width:30px; height:30px; aspect-ratio:1; object-fit:contain; object-position:center; transform:translate(-50%,-50%); animation:piece-in .24s ease-out both; }
+    .drag-piece { position:fixed; z-index:1000; width:30px; height:30px; aspect-ratio:1; pointer-events:none; object-fit:contain; object-position:center; opacity:.96; filter:drop-shadow(0 4px 5px rgba(0,0,0,.28)); transform:translate(-50%,-50%) scale(1.12); }
     .piece.is-drag-source { opacity:.24; }
     .piece.heavy-rotation { transition:left 3s cubic-bezier(.7,0,.9,.45),top 3s cubic-bezier(.7,0,.9,.45),transform 3s cubic-bezier(.7,0,.9,.45); }
     .piece-controls { display:flex; justify-content:center; gap:10px; margin-top:22px; }

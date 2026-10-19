@@ -57,8 +57,13 @@ test('generated maps use unique game region IDs and wider quadrilateral cells', 
       }
     }
     assert.equal(reached.size, targetRegions, 'generated regions remain connected after exact sizing');
-    const startingPieces = regions.flatMap((region) => region.initialPieces);
+    const startingRegions = regions.filter((region) => region.initialPieces.length);
+    assert.equal(startingRegions.length, 2);
+    assert.equal(new Set(startingRegions.map((region) => region.code)).size, 2);
+    assert.ok(startingRegions.every((region) => /^L8-\d+$/.test(region.code)));
+    const startingPieces = startingRegions.flatMap((region) => region.initialPieces);
     assert.deepEqual(startingPieces.map((piece) => piece.team).sort(), ['blue', 'orange']);
+    assert.ok(startingPieces.every((piece) => piece.stage === 'g'));
     assert.ok(regions.some((region) => region.villageBuildingLevel !== undefined));
     assert.ok(regions.some((region) => region.farmBuildingLevel !== undefined));
     assert.ok(Buffer.byteLength(JSON.stringify(board)) < 2_000_000);
