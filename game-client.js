@@ -1359,6 +1359,10 @@
       return gameMode === 'campaign' && !!activeCampaignLevel;
     }
 
+    function hasTurn30Limit() {
+      return gameMode !== 'ai' && !isOnlineGame();
+    }
+
     function isRandomMapEliminationVictoryMode() {
       if (currentBoardData?.randomMap?.generator !== 'cartografo-estrategico') return false;
       if (isCampaignGame()) {
@@ -3333,7 +3337,8 @@
           finishGame(centerWinner, 'center');
         } else if (finishCampaignIfObjectiveMet()) {
           return;
-        } else if (isAutomatic && (!isOnlineGame() || onlineTeam === 'orange')) {
+        } else if (isAutomatic && hasTurn30Limit() &&
+            (!isOnlineGame() || onlineTeam === 'orange')) {
           finishGame(null, 'turn30');
         }
         return;
@@ -3429,7 +3434,8 @@
         finishGame(centerWinner, 'center');
       } else if (finishCampaignIfObjectiveMet()) {
         return;
-      } else if (isAutomatic && (!isOnlineGame() || onlineTeam === 'orange')) {
+      } else if (isAutomatic && hasTurn30Limit() &&
+          (!isOnlineGame() || onlineTeam === 'orange')) {
         finishGame(null, 'turn30');
       }
       maybeShowCampaignResourceDefeat();
@@ -10296,7 +10302,7 @@
       const wheatMessage = getWheatShortageMessage(wheatReport);
       if (wheatMessage) readout.textContent = wheatMessage;
       passTurnButton.disabled = !isLocalPlayersTurn();
-      if (currentTurn === 30) {
+      if (currentTurn === 30 && hasTurn30Limit()) {
         if (!isOnlineGame() || onlineTeam === 'orange') await startWar(true);
         return;
       }
@@ -11650,7 +11656,8 @@
           updateTurnState();
           updateWarAvailability();
           updateSelectedRegionPanel(selectedRegionCode);
-          if (currentTurn === 30 && !isWarRunning && !isGameOver) startWar(true);
+          if (currentTurn === 30 && hasTurn30Limit() &&
+              !isWarRunning && !isGameOver) startWar(true);
         }
         startMessage.textContent = '';
         return;

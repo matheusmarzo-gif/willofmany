@@ -380,6 +380,17 @@ test('AI and online war can be started on any turn while other modes keep their 
   assert.match(clickHandler, /isOnlineGame\(\) && onlineTeam === 'blue'[\s\S]*?type: 'war_request'/);
 });
 
+test('AI and online games do not end automatically on turn 30', () => {
+  assert.match(gameClient,
+    /function hasTurn30Limit\(\)\s*\{\s*return gameMode !== 'ai' && !isOnlineGame\(\);\s*\}/);
+  assert.match(gameClient,
+    /isAutomatic && hasTurn30Limit\(\)[\s\S]*?finishGame\(null, 'turn30'\)/);
+  assert.match(gameClient,
+    /if \(currentTurn === 30 && hasTurn30Limit\(\)\)[\s\S]*?startWar\(true\)/);
+  assert.match(gameClient,
+    /if \(currentTurn === 30 && hasTurn30Limit\(\) &&\s*!isWarRunning && !isGameOver\) startWar\(true\)/);
+});
+
 test('random maps can be sized for AI games and retain the game coordinate dimensions', () => {
   assert.match(html, /id="ai-random-map-enabled" type="checkbox"/);
   assert.match(html, /id="ai-random-map-target" type="number" min="25" max="900"/);
