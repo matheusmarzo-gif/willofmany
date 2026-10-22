@@ -8,14 +8,16 @@
   var weights = { g: 1, f: 7, e: 42, d: 210, c: 840, b: 2520, a: 5040 };
   var strongestToWeakest = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
   var opposite = { orange: 'blue', blue: 'orange' };
+  var movementCostByLayer = { 8: 1, 7: 4, 6: 16, 5: 64, 4: 256, 3: 1024, 2: 4096 };
+  var promotionCostByLayer = { 8: 3, 7: 9, 6: 27, 5: 81, 4: 243, 3: 729, 2: 2197 };
 
   // Tunable strategy weights/priorities, overridable via will-of-many-ai-config.json
   // (loaded by the game client and applied through WillOfManyAI.setConfig). These only
   // affect AI decision preferences, never the game's real economy (piece/move/promotion
   // costs), which remain fixed game rules defined further below.
   var DEFAULT_CONFIG = {
-    maxActionsPerTurn: 35,
-    layerBalanceMinRatio: 0.5,
+    maxActionsPerTurn: 45,
+    layerBalanceMinRatio: 0.65,
     weakOuterLayerBuyRatio: 0.5,
     recycleCoinThresholdByLayer: { 8: 25, 7: 80, 6: 400, 5: 800 },
     highBalanceTurnRule: {
@@ -24,7 +26,7 @@
       recycleByLayer: { 8: ['g', 'f'], 7: ['g'] },
       prohibitPurchasesByLayer: { 8: ['g', 'f'], 7: ['g'] }
     },
-    conquestPriority: { baseWeight: 1.0, weightPerRegionDeficit: 0.5, maxWeight: 6.0 },
+    conquestPriority: { baseWeight: 1.2, weightPerRegionDeficit: 0.7, maxWeight: 8 },
     conquestCostHeuristic: { freeRegionCost: 2, sufficientForceRatioCost: 4 },
     rankChange: {
       minimumPriority: 1,
@@ -36,7 +38,7 @@
     wheat: { seekFarmsWhenDeficit: true, proactiveReserveTurns: 2 },
     povoados: {
       enabled: true,
-      discountFactor: 0.85,
+      discountFactor: 0.88,
       evaluationHorizonTurns: 8,
       captureCostPerStep: 4,
       desirabilityWeight: 0.5,
@@ -69,22 +71,22 @@
         { maxPercent: 1200, allied: -250, enemy: 400 },
         { maxPercent: null, allied: -400, enemy: 600 }
       ],
-      farmBonusByLevel: { 1: 30, 2: 50, 3: 80, 4: 100, 5: 150 },
-      wheatDeficitFarmBonus: 100,
+      farmBonusByLevel: { 1: 60, 2: 120, 3: 220, 4: 380, 5: 600 },
+      wheatDeficitFarmBonus: 220,
       unsupportedNeighborBonus: 40,
       troopRatioByOuterLayer: { 8: 8, 7: 7, 6: 6, 5: 5, 4: 4, 3: 3, 2: 2 },
       troopDeficitBonus: 100,
       external: { logBase: 2, offset: 2, distanceScale: 1, exponent: 2 },
       penalties: {
         inaccessible: {
-          amount: 20,
-          durationTurns: 5,
+          amount: 10,
+          durationTurns: 2,
           label: 'Inacessibilidade',
           description: 'Sem vizinhos de rank igual ou imediatamente adjacente.'
         },
         unavailableAction: {
-          amount: 20,
-          durationTurns: 5,
+          amount: 10,
+          durationTurns: 1,
           label: 'Ação temporariamente inviável',
           description: 'Há vizinhos de rank elegível, mas nenhuma ação legal e viável no momento.'
         }
@@ -183,26 +185,96 @@
     });
   }
 
-  function getDistancesFromOwnedRegions(snapshot, team, human, codes) {
-    var distances = {};
+  function getRankAwareRoutesFromOwnedRegions(snapshot, team, human, codes, captureCostPerStep) {
+    var routes = {};
     var queue = [];
+
+    function compareRoutes(left, right) {
+      return left.cost - right.cost || left.steps - right.steps ||
+        left.code.localeCompare(right.code);
+    }
+
+    function pushRoute(route) {
+      queue.push(route);
+      var index = queue.length - 1;
+      while (index > 0) {
+        var parent = Math.floor((index - 1) / 2);
+        if (compareRoutes(queue[parent], route) <= 0) break;
+        queue[index] = queue[parent];
+        index = parent;
+      }
+      queue[index] = route;
+    }
+
+    function popRoute() {
+      var first = queue[0];
+      var last = queue.pop();
+      if (queue.length) {
+        var index = 0;
+        while (true) {
+          var left = index * 2 + 1;
+          var right = left + 1;
+          if (left >= queue.length) break;
+          var child = right < queue.length &&
+            compareRoutes(queue[right], queue[left]) < 0 ? right : left;
+          if (compareRoutes(queue[child], last) >= 0) break;
+          queue[index] = queue[child];
+          index = child;
+        }
+        queue[index] = last;
+      }
+      return first;
+    }
+
     codes.forEach(function (code) {
       if (getRegionOwner(snapshot, code, team, human) !== team) return;
-      distances[code] = 0;
-      queue.push(code);
+      routes[code] = { cost: 0, steps: 0, source: code, firstHop: null };
+      pushRoute({ code: code, cost: 0, steps: 0, source: code, firstHop: null });
     });
-    for (var index = 0; index < queue.length; index += 1) {
-      var code = queue[index];
-      getSnapshotNeighbors(snapshot, code).forEach(function (neighbor) {
-        if (distances[neighbor] !== undefined) return;
-        distances[neighbor] = distances[code] + 1;
-        queue.push(neighbor);
+
+    while (queue.length) {
+      var current = popRoute();
+      var currentRoute = routes[current.code];
+      if (!currentRoute || current.cost !== currentRoute.cost ||
+          current.steps !== currentRoute.steps) continue;
+      if (getRegionOwner(snapshot, current.code, team, human) === human) continue;
+      var sourceLayer = getRegionLayer(current.code);
+      getSnapshotNeighbors(snapshot, current.code).forEach(function (neighbor) {
+        var targetLayer = getRegionLayer(neighbor);
+        var isMove = targetLayer === sourceLayer;
+        var isPromotion = targetLayer === sourceLayer - 1;
+        if (!isMove && !isPromotion) return;
+        var transitionCost = isMove
+          ? movementCostByLayer[sourceLayer]
+          : promotionCostByLayer[sourceLayer];
+        if (!Number.isFinite(transitionCost)) return;
+        var owner = getRegionOwner(snapshot, neighbor, team, human);
+        var nextCost = current.cost + transitionCost +
+          (owner === team ? 0 : Math.max(0, Number(captureCostPerStep) || 0));
+        var nextSteps = current.steps + 1;
+        var previous = routes[neighbor];
+        if (previous && (previous.cost < nextCost ||
+            (previous.cost === nextCost && previous.steps <= nextSteps))) return;
+        var nextRoute = {
+          cost: nextCost,
+          steps: nextSteps,
+          source: current.steps === 0 ? current.code : current.source,
+          firstHop: current.steps === 0 ? neighbor : current.firstHop
+        };
+        routes[neighbor] = nextRoute;
+        pushRoute({
+          code: neighbor,
+          cost: nextCost,
+          steps: nextSteps,
+          source: nextRoute.source,
+          firstHop: nextRoute.firstHop
+        });
       });
     }
-    return distances;
+    return routes;
   }
 
-  function calculatePovoadoNetPresentValue(production, distance, settings) {
+  function calculatePovoadoNetPresentValue(production, distance, settings, routeCost) {
     settings = object(settings);
     var horizon = Math.max(1, Math.floor(Number(settings.evaluationHorizonTurns) || 8));
     var discountFactor = Number(settings.discountFactor);
@@ -214,8 +286,9 @@
     for (var turn = distanceTurns + 1; turn <= horizon; turn += 1) {
       discountedIncome += production * Math.pow(discountFactor, turn);
     }
-    var captureCost = distanceTurns *
-      Math.max(0, Number(settings.captureCostPerStep) || 0);
+    var captureCost = Number.isFinite(Number(routeCost))
+      ? Math.max(0, Number(routeCost))
+      : distanceTurns * Math.max(0, Number(settings.captureCostPerStep) || 0);
     return Math.max(0, discountedIncome - captureCost);
   }
 
@@ -482,7 +555,7 @@
     );
   }
 
-  function calculateDesirability(snapshot, settings, penaltyTotals, penaltyEntries) {
+  function calculateDesirability(snapshot, settings, penaltyTotals, penaltyEntries, routeCache) {
     snapshot = object(snapshot);
     settings = object(settings || config.desirability);
     penaltyTotals = object(penaltyTotals);
@@ -500,7 +573,6 @@
         if (codes.indexOf(code) === -1) codes.push(code);
       });
     });
-
     var relativeBands = Array.isArray(settings.relativeStrengthBands)
       ? settings.relativeStrengthBands
       : [];
@@ -561,8 +633,10 @@
     var wheatDeficit = snapshot.wheatEnabled === true &&
       getSnapshotWheatBalance(snapshot, team) < 0;
     var povoadoSettings = object(config.povoados);
-    var villageDistances = povoadoSettings.enabled === true
-      ? getDistancesFromOwnedRegions(snapshot, team, human, codes)
+    var villageRoutes = povoadoSettings.enabled === true
+      ? (routeCache || getRankAwareRoutesFromOwnedRegions(
+        snapshot, team, human, codes, povoadoSettings.captureCostPerStep
+      ))
       : {};
     var farmBonuses = object(settings.farmBonusByLevel);
     var wheatFarmBonus = Number(settings.wheatDeficitFarmBonus) || 0;
@@ -614,13 +688,13 @@
       }
       var villageLevel = Number(region.villageBuildingLevel);
       var villageProduction = Number(rules.villageCoinProductionByLevel[villageLevel]) || 0;
-      var villageDistance = villageDistances[code];
-      if (villageProduction > 0 && score.owner !== team &&
-          Number.isFinite(villageDistance)) {
+      var villageRoute = villageRoutes[code];
+      if (villageProduction > 0 && score.owner !== team && villageRoute) {
         var villageValue = calculatePovoadoNetPresentValue(
           villageProduction,
-          villageDistance,
-          povoadoSettings
+          villageRoute.steps,
+          povoadoSettings,
+          villageRoute.cost
         ) * Math.max(0, Number(povoadoSettings.desirabilityWeight) || 0);
         var villageBonus = Math.min(
           Math.max(0, Number(povoadoSettings.maxDesirabilityBonus) || 0),
@@ -765,6 +839,20 @@
         if (codes.indexOf(code) === -1) codes.push(code);
       });
     });
+    var strategicRoutes = null;
+
+    function getStrategicRoutes() {
+      if (!strategicRoutes) {
+        strategicRoutes = getRankAwareRoutesFromOwnedRegions(
+          snapshot,
+          team,
+          human,
+          codes,
+          object(config.povoados).captureCostPerStep
+        );
+      }
+      return strategicRoutes;
+    }
 
     function teamPieces(code, side) {
       var region = object(piecesByRegion[code] || regions[code]);
@@ -1057,54 +1145,25 @@
       return { production: production, consumption: consumption, balance: production - consumption };
     }
 
-    // Straight-line (x,y) distance between two regions' centers, as explicitly requested:
-    // a "burro mas eficiente" way to estimate real proximity to a farm, since the board's
-    // promotion/move adjacency graph does not represent physical closeness (it only models
-    // which layer a region can advance toward, always inward).
-    function euclideanDistance(sourceCode, targetCode) {
-      var source = object(regions[sourceCode]);
-      var target = object(regions[targetCode]);
-      var sx = Number(source.centerX);
-      var sy = Number(source.centerY);
-      var tx = Number(target.centerX);
-      var ty = Number(target.centerY);
-      if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(tx) || !Number.isFinite(ty)) {
-        return Infinity;
-      }
-      return Math.sqrt((sx - tx) * (sx - tx) + (sy - ty) * (sy - ty));
-    }
-
-    // Distance to a farm: prefer real (x,y) proximity (works across layers/quadrants, which
-    // the inward-only BFS distanceToRegion cannot represent); fall back to the BFS hop-count
-    // only when coordinates are unavailable.
-    function distanceToFarm(sourceCode, farmCode) {
-      var euclidean = euclideanDistance(sourceCode, farmCode);
-      if (Number.isFinite(euclidean)) return euclidean;
-      return distanceToRegion(sourceCode, farmCode);
-    }
-
-    // Find closest farm to owned regions
+    // Rank movement and promotion costs determine both route length and affordability.
     function findClosestFarm() {
-      var farms = findFarmRegions();
-      if (!farms.length) return null;
-
-      var ownedRegions = codes.filter(function (code) { return owns(code, team); });
-      if (!ownedRegions.length) return null;
-
-      var closest = null;
-      var closestDistance = Infinity;
-
-      farms.forEach(function (farm) {
-        ownedRegions.forEach(function (ownedCode) {
-          var dist = distanceToFarm(ownedCode, farm.code);
-          if (dist < closestDistance && !owns(farm.code, team)) {
-            closestDistance = dist;
-            closest = { farm: farm.code, distance: dist, nearestOwned: ownedCode };
-          }
-        });
-      });
-
-      return closest;
+      return findFarmRegions()
+        .filter(function (farm) { return !owns(farm.code, team); })
+        .map(function (farm) {
+          var route = getStrategicRoutes()[farm.code];
+          return route ? {
+            farm: farm.code,
+            distance: route.cost,
+            route: route,
+            production: farm.production
+          } : null;
+        })
+        .filter(Boolean)
+        .sort(function (left, right) {
+          return left.distance / left.production - right.distance / right.production ||
+            left.distance - right.distance ||
+            left.farm.localeCompare(right.farm);
+        })[0] || null;
     }
 
     // Calculate conquest priority weight based on region count difference
@@ -1155,79 +1214,21 @@
       }, 0);
     }
 
-    // Find the single best next step (an owned region's neighbor) toward the wheat
-    // emergency target: the one that most reduces distance-to-farm, tie-broken by
-    // preferring the outer (cheaper) layer, exactly as described for the manual plan.
-    function findNextWheatHop(farmTarget) {
-      var best = null;
-      codes.forEach(function (source) {
-        if (!owns(source, team)) return;
-        var sourceLayer = layer(source);
-        adjacent(source).forEach(function (target) {
-          if (owns(target, team)) return;
-          var targetLayer = layer(target);
-          var isMove = targetLayer === sourceLayer;
-          var isPromotion = targetLayer === sourceLayer - 1;
-          if (!isMove && !isPromotion) return;
-          var distance = distanceToFarm(target, farmTarget);
-          if (!Number.isFinite(distance)) return;
-          if (!best || distance < best.distance ||
-              (distance === best.distance && targetLayer > best.targetLayer)) {
-            best = { source: source, target: target, distance: distance, targetLayer: targetLayer, isMove: isMove };
-          }
-        });
-      });
-      return best;
-    }
-
-    // Step-by-step wheat emergency planner: while wheat is in deficit, buy/advance toward
-    // the closest reachable farm one action at a time (the AI turn loop re-invokes
-    // chooseAction after every action, so this naturally chains into a full campaign as
-    // force and territory are recomputed on each call).
-    function planWheatEmergencyAction() {
-      if (!config.wheat.seekFarmsWhenDeficit) return null;
-      var balanceInfo = getWheatBalance();
-      if (!shouldSeekFarmForWheat(
-        snapshot,
-        team,
-        balanceInfo,
-        object(config.wheat).proactiveReserveTurns
-      )) return null;
-
-      var farms = findFarmRegions().filter(function (farm) { return !owns(farm.code, team); });
-      if (!farms.length) return null;
-      var ownedRegions = codes.filter(function (code) { return owns(code, team); });
-      if (!ownedRegions.length) return null;
-
-      var farmDistances = farms.map(function (farm) {
-        var minDistance = Infinity;
-        ownedRegions.forEach(function (ownedCode) {
-          var distance = distanceToFarm(ownedCode, farm.code);
-          if (distance < minDistance) minDistance = distance;
-        });
-        return { code: farm.code, distance: minDistance };
-      }).filter(function (farm) { return Number.isFinite(farm.distance); });
-      if (!farmDistances.length) return null;
-
-      var minFarmDistance = Math.min.apply(null, farmDistances.map(function (farm) { return farm.distance; }));
-      var closestFarms = farmDistances.filter(function (farm) { return farm.distance === minFarmDistance; });
-      var farmTarget = randomItem(closestFarms).code;
-
-      var hop = findNextWheatHop(farmTarget);
-      if (!hop) return null;
-
-      var source = hop.source;
-      var target = hop.target;
+    function planResourceRouteAction(route) {
+      if (!route || !route.firstHop || !route.source) return null;
+      var source = route.source;
+      var targetCode = route.firstHop;
       var sourceLayer = layer(source);
-      var targetOwner = object(regions[target]).dominator || object(regions[target]).owner;
-      var isFree = !targetOwner || targetOwner === 'free';
-      var cost = hop.isMove ? moveCosts[sourceLayer] : promotionCosts[sourceLayer];
+      var targetLayer = layer(targetCode);
+      var isMove = targetLayer === sourceLayer;
+      var targetOwner = object(regions[targetCode]).dominator || object(regions[targetCode]).owner;
+      var isFree = !owns(targetCode, human) &&
+        (!targetOwner || targetOwner === 'free');
+      if (!isFree && isMove) return null;
+      var cost = isMove ? moveCosts[sourceLayer] : promotionCosts[sourceLayer];
 
       if (!isFree) {
-        // Enemy-occupied: the AI needs enough layer-wide force to both (a) satisfy the
-        // engine's own promotion-budget gate and (b) have the safety ratio over the
-        // defender used elsewhere (requiredRatio === sourceLayer, same as calculateConquestCost).
-        var enemyForce = force(target, human);
+        var enemyForce = force(targetCode, human);
         var requiredRatio = sourceLayer;
         var ownLayerForce = layerForce(sourceLayer, team);
         var superiorLayerForce = layerForce(sourceLayer - 1, team);
@@ -1244,12 +1245,10 @@
         }
       }
 
-        if (force(source, team) < 2 || !keepsLayerBalance(source, 1) ||
-          !transferPreservesComposition(source, target, team, 1) ||
-          (hop.isMove && isReverseMoveBlocked(source, target, 1)) ||
-          (!hop.isMove && promotionBudget(source) < 1)) {
-        // Force is layer-sufficient but this specific source can't issue the transfer yet
-        // (e.g. local composition/budget constraints) - buy one more unit here to unlock it.
+      if (force(source, team) < 2 || !keepsLayerBalance(source, 1) ||
+          !transferPreservesComposition(source, targetCode, team, 1) ||
+          (isMove && isReverseMoveBlocked(source, targetCode, 1)) ||
+          (!isMove && promotionBudget(source) < 1)) {
         var unlockPurchase = strongestToWeakest.map(function (stage) {
           return getPurchaseAction(source, stage);
         }).find(function (action) { return action !== null; });
@@ -1257,9 +1256,56 @@
       }
 
       if (!Number.isFinite(Number(points)) || Number(points) < cost) return null;
-      return hop.isMove
-        ? { type: 'move', source: source, target: target, amount: 1 }
-        : getPromotionPurchaseAction(source, target, 1);
+      return isMove
+        ? { type: 'move', source: source, target: targetCode, amount: 1 }
+        : getPromotionPurchaseAction(source, targetCode, 1);
+    }
+
+    function planWheatEmergencyAction() {
+      if (!config.wheat.seekFarmsWhenDeficit || snapshot.wheatEnabled === false) return null;
+      var balanceInfo = getWheatBalance();
+      if (!shouldSeekFarmForWheat(
+        snapshot,
+        team,
+        balanceInfo,
+        object(config.wheat).proactiveReserveTurns
+      )) return null;
+      var farm = findClosestFarm();
+      return farm && farm.route.steps > 1
+        ? planResourceRouteAction(farm.route)
+        : null;
+    }
+
+    function planVillageExpansionAction() {
+      var villageSettings = object(config.povoados);
+      if (villageSettings.enabled !== true) return null;
+      var routes = getStrategicRoutes();
+      var candidates = Object.keys(routes).map(function (code) {
+        var route = routes[code];
+        var region = object(regions[code]);
+        var level = Number(region.villageBuildingLevel);
+        var production = Number(rules.villageCoinProductionByLevel[level]) || 0;
+        if (!production || owns(code, team) || !route.firstHop || route.steps <= 1) return null;
+        var netValue = calculatePovoadoNetPresentValue(
+          production,
+          route.steps,
+          villageSettings,
+          route.cost
+        );
+        return netValue > 0
+          ? { code: code, route: route, value: netValue }
+          : null;
+      }).filter(Boolean).sort(function (left, right) {
+        return right.value - left.value ||
+          left.route.cost - right.route.cost ||
+          left.code.localeCompare(right.code);
+      });
+
+      for (var index = 0; index < candidates.length; index += 1) {
+        var action = planResourceRouteAction(candidates[index].route);
+        if (action) return action;
+      }
+      return null;
     }
 
     var points = snapshot.points;
@@ -1274,8 +1320,8 @@
     var highBalanceTurn = highBalanceRule.enabled !== false &&
       Number.isFinite(turnStartingPoints) &&
       turnStartingPoints > Number(highBalanceRule.minimumStartingCoins);
-    var moveCosts = { 8: 1, 7: 4, 6: 16, 5: 64, 4: 256, 3: 1024, 2: 4096 };
-    var promotionCosts = { 8: 3, 7: 9, 6: 27, 5: 81, 4: 243, 3: 729, 2: 2197 };
+    var moveCosts = movementCostByLayer;
+    var promotionCosts = promotionCostByLayer;
 
     function isPurchaseForbidden(code, stage) {
       if (!highBalanceTurn) return false;
@@ -1846,13 +1892,18 @@
       var visitedTargets = {};
       var rankSettings = object(config.desirability.troopRatioByOuterLayer);
       var candidateLimit = Math.max(1, codes.length);
+      var wheatEmergencyAction = planWheatEmergencyAction();
+      if (wheatEmergencyAction) return wheatEmergencyAction;
+      var villageExpansionAction = planVillageExpansionAction();
+      if (villageExpansionAction) return villageExpansionAction;
 
       for (var attempt = 0; attempt < candidateLimit; attempt += 1) {
         var analysis = calculateDesirability(
           snapshot,
           config.desirability,
           penaltyTotals,
-          penaltyEntries
+          penaltyEntries,
+          getStrategicRoutes()
         );
         var candidatesByCode = {};
         codes.forEach(function (code) {
@@ -1869,10 +1920,20 @@
               first.localeCompare(second);
           });
         if (!candidates.length) return { type: 'pass' };
+        var hasUnvisitedExpansionTarget = candidates.some(function (code) {
+          if (owns(code, team)) return false;
+          return adjacent(code).some(function (source) {
+            return owns(source, team) && !owns(source, human);
+          });
+        });
 
         var target = candidates[0];
         var targetLayer = layer(target);
         if (owns(target, team) && !owns(target, human)) {
+          if (hasUnvisitedExpansionTarget) {
+            visitedTargets[target] = true;
+            continue;
+          }
           var supportNeeds = adjacent(target).filter(function (neighbor) {
             return layer(neighbor) === targetLayer - 1 &&
               getSnapshotFreeUnits(snapshot, neighbor, team) > 0;
@@ -2120,9 +2181,6 @@
     // threeFAndGTransfers below, since those blocks would otherwise intercept available
     // coins (e.g. recycling idle 'g' pieces into upgrades) before the wheat plan gets a
     // chance to advance toward a farm.
-    var wheatEmergencyAction = planWheatEmergencyAction();
-    if (wheatEmergencyAction) return wheatEmergencyAction;
-
     var directPurchaseRegions = codes
       .filter(function (code) {
         return layer(code) < 8 && layer(code) >= 1 &&

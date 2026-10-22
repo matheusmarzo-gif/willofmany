@@ -62,8 +62,10 @@ test('generated maps use unique game region IDs and wider quadrilateral cells', 
     assert.equal(new Set(startingRegions.map((region) => region.code)).size, 2);
     assert.ok(startingRegions.every((region) => /^L8-\d+$/.test(region.code)));
     const startingPieces = startingRegions.flatMap((region) => region.initialPieces);
+    assert.ok(startingRegions.every((region) => region.initialPieces.length === 1));
     assert.deepEqual(startingPieces.map((piece) => piece.team).sort(), ['blue', 'orange']);
-    assert.ok(startingPieces.every((piece) => piece.stage === 'g'));
+    assert.ok(startingPieces.every((piece) =>
+      piece.stage === 'g' && ['blue', 'orange'].includes(piece.team)));
     assert.ok(regions.some((region) => region.villageBuildingLevel !== undefined));
     assert.ok(regions.some((region) => region.farmBuildingLevel !== undefined));
     assert.ok(Buffer.byteLength(JSON.stringify(board)) < 2_000_000);

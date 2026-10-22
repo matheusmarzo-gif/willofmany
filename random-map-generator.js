@@ -825,8 +825,8 @@ var WillOfManyMapGenerator = (() => {
       rankCounts[tile.rank]++;
       tile.building = null;
     }
-    const desirableCoins = Math.round(totalPoints / 15);
-    const desirableWheat = Math.round(totalPoints / 2);
+    const desirableCoins = Math.round(totalPoints / 75);
+    const desirableWheat = Math.round(totalPoints / 10);
     let maxSPDist = 1;
     let maxCenterDist = 1;
     for (const t of regions) {
@@ -1083,6 +1083,31 @@ var WillOfManyMapGenerator = (() => {
   }
 
   // gameMapExport.ts
+  function ensureStartingPointPieces(blocks, startingPoints, L1, L2) {
+    const teams = /* @__PURE__ */ new Set();
+    const regions = /* @__PURE__ */ new Set();
+    startingPoints.forEach((startingPoint) => {
+      const team = startingPoint.team === 1 ? "blue" : startingPoint.team === 2 ? "orange" : null;
+      if (!team || teams.has(team)) {
+        throw new Error("O mapa precisa ter um starting point para cada equipe.");
+      }
+      const centerX = startingPoint.x * L1 + Math.round(L1 / 2);
+      const centerY = startingPoint.y * L2 + Math.round(L2 / 2);
+      const matches = blocks.flatMap((block) => block.regions.filter((region) => {
+        const [row, column] = region.positions[0] || [];
+        return Number.isInteger(row) && Number.isInteger(column) && block.C_inicial.x + (column - 1) * block.L1 === centerX && block.C_inicial.y + (row - 1) * block.L2 === centerY;
+      }));
+      if (matches.length !== 1 || matches[0].layer !== 8 || regions.has(matches[0].code)) {
+        throw new Error("N\xE3o foi poss\xEDvel localizar os starting points do mapa gerado.");
+      }
+      matches[0].initialPieces = [{ team, stage: "g" }];
+      teams.add(team);
+      regions.add(matches[0].code);
+    });
+    if (startingPoints.length !== 2 || teams.size !== 2 || regions.size !== 2) {
+      throw new Error("O mapa precisa ter dois starting points distintos, um para cada equipe.");
+    }
+  }
   function generateRandomBoard(targetRegions, rotationsEnabled = false) {
     if (!Number.isFinite(targetRegions)) {
       throw new RangeError("A meta de regi\xF5es precisa ser um n\xFAmero finito.");
@@ -1105,6 +1130,7 @@ var WillOfManyMapGenerator = (() => {
       rotationEnabled: rotationsEnabled,
       linearRotationEnabled: rotationsEnabled && [3, 5].includes(block.matrixSize)
     }));
+    ensureStartingPointPieces(configuredBlocks, mapState.startingPoints, 1e3, 500);
     return {
       boardType: "quadrilateral",
       version: 1,

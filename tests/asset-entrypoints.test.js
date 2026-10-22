@@ -88,7 +88,7 @@ test('campaign farms use rule-backed building levels and villages remain optiona
   ), false, 'no villages are assigned to campaign regions yet');
   assert.match(html, /id="region-village"/);
   assert.match(gameClient, /icon\.dataset\.level = String\(level\)/);
-  assert.match(gameClient, /levelLabel\.textContent = String\(level\)/);
+  assert.match(gameClient, /illustration\.setAttribute\('href', `povoado_\$\{level\}\.png`\)/);
   assert.match(gameClient, /getVillageCoinIncome\(currentTeam\)/);
 });
 
@@ -112,9 +112,17 @@ test('rank changes are opt-in for AI/online games and enabled for Level 9 only',
   assert.match(gameClient,
     /action\.type === 'rankChange'[\s\S]*?performRankChange\(action\.source, action\.rankChangeType, action\.target\)/);
   assert.match(gameClient, /rankChangeCandidates\.push\(\{ \.\.\.option, neighborLayers \}\)/);
+  assert.match(gameClient,
+    /rankChangeControlsRegionCode = regionCode;\s*rankChangeControlsExpanded = false;/);
   assert.match(gameClient, /window\.setTimeout\(\(\) => \{[\s\S]*?rankChangeControlsExpanded = false;[\s\S]*?\}, 3000\)/);
+  assert.match(gameClient,
+    /function performRankChange\(sourceCode, type, targetCode\)[\s\S]*?recalculateRegionForces\(\);\s*renderBoardLayers\(\);\s*refreshRegionVisuals\(\);/);
   assert.match(gameClient, /rank-change-expand-button/);
   assert.match(gameCss, /\.rank-change-floating-controls\.is-collapsed/);
+  assert.match(gameClient,
+    /function positionCollapsedRankChangeControl\(regionCode, button\)[\s\S]*?app\.appendChild\(rankChangeFloatingControls\)[\s\S]*?statisticsButton\.getBoundingClientRect\(\)[\s\S]*?rankChangeFloatingControls\.style\.top = `\$\{statisticsBounds\.bottom \+ 4\}px`/);
+  assert.match(gameCss, /\.rank-change-floating-controls\.is-landscape-collapsed\s*\{\s*position:fixed/);
+  assert.match(gameClient, /window\.addEventListener\('resize',[\s\S]*?updateCollapsedRankChangeControlPosition\(\)/);
 });
 
 test('circular movement uses geometric same-rank neighbors instead of region numbering', () => {
@@ -280,10 +288,23 @@ test('campaign keeps blue assigned to the AI and blocks human actions during its
 });
 
 test('random campaign levels are unlocked after Level 9 and their maps are saved for replay', () => {
+  const campaignLevelFiles = gameClient.match(/const campaignLevelFiles = \{([\s\S]*?)\n    \};/)[1];
+  const campaignLevelIds = [...campaignLevelFiles.matchAll(/^\s*'(tabuleiro-\d+)':/gm)]
+    .map(([, levelId]) => levelId);
+  const completedLevelIndex = campaignLevelIds.indexOf('tabuleiro-09');
+  const nextLevelNumber = completedLevelIndex + 2;
+  const nextLevelId = campaignLevelIds[nextLevelNumber - 1] || `random-${nextLevelNumber}`;
+
+  assert.equal(campaignLevelIds.length, 9);
+  assert.equal(nextLevelId, 'random-10');
   assert.match(gameClient, /const randomCampaignLevelsPerPage = 5/);
   assert.match(gameClient, /const initialRandomCampaignRegions = 60/);
   assert.match(gameClient, /const randomCampaignRegionsPerLevel = 5/);
   assert.match(gameClient, /const maxRandomCampaignRegions = 900/);
+  assert.match(gameClient, /function getCampaignLevelId\(levelNumber\)[\s\S]*?const staticLevelId = Object\.keys\(campaignLevelFiles\)\[levelNumber - 1\];[\s\S]*?`random-\$\{levelNumber\}`/);
+  assert.match(gameClient, /function getNextCampaignLevelId\(levelId\) \{\s*const levelNumber = getCampaignLevelNumber\(levelId\);\s*return levelNumber === null \? null : getCampaignLevelId\(levelNumber \+ 1\);\s*\}/);
+  assert.match(gameClient, /function unlockNextCampaignLevel\(levelId\)[\s\S]*?getNextCampaignLevelId\(levelId\)[\s\S]*?localStorage\.setItem\(campaignProgressStorageKey, nextLevelId\)/);
+  assert.match(gameClient, /campaignNextLevelId = unlockNextCampaignLevel\(activeCampaignLevel\.id\);\s*finishGame\('orange', 'campaign'\)/);
   assert.match(gameClient, /initialRandomCampaignRegions \+ \(number - firstRandomCampaignLevel\) \* randomCampaignRegionsPerLevel/);
   assert.match(gameClient, /Math\.min\(\s*maxRandomCampaignRegions/);
   assert.match(gameClient, /function getCampaignTrailPage\(levelNumber\)/);
@@ -293,8 +314,14 @@ test('random campaign levels are unlocked after Level 9 and their maps are saved
   assert.match(gameClient, /window\.indexedDB\.open\(randomCampaignMapDatabaseName, 1\)/);
   assert.match(gameClient, /function migrateLegacyRandomCampaignMaps\(database\)/);
   assert.match(gameClient, /function loadRandomCampaignBoard\(levelId\)/);
+  assert.match(gameClient, /function hasValidRandomMapStartingPieces\(data\)[\s\S]*?startingPieces\.length === 2[\s\S]*?piece\.stage === 'g'/);
+  assert.match(gameClient, /storedRegionCount === level\.targetRegions[\s\S]*?hasValidRandomMapStartingPieces\(storedBoard\)/);
   assert.match(gameClient, /storedBoard\.randomMap\.targetRegions === level\.targetRegions/);
   assert.match(gameClient, /storedRegionCount === level\.targetRegions/);
+  assert.match(gameClient, /function isRandomMapEliminationVictoryMode\(\)[\s\S]*?getCampaignLevelNumber\(activeCampaignLevel\.id\) >= firstRandomCampaignLevel[\s\S]*?return gameMode === 'ai' \|\| isOnlineGame\(\)/);
+  assert.match(gameClient, /function finishIfRandomMapTeamEliminated\([\s\S]*?gameRules\.getEliminationWinner\(pieceCounts\.orange, pieceCounts\.blue\)[\s\S]*?finishGame\(winner, 'elimination'/);
+  assert.match(gameClient, /if \(isRandomMapEliminationVictoryMode\(\)\) \{\s*return finishIfRandomMapTeamEliminated\(notifyOpponent\);\s*\}/);
+  assert.match(gameClient, /reason === 'elimination' \? 'Vitória por eliminação: uma equipe ficou sem peças\.'/);
   assert.match(gameClient, /generatedBoardData: currentBoardData\?\.randomMap/);
   assert.match(gameClient, /applyRegionData\(message\.state\.generatedBoardData\)/);
   assert.match(html, /id="campaign-trail-switch"/);
@@ -321,6 +348,27 @@ test('online random maps are configured by the orange host and synchronized in s
   assert.match(gameClient, /if \(saved\?\.generatedBoardData\) \{[\s\S]*?applyRegionData\(saved\.generatedBoardData\)/);
 });
 
+test('AI and online war can be started on any turn while other modes keep their schedule', () => {
+  const availabilityStart = gameClient.indexOf('function updateWarAvailability()');
+  const availabilityEnd = gameClient.indexOf('function getGameSnapshot()', availabilityStart);
+  const availability = gameClient.slice(availabilityStart, availabilityEnd);
+  const warStart = gameClient.indexOf('async function startWar(');
+  const warEnd = gameClient.indexOf('function performRankChange(', warStart);
+  const startGuard = gameClient.slice(warStart, warEnd);
+  const clickStart = gameClient.indexOf("warButton.addEventListener('click'");
+  const clickEnd = gameClient.indexOf('function performRankChange(', clickStart);
+  const clickHandler = gameClient.slice(clickStart, clickEnd);
+
+  assert.match(availability, /warAvailableAnyTurn = gameMode === 'ai' \|\| isOnlineGame\(\)/);
+  assert.match(availability, /isOnlineGame\(\) && \(!onlineSocket \|\| onlineSocket\.readyState !== WebSocket\.OPEN\)/);
+  assert.match(availability, /!isCampaignGame\(\) && !warAvailableAnyTurn && !\[6, 13, 18, 25\]\.includes\(currentTurn\)/);
+  assert.match(startGuard,
+    /!isCampaignGame\(\) && !warAvailableAnyTurn && !isAutomatic && !allowUnscheduled &&[\s\S]*?\[6, 13, 18, 25\]\.includes\(currentTurn\)/);
+  assert.match(clickHandler, /gameMode === 'ai' && isAiTurnRunning/);
+  assert.match(clickHandler, /!isLocalPlayersTurn\(\) && gameMode !== 'ai' && !isOnlineGame\(\)/);
+  assert.match(clickHandler, /isOnlineGame\(\) && onlineTeam === 'blue'[\s\S]*?type: 'war_request'/);
+});
+
 test('random maps can be sized for AI games and retain the game coordinate dimensions', () => {
   assert.match(html, /id="ai-random-map-enabled" type="checkbox"/);
   assert.match(html, /id="ai-random-map-target" type="number" min="25" max="900"/);
@@ -330,7 +378,7 @@ test('random maps can be sized for AI games and retain the game coordinate dimen
   assert.match(gameClient, /gameMode === 'online' \? onlineRandomMapTarget\.value : aiRandomMapTarget\.value/);
   assert.match(gameClient, /gameRules\.getQuadrilateralCellDimensions\(\s*block,\s*data\?\.randomMap\?\.generator === 'cartografo-estrategico'\s*\)/);
   assert.match(gameClient, /applyRegionData\(createRandomBoardData\(targetRegions, null, rotationsEnabled\)\)/);
-  assert.match(gameClient, /startingPieces\.length !== 2[\s\S]*?new Set\(startingPieces\.map\(\(\{ piece \}\) => piece\.team\)\)\.size !== 2[\s\S]*?piece\.stage !== 'g'/);
+  assert.match(gameClient, /if \(!hasValidRandomMapStartingPieces\(boardData\)\) \{\s*throw new Error\('o mapa gerado precisa conter dois starting points L8 opostos, um para cada equipe, com peça G'\)/);
   assert.match(gameClient, /aiRandomMapSizeLabel\.classList\.toggle\('is-hidden', !aiRandomMapCheckbox\.checked\)/);
 });
 
@@ -507,7 +555,8 @@ test('campaign can restart the current turn, handle resource defeat, and show co
     .includes('ui:rotateQuadrilateralBlockButton'));
   assert.deepEqual(levelThreeBoard.campaign.objectiveRegions, ['L8-16']);
   assert.match(gameClient, /function updateTurnState\(\) \{\s*if \(finishCampaignIfObjectiveMet\(\)\) return;/);
-  assert.match(gameClient, /function finishCampaignIfObjectiveMet\(\) \{\s*if \(!isGameStarted \|\| isGameOver \|\| !isCampaignGame\(\) \|\| !campaignObjectiveRegions\.length/);
+  assert.match(gameClient,
+    /function finishCampaignIfObjectiveMet\(\) \{\s*if \(!isGameStarted \|\| isGameOver \|\| !isCampaignGame\(\)\) return false;\s*if \(isRandomMapEliminationVictoryMode\(\)\) return finishIfRandomMapTeamEliminated\(\);/);
 });
 
 test('Level 4 copies Level 2 with its objective and initial armies updated', () => {
@@ -586,7 +635,8 @@ test('campaign guides configure valid objective regions and event-driven transit
     'regionMoved',
     'bagCollected',
     'actionCompleted',
-    'turnStarted'
+    'turnStarted',
+    'rankChangeAvailable'
   ]);
 
   campaignBoards.forEach((board) => {
@@ -910,7 +960,10 @@ test('Level 6 defines its complete 5x5 board, no-income campaign, and ring/linea
   assert.match(gameClient, /'tabuleiro-07': 'tabuleiro-07\.json'/);
   assert.match(gameClient, /'tabuleiro-08': 'tabuleiro-08\.json'/);
   assert.match(gameClient, /activeCampaignLevel\.objectiveText \|\| `conquiste/);
-  assert.match(gameClient, /function finishCampaignIfObjectiveMet\(\)[\s\S]*?campaignObjectiveRegions\.every\(\(regionCode\) => getRegionDominador\(regionCode\) === 'orange'\)/);
+  assert.match(
+    gameClient,
+    /function finishCampaignIfObjectiveMet\(\)[\s\S]*?gameRules\.mapCampaignObjectiveRegions\(\s*campaignObjectiveRegions,\s*rankChangedRegions\s*\)[\s\S]*?currentObjectiveRegions\.every\(\(regionCode\) => getRegionDominador\(regionCode\) === 'orange'\)/
+  );
 
   const [block] = levelSixBoard.blocks;
   assert.equal(block.name, 'BQ01');
@@ -1151,6 +1204,17 @@ test('Level 8 defines unique regions, fixed singleton cells, rotating rings, and
   assert.match(gameClient, /function appendCampaignFarmIcon\([\s\S]*?geometry\.shape === 'circular'[\s\S]*?appendCampaignFarmIcon\(renderLayer, code, geometry/);
   assert.match(gameClient, /gameRules\.farmProductionByLevel\[level\]/);
   assert.match(gameClient, /const tier = level/);
+  assert.match(gameClient, /illustration\.setAttribute\('href', `fazenda_\$\{tier\}\.png`\)/);
+  assert.match(gameClient, /illustration\.setAttribute\('href', `povoado_\$\{level\}\.png`\)/);
+  assert.match(gameClient, /illustration\.setAttribute\('width', '45'\)/);
+  assert.match(gameClient, /illustration\.setAttribute\('height', '45'\)/);
+  assert.match(gameClient, /illustration\.setAttribute\('width', '48'\)/);
+  assert.match(gameClient, /illustration\.setAttribute\('height', '48'\)/);
+  assert.match(gameClient, /gameRules\.getQuadrilateralBuildingIconScale\(\s*geometry\.cells,\s*iconScale,\s*45\s*\)/);
+  for (let level = 1; level <= 5; level += 1) {
+    assert.ok(fs.existsSync(path.join(root, `fazenda_${level}.png`)));
+    assert.ok(fs.existsSync(path.join(root, `povoado_${level}.png`)));
+  }
   assert.deepEqual(levelEightBoard.campaign.objectiveRegions.slice().sort(), regionCodes.slice().sort());
   assert.equal(levelEightBoard.campaign.objective.type, 'captureAllRegions');
 });

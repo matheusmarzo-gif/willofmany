@@ -85,8 +85,8 @@ export function placeBuildings(
     tile.building = null;
   }
 
-  const desirableCoins = Math.round(totalPoints / 15);
-  const desirableWheat = Math.round(totalPoints / 2);
+  const desirableCoins = Math.round(totalPoints / 75);
+  const desirableWheat = Math.round(totalPoints / 10);
 
   // Maximum spatial distances for normalization
   let maxSPDist = 1;

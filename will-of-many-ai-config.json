@@ -1,11 +1,11 @@
 {
   "_readme": "Ajuste estes valores para mudar a estrategia da IA sem editar codigo. Eles NAO alteram os custos reais do jogo (compra, movimento, promocao sao regras fixas do motor); controlam apenas preferencias e prioridades de decisao da IA.",
 
-  "maxActionsPerTurn": 50,
+  "maxActionsPerTurn": 45,
   "_maxActionsPerTurn_readme": "Numero maximo de acoes que a IA pode executar em um turno. Cada compra, movimento, promocao ou reciclagem conta como uma acao.",
 
-  "layerBalanceMinRatio": 0.5,
-  "_layerBalanceMinRatio_readme": "Fracao minima da forca humana em uma camada que a IA tenta manter antes de gastar/mover suas propria tropas daquela camada (0.5 = manter pelo menos metade da forca humana).",
+  "layerBalanceMinRatio": 0.65,
+  "_layerBalanceMinRatio_readme": "Fracao minima da forca humana em uma camada que a IA tenta manter antes de gastar/mover suas propria tropas daquela camada (0.65 = manter pelo menos 65% da forca humana).",
 
   "weakOuterLayerBuyRatio": 0.5,
   "_weakOuterLayerBuyRatio_readme": "Se a forca da IA na camada mais externa (L8) cair abaixo desta fracao da forca humana na mesma camada, a IA prioriza comprar pecas 'g' ali como emergencia.",
@@ -33,9 +33,9 @@
   "_recycleCoinThresholdByLayer_readme": "Quantas moedas (multiplicadas pelo custo da peca) a IA precisa ter sobrando numa camada antes de reciclar uma peca fraca para abrir espaco para uma mais forte.",
 
   "conquestPriority": {
-    "baseWeight": 1.0,
-    "weightPerRegionDeficit": 0.5,
-    "maxWeight": 6.0
+    "baseWeight": 1.2,
+    "weightPerRegionDeficit": 0.7,
+    "maxWeight": 8
   },
   "_conquestPriority_readme": "Quanto mais regioes o jogador humano dominar a mais do que a IA, maior o peso aplicado a forca da IA ao decidir quais regioes humanas ameacar/atacar primeiro. peso = min(maxWeight, baseWeight + weightPerRegionDeficit * (regioes_humano - regioes_IA)).",
 
@@ -62,13 +62,13 @@
 
   "povoados": {
     "enabled": true,
-    "discountFactor": 0.85,
+    "discountFactor": 0.88,
     "evaluationHorizonTurns": 8,
     "captureCostPerStep": 4,
     "desirabilityWeight": 0.5,
     "maxDesirabilityBonus": 500
   },
-  "_povoados_readme": "A IA estima o valor presente da renda futura dos povoados alcancaveis pela vizinhanca do tabuleiro e adiciona o bonus limitado a maxDesirabilityBonus a desejabilidade do alvo. Os valores reais das construcoes continuam definidos em game-rules.js.",
+  "_povoados_readme": "A IA estima o valor presente da renda dos povoados alcancaveis por rotas direcionadas do tabuleiro, ponderando cada movimento/promocao pelo custo do rank de origem e somando captureCostPerStep ao entrar em territorios nao controlados. Ela planeja a proxima etapa somente quando a renda projetada supera o custo estimado; o bonus de desejabilidade e limitado a maxDesirabilityBonus. Os valores reais das construcoes continuam definidos em game-rules.js.",
 
   "desirability": {
     "baseScoreByLayer": {
@@ -85,37 +85,37 @@
     "relativeStrengthBands": [
       { "maxPercent": 4, "allied": 50, "enemy": 0 },
       { "maxPercent": 25, "allied": 40, "enemy": 0 },
-      { "maxPercent": 50, "allied": 20, "enemy": 0 },
-      { "maxPercent": 75, "allied": 10, "enemy": 0 },
-      { "maxPercent": 100, "allied": 0, "enemy": 0 },
-      { "maxPercent": 130, "allied": -10, "enemy": 10 },
-      { "maxPercent": 170, "allied": -20, "enemy": 20 },
-      { "maxPercent": 230, "allied": -40, "enemy": 40 },
-      { "maxPercent": 300, "allied": -60, "enemy": 60 },
-      { "maxPercent": 400, "allied": -80, "enemy": 80 },
-      { "maxPercent": 600, "allied": -100, "enemy": 100 },
-      { "maxPercent": 800, "allied": -150, "enemy": 150 },
-      { "maxPercent": 1200, "allied": -250, "enemy": 250 },
-      { "maxPercent": null, "allied": -400, "enemy": 400 }
+      { "maxPercent": 50, "allied": 20, "enemy": 5 },
+      { "maxPercent": 75, "allied": 10, "enemy": 10 },
+      { "maxPercent": 100, "allied": 0, "enemy": 20 },
+      { "maxPercent": 130, "allied": -10, "enemy": 40 },
+      { "maxPercent": 170, "allied": -20, "enemy": 60 },
+      { "maxPercent": 230, "allied": -40, "enemy": 80 },
+      { "maxPercent": 300, "allied": -60, "enemy": 90 },
+      { "maxPercent": 400, "allied": -80, "enemy": 100 },
+      { "maxPercent": 600, "allied": -100, "enemy": 200 },
+      { "maxPercent": 800, "allied": -150, "enemy": 300 },
+      { "maxPercent": 1200, "allied": -250, "enemy": 400 },
+      { "maxPercent": null, "allied": -400, "enemy": 600 }
     ],
     "_relativeStrengthBands_readme": "Percentual relativo = (tropas da regiao / tropas totais do rank) / (1 / regioes ocupadas do rank) * 100. maxPercent define o limite inclusivo de cada faixa; null representa acima da faixa anterior.",
-    "farmBonusByLevel": { "1": 100, "2": 135, "3": 200, "4": 250, "5": 350 },
+    "farmBonusByLevel": { "1": 60, "2": 120, "3": 220, "4": 380, "5": 600 },
     "_farmLevelByProduction_readme": "O nivel e determinado pela producao farmProductionPerTurn: nivel 1=250, nivel 2=1000, nivel 3=4000, nivel 4=16000 e nivel 5=50000. Essa tabela factual compartilhada esta definida uma unica vez em game-rules.js; por exemplo, producao 250 corresponde ao nivel 1.",
-    "wheatDeficitFarmBonus": 350,
+    "wheatDeficitFarmBonus": 220,
     "unsupportedNeighborBonus": 40,
     "troopRatioByOuterLayer": { "8": 8, "7": 7, "6": 6, "5": 5, "4": 4, "3": 3, "2": 2 },
     "troopDeficitBonus": 100,
-    "external": { "logBase": 2, "offset": 2, "distanceScale": 1, "exponent": 6 },
+    "external": { "logBase": 2, "offset": 2, "distanceScale": 1, "exponent": 2 },
     "_external_readme": "Desejabilidade externa soma bi * (log_base( offset - (distancia / distanciaMax) / distanceScale )) ^ exponent para cada outra regiao. Os padroes implementam bi * (log2(2 - dij/D))^2.",
     "penalties": {
       "inaccessible": {
-        "amount": 20,
-        "durationTurns": 5,
+        "amount": 10,
+        "durationTurns": 2,
         "label": "Inacessibilidade",
         "description": "Sem vizinhos de rank igual ou imediatamente adjacente."
       },
       "unavailableAction": {
-        "amount": 20,
+        "amount": 10,
         "durationTurns": 1,
         "label": "Ação temporariamente inviável",
         "description": "Há vizinhos de rank elegível, mas nenhuma ação legal e viável no momento."

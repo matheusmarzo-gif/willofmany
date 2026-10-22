@@ -1,5 +1,47 @@
 import { buildQuadrilateralBlocksExport, DEFAULT_PARAMETERS, generateFullMap } from './mapGenerator';
 
+function ensureStartingPointPieces(
+  blocks: ReturnType<typeof buildQuadrilateralBlocksExport>['blocks'],
+  startingPoints: ReturnType<typeof generateFullMap>['startingPoints'],
+  L1: number,
+  L2: number
+) {
+  const teams = new Set<string>();
+  const regions = new Set<string>();
+
+  startingPoints.forEach((startingPoint) => {
+    const team = startingPoint.team === 1
+      ? 'blue'
+      : startingPoint.team === 2
+        ? 'orange'
+        : null;
+    if (!team || teams.has(team)) {
+      throw new Error('O mapa precisa ter um starting point para cada equipe.');
+    }
+
+    const centerX = startingPoint.x * L1 + Math.round(L1 / 2);
+    const centerY = startingPoint.y * L2 + Math.round(L2 / 2);
+    const matches = blocks.flatMap((block) => block.regions.filter((region) => {
+      const [row, column] = region.positions[0] || [];
+      return Number.isInteger(row) && Number.isInteger(column) &&
+        block.C_inicial.x + (column - 1) * block.L1 === centerX &&
+        block.C_inicial.y + (row - 1) * block.L2 === centerY;
+    }));
+
+    if (matches.length !== 1 || matches[0].layer !== 8 || regions.has(matches[0].code)) {
+      throw new Error('Não foi possível localizar os starting points do mapa gerado.');
+    }
+
+    matches[0].initialPieces = [{ team, stage: 'g' }];
+    teams.add(team);
+    regions.add(matches[0].code);
+  });
+
+  if (startingPoints.length !== 2 || teams.size !== 2 || regions.size !== 2) {
+    throw new Error('O mapa precisa ter dois starting points distintos, um para cada equipe.');
+  }
+}
+
 export function generateRandomBoard(targetRegions: number, rotationsEnabled = false) {
   if (!Number.isFinite(targetRegions)) {
     throw new RangeError('A meta de regiões precisa ser um número finito.');
@@ -22,6 +64,7 @@ export function generateRandomBoard(targetRegions: number, rotationsEnabled = fa
     rotationEnabled: rotationsEnabled,
     linearRotationEnabled: rotationsEnabled && [3, 5].includes(block.matrixSize),
   }));
+  ensureStartingPointPieces(configuredBlocks, mapState.startingPoints, 1000, 500);
 
   return {
     boardType: 'quadrilateral',

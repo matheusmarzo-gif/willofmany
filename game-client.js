@@ -629,6 +629,19 @@
         Array.isArray(data.blocks);
     }
 
+    function hasValidRandomMapStartingPieces(data) {
+      if (!isGeneratedBoardData(data)) return false;
+      const startingPieces = data.blocks.flatMap((block) =>
+        (block.regions || []).flatMap((region) =>
+          (region.initialPieces || []).map((piece) => ({ code: region.code, piece }))));
+      return startingPieces.length === 2 &&
+        new Set(startingPieces.map(({ piece }) => piece.team)).size === 2 &&
+        new Set(startingPieces.map(({ code }) => code)).size === 2 &&
+        startingPieces.every(({ code, piece }) =>
+          /^L8-\d+$/.test(code) && ['blue', 'orange'].includes(piece.team) &&
+          piece.stage === 'g');
+    }
+
     function createRandomBoardData(targetRegions, campaignLevelId = null, rotationsEnabled = false) {
       const generator = window.WillOfManyMapGenerator;
       if (typeof generator?.generateRandomBoard !== 'function') {
@@ -639,14 +652,7 @@
       if (!isGeneratedBoardData(boardData)) {
         throw new Error('o gerador retornou um mapa incompatível com o jogo');
       }
-      const startingPieces = boardData.blocks.flatMap((block) =>
-        block.regions.flatMap((region) =>
-          (region.initialPieces || []).map((piece) => ({ code: region.code, piece }))));
-      if (startingPieces.length !== 2 ||
-          new Set(startingPieces.map(({ piece }) => piece.team)).size !== 2 ||
-          new Set(startingPieces.map(({ code }) => code)).size !== 2 ||
-          startingPieces.some(({ code, piece }) =>
-            !/^L8-\d+$/.test(code) || piece.stage !== 'g')) {
+      if (!hasValidRandomMapStartingPieces(boardData)) {
         throw new Error('o mapa gerado precisa conter dois starting points L8 opostos, um para cada equipe, com peça G');
       }
       boardData.randomMap.id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -701,6 +707,7 @@
         if (storedBoard.randomMap.targetRegions === level.targetRegions &&
             storedBoard.randomMap.actualRegions === level.targetRegions &&
             storedRegionCount === level.targetRegions &&
+            hasValidRandomMapStartingPieces(storedBoard) &&
             storedBoard.randomMap.rotationsEnabled === true &&
             rotationSettingsMatch) {
           applyRegionData(storedBoard);
@@ -1352,6 +1359,14 @@
       return gameMode === 'campaign' && !!activeCampaignLevel;
     }
 
+    function isRandomMapEliminationVictoryMode() {
+      if (currentBoardData?.randomMap?.generator !== 'cartografo-estrategico') return false;
+      if (isCampaignGame()) {
+        return getCampaignLevelNumber(activeCampaignLevel.id) >= firstRandomCampaignLevel;
+      }
+      return gameMode === 'ai' || isOnlineGame();
+    }
+
     function isWheatEnabled() {
       return !isCampaignGame() || activeCampaignLevel.wheatEnabled === true;
     }
@@ -1394,11 +1409,12 @@
     }
 
     function updateWarAvailability() {
+      const warAvailableAnyTurn = gameMode === 'ai' || isOnlineGame();
       warButton.disabled = isGameOver || isWarRunning ||
+        (gameMode === 'ai' && isAiTurnRunning) ||
         (isBluetoothGame() && !bluetoothConnected) ||
-        (isOnlineGame() && (!onlineSocket || onlineSocket.readyState !== WebSocket.OPEN ||
-          (onlineTeam !== 'orange' && ![6, 13, 18, 25].includes(currentTurn)))) ||
-        (!isCampaignGame() && ![6, 13, 18, 25].includes(currentTurn));
+        (isOnlineGame() && (!onlineSocket || onlineSocket.readyState !== WebSocket.OPEN)) ||
+        (!isCampaignGame() && !warAvailableAnyTurn && ![6, 13, 18, 25].includes(currentTurn));
     }
 
     function getGameSnapshot() {
@@ -3249,8 +3265,9 @@
     }
 
     async function startWar(isAutomatic = false, allowUnscheduled = false) {
+      const warAvailableAnyTurn = gameMode === 'ai' || isOnlineGame();
       if (isWarRunning || !allRegionMasks ||
-          (!isCampaignGame() && !isAutomatic && !allowUnscheduled &&
+          (!isCampaignGame() && !warAvailableAnyTurn && !isAutomatic && !allowUnscheduled &&
             ![6, 13, 18, 25].includes(currentTurn))) return;
       clearCampaignMoveUndoHistory();
       const campaignCaptures = [];
@@ -3296,7 +3313,11 @@
         restoreStageView();
         updateWarAvailability();
         const centerWinner = getCenterConqueror();
-        if (centerWinner && (!isOnlineGame() || onlineTeam === 'orange')) {
+        if (isRandomMapEliminationVictoryMode() &&
+            finishIfRandomMapTeamEliminated()) {
+          return;
+        } else if (!isRandomMapEliminationVictoryMode() && centerWinner &&
+            (!isOnlineGame() || onlineTeam === 'orange')) {
           finishGame(centerWinner, 'center');
         } else if (finishCampaignIfObjectiveMet()) {
           return;
@@ -3388,7 +3409,11 @@
       }
       evaluateCampaignGuideTransitions();
       const centerWinner = getCenterConqueror();
-      if (centerWinner && (!isOnlineGame() || onlineTeam === 'orange')) {
+      if (isRandomMapEliminationVictoryMode() &&
+          finishIfRandomMapTeamEliminated()) {
+        return;
+      } else if (!isRandomMapEliminationVictoryMode() && centerWinner &&
+          (!isOnlineGame() || onlineTeam === 'orange')) {
         finishGame(centerWinner, 'center');
       } else if (finishCampaignIfObjectiveMet()) {
         return;
@@ -4632,7 +4657,33 @@
       renderRankChangeControls(regionCode);
     }
 
+    function restoreRankChangeControlsToStage() {
+      rankChangeFloatingControls.classList.remove('is-landscape-collapsed');
+      if (rankChangeFloatingControls.parentElement !== stage) {
+        stage.appendChild(rankChangeFloatingControls);
+      }
+    }
+
+    function updateCollapsedRankChangeControlPosition() {
+      if (rankChangeControlsExpanded || !rankChangeControlsRegionCode) return;
+      const button = rankChangeFloatingControls.querySelector('.rank-change-expand-button');
+      if (button) positionCollapsedRankChangeControl(rankChangeControlsRegionCode, button);
+    }
+
     function positionCollapsedRankChangeControl(regionCode, button) {
+      if (window.matchMedia('(orientation:landscape) and (max-height:600px) and (max-width:1000px)').matches) {
+        if (rankChangeFloatingControls.parentElement !== app) {
+          app.appendChild(rankChangeFloatingControls);
+        }
+        rankChangeFloatingControls.classList.add('is-landscape-collapsed');
+        const statisticsBounds = statisticsButton.getBoundingClientRect();
+        if (!statisticsBounds.width || !statisticsBounds.height) return;
+        rankChangeFloatingControls.style.left =
+          `${statisticsBounds.left + statisticsBounds.width / 2}px`;
+        rankChangeFloatingControls.style.top = `${statisticsBounds.bottom + 4}px`;
+        return;
+      }
+      restoreRankChangeControlsToStage();
       const regionShape = [...stage.querySelectorAll('[data-region]')]
         .find((shape) => shape.dataset.region === regionCode);
       if (!regionShape) return;
@@ -4689,6 +4740,7 @@
       rankChangeFloatingControls.replaceChildren();
       if (!upgradeDowngradeEnabled || !isGameStarted || isGameOver || isWarRunning ||
           conflictSimulation || !isLocalPlayersTurn() || !regionCode) {
+        restoreRankChangeControlsToStage();
         if (rankChangeControlsCollapseTimeout) {
           window.clearTimeout(rankChangeControlsCollapseTimeout);
           rankChangeControlsCollapseTimeout = null;
@@ -4701,6 +4753,7 @@
       const options = getRankChangeOptionsForRegion(regionCode, currentTeam);
       const position = getRegionFocusPoint(regionCode);
       if (!options.length || !position) {
+        restoreRankChangeControlsToStage();
         if (rankChangeControlsCollapseTimeout) {
           window.clearTimeout(rankChangeControlsCollapseTimeout);
           rankChangeControlsCollapseTimeout = null;
@@ -4716,7 +4769,7 @@
           rankChangeControlsCollapseTimeout = null;
         }
         rankChangeControlsRegionCode = regionCode;
-        rankChangeControlsExpanded = true;
+        rankChangeControlsExpanded = false;
       }
       rankChangeFloatingControls.style.left = `${Math.max(8, Math.min(92, position.x))}%`;
       rankChangeFloatingControls.style.top = `${Math.max(4, Math.min(94, position.y + 3))}%`;
@@ -4750,6 +4803,7 @@
         });
         return;
       }
+      restoreRankChangeControlsToStage();
       rankChangeFloatingControls.classList.remove('is-collapsed');
       options.forEach((option) => {
         const button = document.createElement('button');
@@ -5115,8 +5169,12 @@
     window.addEventListener('resize', () => {
       updateRegionActionPositions();
       if (Object.keys(regionGeometryByCode).length) renderBoardLayers();
+      updateCollapsedRankChangeControlPosition();
     });
-    window.addEventListener('orientationchange', updateRegionActionPositions);
+    window.addEventListener('orientationchange', () => {
+      updateRegionActionPositions();
+      updateCollapsedRankChangeControlPosition();
+    });
 
     function updateReadout() {
       const total = pieceCounts.blue + pieceCounts.orange;
@@ -8128,41 +8186,14 @@
       icon.setAttribute('pointer-events', 'none');
       icon.dataset.region = code;
 
-      const background = document.createElementNS(svgNamespace, 'circle');
-      background.setAttribute('r', '15');
-      background.setAttribute('fill', ['#fff2bf', '#f7e8a4', '#eed77d', '#e8c44e', '#dcad2c'][tier - 1]);
-      background.setAttribute('stroke', '#634c1d');
-      background.setAttribute('stroke-width', '1.5');
-      icon.appendChild(background);
-
-      const field = document.createElementNS(svgNamespace, 'path');
-      field.setAttribute('d', 'M-10 9 Q0 5 10 9');
-      field.setAttribute('fill', 'none');
-      field.setAttribute('stroke', '#546b35');
-      field.setAttribute('stroke-width', '1.7');
-      field.setAttribute('stroke-linecap', 'round');
-      icon.appendChild(field);
-
-      const stalkXs = [-7, -3.5, 0, 3.5, 7].slice(0, tier);
-      stalkXs.forEach((x, index) => {
-        const topY = -8 + Math.abs(index - (tier - 1) / 2) * 1.2;
-        const stalk = document.createElementNS(svgNamespace, 'path');
-        stalk.setAttribute('d', `M${x} 7 Q${x - 1} 0 ${x} ${topY}`);
-        stalk.setAttribute('fill', 'none');
-        stalk.setAttribute('stroke', '#526c31');
-        stalk.setAttribute('stroke-width', '1.6');
-        stalk.setAttribute('stroke-linecap', 'round');
-        icon.appendChild(stalk);
-
-        const grain = document.createElementNS(svgNamespace, 'ellipse');
-        grain.setAttribute('cx', String(x));
-        grain.setAttribute('cy', String(topY));
-        grain.setAttribute('rx', '1.8');
-        grain.setAttribute('ry', '2.8');
-        grain.setAttribute('fill', '#9a6a1b');
-        grain.setAttribute('transform', `rotate(-28 ${x} ${topY})`);
-        icon.appendChild(grain);
-      });
+      const illustration = document.createElementNS(svgNamespace, 'image');
+      illustration.setAttribute('href', `fazenda_${tier}.png`);
+      illustration.setAttribute('x', '-22.5');
+      illustration.setAttribute('y', '-22.5');
+      illustration.setAttribute('width', '45');
+      illustration.setAttribute('height', '45');
+      illustration.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      icon.appendChild(illustration);
 
       const title = document.createElementNS(svgNamespace, 'title');
       title.textContent = `Fazenda em ${code}: ${formatStatisticsNumber(production)} trigo por turno`;
@@ -8190,40 +8221,14 @@
       icon.dataset.region = code;
       icon.dataset.level = String(level);
 
-      const background = document.createElementNS(svgNamespace, 'circle');
-      background.setAttribute('r', '12');
-      background.setAttribute('fill', ['#f6e3a5', '#edcf73', '#e4b943', '#dca52b', '#c98720'][level - 1]);
-      background.setAttribute('stroke', '#634c1d');
-      background.setAttribute('stroke-width', '1.5');
-      icon.appendChild(background);
-
-      const house = document.createElementNS(svgNamespace, 'path');
-      house.setAttribute('d', 'M-8 0 L0-7 8 0 V7 H-8 Z M-2 7 V2 H2 V7');
-      house.setAttribute('fill', '#fff7df');
-      house.setAttribute('stroke', '#65451f');
-      house.setAttribute('stroke-width', '1.5');
-      house.setAttribute('stroke-linejoin', 'round');
-      icon.appendChild(house);
-
-      const levelBadge = document.createElementNS(svgNamespace, 'circle');
-      levelBadge.setAttribute('cx', '10');
-      levelBadge.setAttribute('cy', '-10');
-      levelBadge.setAttribute('r', '7');
-      levelBadge.setAttribute('fill', '#49331f');
-      levelBadge.setAttribute('stroke', '#fff7df');
-      levelBadge.setAttribute('stroke-width', '1.5');
-      icon.appendChild(levelBadge);
-
-      const levelLabel = document.createElementNS(svgNamespace, 'text');
-      levelLabel.setAttribute('x', '10');
-      levelLabel.setAttribute('y', '-10');
-      levelLabel.setAttribute('fill', '#fff');
-      levelLabel.setAttribute('font-size', '8');
-      levelLabel.setAttribute('font-weight', '800');
-      levelLabel.setAttribute('text-anchor', 'middle');
-      levelLabel.setAttribute('dominant-baseline', 'central');
-      levelLabel.textContent = String(level);
-      icon.appendChild(levelLabel);
+      const illustration = document.createElementNS(svgNamespace, 'image');
+      illustration.setAttribute('href', `povoado_${level}.png`);
+      illustration.setAttribute('x', '-24');
+      illustration.setAttribute('y', '-24');
+      illustration.setAttribute('width', '48');
+      illustration.setAttribute('height', '48');
+      illustration.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      icon.appendChild(illustration);
 
       const title = document.createElementNS(svgNamespace, 'title');
       title.textContent =
@@ -8723,6 +8728,7 @@
       const totalBlue = Object.keys(regionPiecesByRegion).reduce((sum, code) => sum + getTeamSoldierCount(code, 'blue'), 0);
       const winnerLabel = winner === 'orange' ? 'Laranja' : winner === 'blue' ? 'Azul' : 'Empate';
       const endReason = reason === 'center' ? 'Vitória por conquista do centro.' :
+        reason === 'elimination' ? 'Vitória por eliminação: uma equipe ficou sem peças.' :
         reason === 'campaign' ? `Level concluído: ${activeCampaignLevel?.name || 'Campanha'}.` :
         reason === 'turn30' ? 'Fim do turno 30.' :
           reason === 'inactivity' ? 'Derrota por ficar mais de 40 segundos sem interagir.' :
@@ -8811,15 +8817,43 @@
 
     function finishIfCenterConquered(notifyOpponent = true) {
       if (!isGameStarted || isGameOver || isApplyingBluetoothAction) return false;
+      if (isRandomMapEliminationVictoryMode()) {
+        return finishIfRandomMapTeamEliminated(notifyOpponent);
+      }
       const centerWinner = getCenterConqueror();
       if (!centerWinner) return false;
       finishGame(centerWinner, 'center', notifyOpponent);
       return true;
     }
 
+    function finishIfRandomMapTeamEliminated(notifyOpponent = true) {
+      if (!isGameStarted || isGameOver || !isRandomMapEliminationVictoryMode() ||
+          (isOnlineGame() && onlineTeam !== 'orange')) return false;
+      recalculatePieceCounts();
+      const winner = gameRules.getEliminationWinner(pieceCounts.orange, pieceCounts.blue);
+      if (!winner) return false;
+      if (isCampaignGame()) {
+        if (winner === 'orange') {
+          campaignNextLevelId = unlockNextCampaignLevel(activeCampaignLevel.id);
+          finishGame(winner, 'campaign', notifyOpponent);
+        } else {
+          failCampaignLevel();
+        }
+        return true;
+      }
+      finishGame(winner, 'elimination', notifyOpponent);
+      return true;
+    }
+
     function finishCampaignIfObjectiveMet() {
-      if (!isGameStarted || isGameOver || !isCampaignGame() || !campaignObjectiveRegions.length ||
-          !campaignObjectiveRegions.every((regionCode) => getRegionDominador(regionCode) === 'orange')) {
+      if (!isGameStarted || isGameOver || !isCampaignGame()) return false;
+      if (isRandomMapEliminationVictoryMode()) return finishIfRandomMapTeamEliminated();
+      if (!campaignObjectiveRegions.length) return false;
+      const currentObjectiveRegions = gameRules.mapCampaignObjectiveRegions(
+        campaignObjectiveRegions,
+        rankChangedRegions
+      );
+      if (!currentObjectiveRegions.every((regionCode) => getRegionDominador(regionCode) === 'orange')) {
         return false;
       }
       campaignNextLevelId = unlockNextCampaignLevel(activeCampaignLevel.id);
@@ -8937,7 +8971,9 @@
       };
       const resolveRegionTargets = (value) => {
         if (Array.isArray(value)) return value.flatMap(resolveRegionTargets);
-        if (value === 'objectives') return [...campaignObjectiveRegions];
+        if (value === 'objectives') {
+          return gameRules.mapCampaignObjectiveRegions(campaignObjectiveRegions, rankChangedRegions);
+        }
         if (Object.prototype.hasOwnProperty.call(guideRegionTargets, value)) {
           return guideRegionTargets[value]();
         }
@@ -9793,15 +9829,18 @@
         return;
       }
       isAiTurnRunning = true;
+      updateWarAvailability();
       passTurnButton.disabled = true;
       if (isCampaignGame() && activeCampaignLevel.aiActionsEnabled === false) {
         turnPlayer.textContent = 'Vez: azul · IA inativa';
         isAiTurnRunning = false;
+        updateWarAvailability();
         await passTurnToNextPlayer(true);
         return;
       }
       if (!(await loadAiConfig())) {
         isAiTurnRunning = false;
+        updateWarAvailability();
         const message = 'Vez da IA suspensa: configuração indisponível; recarregue o aplicativo.';
         turnPlayer.textContent = message;
         readout.textContent = message;
@@ -9992,6 +10031,7 @@
         }
       }
       isAiTurnRunning = false;
+      updateWarAvailability();
       updateTurnState();
       if (isLevelEightCampaign() && !levelEightAiEnabled) return;
       if (!isGameOver) await passTurnToNextPlayer(true);
@@ -10111,7 +10151,8 @@
         onlineStatus.textContent = 'Pedido de guerra enviado ao anfitrião da partida.';
         return;
       }
-      if (!isLocalPlayersTurn()) return;
+      if (gameMode === 'ai' && isAiTurnRunning) return;
+      if (!isLocalPlayersTurn() && gameMode !== 'ai' && !isOnlineGame()) return;
       evaluateCampaignGuideTransitions({
         type: 'actionCompleted',
         action: 'war',
@@ -10182,6 +10223,7 @@
       selectedRegionCode = option.target;
       recalculatePieceCounts();
       recalculateRegionForces();
+      renderBoardLayers();
       refreshRegionVisuals();
       renderPiecePurchaseButtons();
       updateSelectedRegionPanel(option.target);
@@ -11251,7 +11293,8 @@
         finishGame(message.winner === 'orange' || message.winner === 'blue' ? message.winner : null,
           message.reason === 'center' ? 'center' :
             message.reason === 'inactivity' ? 'inactivity' :
-              message.reason === 'surrender' ? 'surrender' : 'turn30', false);
+              message.reason === 'elimination' ? 'elimination' :
+                message.reason === 'surrender' ? 'surrender' : 'turn30', false);
         const resultMessage = message.reason === 'inactivity'
           ? message.inactiveTeam === onlineTeam
             ? 'Você perdeu por ficar mais de 40 segundos sem interagir.'
@@ -11401,7 +11444,11 @@
         const winner = message.winner === 'orange' || message.winner === 'blue'
           ? message.winner
           : null;
-        finishGame(winner, message.reason === 'center' ? 'center' : 'turn30', false);
+        finishGame(winner,
+          message.reason === 'center' || message.reason === 'elimination'
+            ? message.reason
+            : 'turn30',
+          false);
         return;
       }
       if (message.type === 'game_action') {

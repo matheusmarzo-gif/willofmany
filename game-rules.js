@@ -115,6 +115,14 @@
     return ascendingStages.reduce((total, stage) => total + Number(teamCounts[stage] || 0), 0);
   }
 
+  function getEliminationWinner(orangePieceCount, bluePieceCount) {
+    if (![orangePieceCount, bluePieceCount].every(Number.isFinite) ||
+        orangePieceCount < 0 || bluePieceCount < 0) return null;
+    if (orangePieceCount === 0 && bluePieceCount > 0) return 'blue';
+    if (bluePieceCount === 0 && orangePieceCount > 0) return 'orange';
+    return null;
+  }
+
   function getRankChangeRequirements(type, sourceLayer) {
     const rules = rankChangeRules[type];
     const layer = Number(sourceLayer);
@@ -139,6 +147,13 @@
       ? Math.floor((soldiers - 2 * layer + 1) / layer)
       : Math.floor((soldiers - 2 * targetLayer + 1) * layer / 3);
     return Math.max(0, converted);
+  }
+
+  function mapCampaignObjectiveRegions(objectiveRegions, rankChanges) {
+    const currentCodeByOrigin = new Map(
+      rankChanges.map(({ originCode, code }) => [originCode, code])
+    );
+    return objectiveRegions.map((regionCode) => currentCodeByOrigin.get(regionCode) || regionCode);
   }
 
   function areAxisAlignedCellsNeighbors(
@@ -579,8 +594,10 @@
     buildStageCountsFromSoldierTotal,
     getSoldierCount,
     getPieceCount,
+    getEliminationWinner,
     getRankChangeRequirements,
     calculateRankChangeSoldierTotal,
+    mapCampaignObjectiveRegions,
     areAxisAlignedCellsNeighbors,
     rotateQuadrilateralMatrix,
     rotateQuadrilateralMatrixPath,

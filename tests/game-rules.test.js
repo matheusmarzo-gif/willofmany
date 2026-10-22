@@ -132,7 +132,28 @@ test('rank change soldier conversions follow the requested formulas', () => {
   assert.equal(rules.calculateRankChangeSoldierTotal('upgrade', 7, -1), null);
 });
 
-test('AI turn action limit is configurable and defaults to 35', () => {
+test('Level 9 campaign objectives follow regions after rank changes', () => {
+  const levelNine = campaignBoards[8];
+  const regionCodes = levelNine.blocks.flatMap((block) =>
+    block.regions.map((region) => region.code)
+  );
+  const objectives = levelNine.campaign.objectiveRegions;
+  const rankChanges = [
+    { originCode: 'L8-1', code: 'L7-7' },
+    { originCode: 'L6-3', code: 'L5-1' }
+  ];
+
+  assert.equal(new Set(objectives).size, regionCodes.length);
+  assert.deepEqual(new Set(objectives), new Set(regionCodes));
+  assert.deepEqual(
+    rules.mapCampaignObjectiveRegions(objectives, rankChanges),
+    objectives.map((regionCode) =>
+      rankChanges.find((change) => change.originCode === regionCode)?.code || regionCode
+    )
+  );
+});
+
+test('AI turn action limit follows the strategy config and remains adjustable', () => {
   const configuredLimit = Number(aiConfig.maxActionsPerTurn);
   assert.ok(Number.isInteger(configuredLimit) && configuredLimit > 0);
 
@@ -142,6 +163,34 @@ test('AI turn action limit is configurable and defaults to 35', () => {
     assert.equal(gameAI.getConfig().maxActionsPerTurn, configuredLimit);
     gameAI.setConfig({ maxActionsPerTurn: 12 });
     assert.equal(gameAI.getConfig().maxActionsPerTurn, 12);
+  } finally {
+    gameAI.setConfig(originalConfig);
+  }
+});
+
+test('AI applies the refreshed strategy weights while preserving the legacy config contract', () => {
+  const originalConfig = gameAI.getConfig();
+  try {
+    gameAI.setConfig(aiConfig);
+    const config = gameAI.getConfig();
+    assert.equal(config.maxActionsPerTurn, 45);
+    assert.equal(config.layerBalanceMinRatio, 0.65);
+    assert.deepEqual(config.conquestPriority, {
+      baseWeight: 1.2,
+      weightPerRegionDeficit: 0.7,
+      maxWeight: 8
+    });
+    assert.equal(config.povoados.discountFactor, 0.88);
+    assert.equal(config.povoados.evaluationHorizonTurns, 8);
+    assert.deepEqual(config.desirability.farmBonusByLevel, {
+      1: 60,
+      2: 120,
+      3: 220,
+      4: 380,
+      5: 600
+    });
+    assert.equal(config.desirability.external.exponent, 2);
+    assert.equal(config.desirability.penalties.unavailableAction.durationTurns, 1);
   } finally {
     gameAI.setConfig(originalConfig);
   }
@@ -342,7 +391,7 @@ test('farm production tiers are shared and map 250 wheat per turn to level 1', (
 
   assert.deepEqual(analysis.regions['L8-1'].internalBreakdown, [
     { label: 'Base L8 livre', value: 50 },
-    { label: 'Fazenda nível 1', value: 30 }
+    { label: 'Fazenda nível 1', value: 60 }
   ]);
 });
 
@@ -426,6 +475,15 @@ test('final piece count evaluates a merged copy without mutating the source', ()
 
   assert.equal(rules.getFinalPieceCountForTeam(counts), 2);
   assert.deepEqual(counts, { g: 7, f: 1, e: 0, d: 0, c: 0, b: 0, a: 0 });
+});
+
+test('random-map elimination selects the surviving team only after all enemy pieces are lost', () => {
+  assert.equal(rules.getEliminationWinner(0, 1), 'blue');
+  assert.equal(rules.getEliminationWinner(3, 0), 'orange');
+  assert.equal(rules.getEliminationWinner(0, 0), null);
+  assert.equal(rules.getEliminationWinner(2, 1), null);
+  assert.equal(rules.getEliminationWinner(-1, 1), null);
+  assert.equal(rules.getEliminationWinner(null, 1), null);
 });
 
 test('soldier totals can be represented as canonical stage counts', () => {
@@ -889,7 +947,109 @@ test('farms get level and wheat-deficit bonuses; unsupported and deficient ranks
 
   assert.equal(analysis.rankDeficits[8], 3);
   assert.equal(analysis.regions['L8-1'].internal, 170);
-  assert.equal(analysis.regions['L7-1'].internal, 155);
+  assert.equal(analysis.regions['L7-1'].internal, 305);
+});
+
+test('AI plans a multi-step route to a distant village when its income justifies the rank costs', () => {
+  const originalConfig = gameAI.getConfig();
+  try {
+    gameAI.setConfig(aiConfig);
+    const action = gameAI.chooseAction({
+      aiTeam: 'blue',
+      humanTeam: 'orange',
+      points: 20,
+      regions: {
+        'L8-1': { dominator: 'blue' },
+        'L8-2': { dominator: 'free' },
+        'L7-1': { dominator: 'free', villageBuildingLevel: 1 }
+      },
+      regionPiecesByRegion: {
+        'L8-1': { blue: { g: 3 }, orange: {} }
+      },
+      regionNeighborCache: {
+        'L8-1': { sameRank: ['L8-2'] },
+        'L8-2': { sameRank: ['L8-1'], inferior: ['L7-1'] },
+        'L7-1': { superior: ['L8-2'] }
+      },
+      regionPieceLimits: { 'L8-1': 8, 'L8-2': 8, 'L7-1': 7 }
+    });
+
+    assert.deepEqual(action, {
+      type: 'move',
+      source: 'L8-1',
+      target: 'L8-2',
+      amount: 1
+    });
+  } finally {
+    gameAI.setConfig(originalConfig);
+  }
+});
+
+test('AI routes a wheat deficit toward a distant high-yield farm by weighted path cost', () => {
+  const action = gameAI.chooseAction({
+    aiTeam: 'blue',
+    humanTeam: 'orange',
+    points: 20,
+    wheatEnabled: true,
+    wheatTotalsByTeam: { blue: { production: 0, consumption: 1 } },
+    regions: {
+      'L8-1': { dominator: 'blue' },
+      'L8-2': { dominator: 'free', farmProductionPerTurn: 250 },
+      'L8-3': { dominator: 'free' },
+      'L8-4': { dominator: 'free', farmProductionPerTurn: 50000 }
+    },
+    regionPiecesByRegion: {
+      'L8-1': { blue: { g: 3 }, orange: {} }
+    },
+    regionNeighborCache: {
+      'L8-1': { sameRank: ['L8-2', 'L8-3'] },
+      'L8-2': { sameRank: ['L8-1'] },
+      'L8-3': { sameRank: ['L8-1', 'L8-4'] },
+      'L8-4': { sameRank: ['L8-3'] }
+    },
+    regionPieceLimits: {
+      'L8-1': 8,
+      'L8-2': 8,
+      'L8-3': 8,
+      'L8-4': 8
+    }
+  });
+
+  assert.deepEqual(action, {
+    type: 'move',
+    source: 'L8-1',
+    target: 'L8-3',
+    amount: 1
+  });
+});
+
+test('AI excludes a distant village when rank-specific travel costs exceed its projected income', () => {
+  const analysis = gameAI.calculateDesirability({
+    aiTeam: 'blue',
+    humanTeam: 'orange',
+    regions: {
+      'L8-1': { dominator: 'blue' },
+      'L7-1': { dominator: 'free' },
+      'L6-1': { dominator: 'free' },
+      'L5-1': { dominator: 'free' },
+      'L4-1': { dominator: 'free', villageBuildingLevel: 1 }
+    },
+    regionPiecesByRegion: {
+      'L8-1': { blue: { g: 2 }, orange: {} }
+    },
+    regionNeighborCache: {
+      'L8-1': { inferior: ['L7-1'] },
+      'L7-1': { superior: ['L8-1'], inferior: ['L6-1'] },
+      'L6-1': { superior: ['L7-1'], inferior: ['L5-1'] },
+      'L5-1': { superior: ['L6-1'], inferior: ['L4-1'] },
+      'L4-1': { superior: ['L5-1'] }
+    }
+  });
+  const village = analysis.regions['L4-1'];
+
+  assert.equal(village.internal, 20);
+  assert.ok(!village.internalBreakdown.some((factor) =>
+    factor.label.includes('valor econômico descontado')));
 });
 
 test('desirability analysis explains each internal score factor', () => {
@@ -904,11 +1064,11 @@ test('desirability analysis explains each internal score factor', () => {
   });
   const score = analysis.regions['L8-1'];
 
-  assert.equal(score.internal, 180);
+  assert.equal(score.internal, 330);
   assert.deepEqual(score.internalBreakdown, [
     { label: 'Base L8 livre', value: 50 },
-    { label: 'Fazenda nível 1', value: 30 },
-    { label: 'Déficit de trigo', value: 100 }
+    { label: 'Fazenda nível 1', value: 60 },
+    { label: 'Déficit de trigo', value: 220 }
   ]);
 });
 
@@ -943,7 +1103,7 @@ test('inaccessible desirability penalty requires no equal or adjacent-rank neigh
     type: 'inaccessible',
     label: 'Penalidade: Inacessibilidade',
     description: 'Sem vizinhos de rank igual ou imediatamente adjacente.',
-    value: -20
+    value: -10
   });
 });
 
@@ -1006,6 +1166,52 @@ test('AI plans a purchase and promotion toward the highest-desirability free reg
     stage: 'f',
     followUp: null
   });
+});
+
+test('AI expands toward valuable frontier instead of reinforcing an isolated high-score region', () => {
+  const originalConfig = gameAI.getConfig();
+  try {
+    gameAI.setConfig({
+      ...aiConfig,
+      desirability: {
+        ...aiConfig.desirability,
+        baseScoreByLayer: {
+          ...aiConfig.desirability.baseScoreByLayer,
+          8: { free: 1, allied: 10000, enemy: 1 }
+        }
+      }
+    });
+
+    const action = gameAI.chooseAction({
+      aiTeam: 'blue',
+      humanTeam: 'orange',
+      points: 10,
+      regions: {
+        'L8-1': { dominator: 'blue' },
+        'L8-8': { dominator: 'blue' },
+        'L8-9': { dominator: 'free', farmProductionPerTurn: 50000 }
+      },
+      regionPiecesByRegion: {
+        'L8-1': { blue: { g: 1 }, orange: {} },
+        'L8-8': { blue: { g: 2 }, orange: {} },
+        'L8-9': { blue: {}, orange: {} }
+      },
+      regionNeighborCache: {
+        'L8-8': { right: ['L8-9'] },
+        'L8-9': { left: ['L8-8'] }
+      },
+      regionPieceLimits: { 'L8-1': 8, 'L8-8': 8, 'L8-9': 8 }
+    });
+
+    assert.deepEqual(action, {
+      type: 'move',
+      source: 'L8-8',
+      target: 'L8-9',
+      amount: 1
+    });
+  } finally {
+    gameAI.setConfig(originalConfig);
+  }
 });
 
 test('AI requests a temporary random rotation when the selected region has no usable adjacent rank', () => {
