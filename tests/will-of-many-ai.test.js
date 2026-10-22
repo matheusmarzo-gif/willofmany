@@ -144,7 +144,7 @@ test('rank 8 can upgrade when downgrade is not a legal rank', () => {
   });
 });
 
-test('desirability values reachable villages using discounted income and graph distance', () => {
+test('desirability values reachable villages using discounted income and estimated arrival', () => {
   const snapshot = {
     aiTeam: 'blue',
     humanTeam: 'orange',
@@ -171,6 +171,198 @@ test('desirability values reachable villages using discounted income and graph d
     'the higher-yield village is more desirable even when one graph step farther away');
   assert.ok(villageBonus('L8-3') <= aiConfig.povoados.maxDesirabilityBonus);
   assert.equal(villageBonus('L8-4'), 0, 'regions without a settlement get no settlement bonus');
+});
+
+test('resource route arrival uses estimated actions and available coin income, not one turn per step', () => {
+  const settings = aiConfig.resourceRoutes;
+
+  assert.equal(ai.estimateResourceRouteArrivalTurns(
+    { steps: 8, travelCost: 8 },
+    { points: 8, coinsPerTurn: 8 },
+    settings
+  ), 1, 'eight affordable route actions can fit in one estimated turn');
+  assert.equal(ai.estimateResourceRouteArrivalTurns(
+    { steps: 8, travelCost: 32 },
+    { points: 8, coinsPerTurn: 8 },
+    settings
+  ), 4, 'movement cost delays the route when it exceeds the available income');
+});
+
+test('resource routes choose cheaper outer-rank access and price enemy capture risk', () => {
+  const snapshot = {
+    aiTeam: 'blue',
+    humanTeam: 'orange',
+    wheatEnabled: false,
+    points: 8,
+    coinsPerTurn: 8,
+    regions: {
+      'L8-1': { layer: 8, dominator: 'blue', blue: 3, orange: 0 },
+      'L7-1': { layer: 7, dominator: 'blue', blue: 3, orange: 0 },
+      'L7-2': {
+        layer: 7,
+        dominator: 'free',
+        blue: 0,
+        orange: 0,
+        farmBuildingLevel: 5
+      }
+    },
+    regionNeighborCache: {
+      'L8-1': { inferior: ['L7-2'] },
+      'L7-1': { sameRank: ['L7-2'] },
+      'L7-2': { superior: ['L8-1'], sameRank: ['L7-1'] }
+    }
+  };
+  const freeRoute = ai.calculateDesirability(
+    snapshot,
+    aiConfig.desirability
+  ).regions['L7-2'].resourceRoute.route;
+
+  assert.equal(freeRoute.source, 'L8-1',
+    'the lower-cost outer-rank promotion is preferred over inner-rank movement');
+  assert.equal(freeRoute.travelCost, 3);
+  snapshot.regions['L7-2'].dominator = 'orange';
+  const enemyRoute = ai.calculateDesirability(
+    snapshot,
+    aiConfig.desirability
+  ).regions['L7-2'].resourceRoute.route;
+
+  assert.equal(enemyRoute.cost - freeRoute.cost, aiConfig.povoados.enemyCaptureCostPerStep -
+    aiConfig.povoados.captureCostPerStep);
+});
+
+test('farms attract the first legal route step even without a wheat deficit', () => {
+  const snapshot = {
+    aiTeam: 'blue',
+    humanTeam: 'orange',
+    wheatEnabled: false,
+    points: 8,
+    coinsPerTurn: 8,
+    regions: {
+      'L8-1': { layer: 8, dominator: 'blue', blue: 3, orange: 0 },
+      'L8-2': { layer: 8, dominator: 'free', blue: 0, orange: 0 },
+      'L8-3': {
+        layer: 8,
+        dominator: 'free',
+        blue: 0,
+        orange: 0,
+        farmBuildingLevel: 5
+      },
+      'L8-4': { layer: 8, dominator: 'free', blue: 0, orange: 0 }
+    },
+    regionPiecesByRegion: {
+      'L8-1': { blue: { g: 3 }, orange: { g: 0 } }
+    },
+    regionPieceLimits: {
+      'L8-1': 8,
+      'L8-2': 8,
+      'L8-3': 8,
+      'L8-4': 8
+    },
+    regionNeighborCache: {
+      'L8-1': { sameRank: ['L8-2', 'L8-4'] },
+      'L8-2': { sameRank: ['L8-1', 'L8-3'] },
+      'L8-3': { sameRank: ['L8-2'] },
+      'L8-4': { sameRank: ['L8-1'] }
+    }
+  };
+
+  const analysis = ai.calculateDesirability(snapshot, aiConfig.desirability);
+  assert.equal(analysis.regions['L8-2'].resourceRoute.target, 'L8-3');
+  assert.ok(analysis.regions['L8-2'].resourceRoute.bonus > 0);
+  assert.equal(analysis.regions['L8-2'].resourceRoute.arrivalTurns, 1);
+  assert.equal(ai.chooseAction(snapshot).target, 'L8-2',
+    'the resource route first step outranks an equally accessible ordinary region');
+});
+
+test('a free farm takes priority when the AI has no farms and a wheat deficit', () => {
+  const originalConfig = ai.getConfig();
+  ai.setConfig({
+    ...aiConfig,
+    desirability: {
+      ...aiConfig.desirability,
+      baseScoreByLayer: {
+        ...aiConfig.desirability.baseScoreByLayer,
+        8: { free: 10000, allied: 30, enemy: 150 }
+      }
+    }
+  });
+  try {
+    const action = ai.chooseAction({
+      aiTeam: 'blue',
+      humanTeam: 'orange',
+      wheatEnabled: true,
+      wheatBalances: { blue: 1000 },
+      wheatTotalsByTeam: {
+        blue: { production: 0, consumption: 1 }
+      },
+      points: 8,
+      regions: {
+        'L8-12': { dominator: 'blue' },
+        'L8-11': { dominator: 'free', farmBuildingLevel: 1 },
+        'L8-13': { dominator: 'free' }
+      },
+      regionPiecesByRegion: {
+        'L8-12': { blue: { g: 4 }, orange: {} }
+      },
+      regionPieceLimits: {
+        'L8-12': 8,
+        'L8-11': 8,
+        'L8-13': 8
+      },
+      regionNeighborCache: {
+        'L8-12': { left: ['L8-11'], right: ['L8-13'] },
+        'L8-11': { right: ['L8-12'] },
+        'L8-13': { left: ['L8-12'] }
+      }
+    });
+
+    assert.deepEqual(action, {
+      type: 'move',
+      source: 'L8-12',
+      target: 'L8-11',
+      amount: 1
+    });
+  } finally {
+    ai.setConfig(originalConfig);
+  }
+});
+
+test('wheat urgency increases the farm route attraction as reserves approach depletion', () => {
+  const snapshot = {
+    aiTeam: 'blue',
+    humanTeam: 'orange',
+    wheatEnabled: true,
+    points: 8,
+    coinsPerTurn: 8,
+    wheatBalances: { blue: 0 },
+    wheatTotalsByTeam: {
+      blue: { production: 0, consumption: 100 }
+    },
+    regions: {
+      'L8-1': { layer: 8, dominator: 'blue', blue: 3, orange: 0 },
+      'L8-2': {
+        layer: 8,
+        dominator: 'free',
+        blue: 0,
+        orange: 0,
+        farmBuildingLevel: 2
+      }
+    },
+    regionPiecesByRegion: {
+      'L8-1': { blue: { g: 3 }, orange: { g: 0 } }
+    },
+    regionNeighborCache: {
+      'L8-1': { sameRank: ['L8-2'] },
+      'L8-2': { sameRank: ['L8-1'] }
+    }
+  };
+
+  const urgentAnalysis = ai.calculateDesirability(snapshot, aiConfig.desirability);
+  snapshot.wheatEnabled = false;
+  const stableAnalysis = ai.calculateDesirability(snapshot, aiConfig.desirability);
+  const getRouteBonus = (analysis) => analysis.regions['L8-2'].resourceRoute.bonus;
+
+  assert.ok(getRouteBonus(urgentAnalysis) > getRouteBonus(stableAnalysis));
 });
 
 test('wheat planner starts before projected reserves are exhausted', () => {

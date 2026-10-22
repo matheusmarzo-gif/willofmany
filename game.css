@@ -147,9 +147,10 @@
     .rank-change-floating-controls.is-landscape-collapsed { position:fixed; z-index:30; }
     .rank-change-floating-controls.is-viewport-positioned { position:fixed; z-index:30; }
     .rank-change-floating-controls button { min-width:0; min-height:28px; padding:4px 6px; border-color:rgba(32,33,31,.32); background:rgba(255,255,255,.96); box-shadow:0 2px 8px rgba(0,0,0,.25); font-size:9px; font-weight:800; white-space:nowrap; pointer-events:auto; }
+    .rank-change-floating-controls.is-viewport-positioned button:not(.rank-change-expand-button) { min-height:24px; padding:3px 4px; font-size:7px; line-height:1.1; }
     .rank-change-floating-controls button:disabled { cursor:not-allowed; opacity:.48; }
     .rank-change-floating-controls.is-collapsed { gap:0; }
-    .rank-change-floating-controls .rank-change-expand-button { width:42px; min-width:42px; height:42px; min-height:42px; padding:0; border-radius:50%; font-size:18px; line-height:1; }
+    .rank-change-floating-controls .rank-change-expand-button { width:56px; min-width:56px; height:56px; min-height:56px; padding:0; border-radius:50%; font-size:22px; line-height:1; }
     .board-focus-dim { fill:#111315; fill-opacity:.76; fill-rule:evenodd; }
     .board-focus-outline { fill:none; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; animation:region-outline-pulse 1s ease-in-out infinite alternate; }
     .board-focus-outline.is-war-outer { stroke:#ffd447; stroke-width:4px; filter:drop-shadow(0 0 3px rgba(255,196,44,.95)); }

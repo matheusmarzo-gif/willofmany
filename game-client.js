@@ -1481,6 +1481,9 @@
       return {
         currentTeam, humanTeam, aiTeam, currentTurn, gameSpeed, hasRotatedThisTurn,
         points: pontosDoTurn[aiTeam],
+        coinsPerTurn: (isCampaignGame()
+          ? getCampaignCoinsPerTurn(activeCampaignLevel, currentTurn)
+          : getTurnPointIncome(currentTurn)) + getVillageCoinIncome(aiTeam),
         aiTurnStartingPoints,
         upgradeDowngradeEnabled,
         campaignLevelId: activeCampaignLevel?.id || null,
@@ -2959,6 +2962,7 @@
 
     function getCombatNeighbors(regionCode) {
       if (currentBoardData?.randomMap?.generator === 'cartografo-estrategico') {
+        // Generated boards may place physically adjacent regions several ranks apart.
         return gameRules.getAxisAlignedRegionNeighbors(
           regionCode,
           regionGeometryByCode,
@@ -4700,6 +4704,7 @@
         return;
       }
       if (currentBoardData?.randomMap?.generator === 'cartografo-estrategico') {
+        // Keep the control outside the transformed stage so map zoom cannot scale it.
         if (rankChangeFloatingControls.parentElement !== app) {
           app.appendChild(rankChangeFloatingControls);
         }
@@ -6791,8 +6796,16 @@
     }
 
     function placeBoardInitialPieces() {
-      const initialPieces = Object.entries(regionGeometryByCode).flatMap(([regionCode, geometry]) =>
+      let initialPieces = Object.entries(regionGeometryByCode).flatMap(([regionCode, geometry]) =>
         geometry.initialPieces.map((piece) => ({ ...piece, regionCode })));
+      if (isGeneratedBoardData(currentBoardData)) {
+        const startingRegions = Object.entries(regionGeometryByCode).map(([code, geometry]) => ({
+          code,
+          x: geometry.centerX,
+          y: geometry.centerY
+        }));
+        initialPieces = gameRules.ensureRandomMapStartingPieces(initialPieces, startingRegions);
+      }
       if (initialPieces.length) {
         initialPieces.forEach(({ team, stage, regionCode }) => placeInitialPiece(team, regionCode, stage));
         return;
@@ -7538,26 +7551,14 @@
           : mode.rotationPath.vertical;
         mode.direction = routeDirection > 0 ? 'right' : 'left';
         mode.animating = true;
-        updateBoardFocusOverlay();
-        updateSelectedRegionPanel(mode.selectedRegionCode);
-        const rotationSucceeded = rotateQuadrilateralBlock(
+        completeQuadrilateralRotationGesture(mode, () => rotateQuadrilateralBlock(
           mode.blockName,
           mode.direction,
           true,
           mode.rotationPath,
           mode.passType,
           mode.targetKey
-        );
-        if (!rotationSucceeded) {
-          mode.animating = false;
-          mode.direction = null;
-          updateBoardFocusOverlay();
-          updateSelectedRegionPanel(mode.selectedRegionCode);
-          return;
-        }
-        quadrilateralRotationReturnTimeout = window.setTimeout(() => {
-          if (quadrilateralRotationMode === mode) endQuadrilateralRotationMode(true);
-        }, 850);
+        ), 850);
         return;
       }
       if (cancelled || Math.abs(gesture.angleTravel) < Math.PI * 4 / 3 ||
@@ -7570,9 +7571,7 @@
       mode.direction = mode.kind === 'circular'
         ? gesture.angleTravel > 0 ? 'right' : 'left'
         : gesture.angleTravel > 0 ? 'right' : 'left';
-      updateBoardFocusOverlay();
-      updateSelectedRegionPanel(mode.selectedRegionCode);
-      const rotationSucceeded = mode.kind === 'circular'
+      completeQuadrilateralRotationGesture(mode, () => mode.kind === 'circular'
         ? rotateCircularDisk(mode.blockName, mode.disco, mode.direction, true, mode.passType)
         : rotateQuadrilateralBlock(
           mode.blockName,
@@ -7581,7 +7580,34 @@
           mode.rotationPath,
           mode.passType,
           mode.targetKey
-        );
+        ), mode.kind === 'circular' ? 3200 : 850);
+    }
+
+    function completeQuadrilateralRotationGesture(mode, rotate, returnDelay) {
+      let rotationSucceeded;
+      try {
+        updateBoardFocusOverlay();
+        updateSelectedRegionPanel(mode.selectedRegionCode);
+        rotationSucceeded = rotate();
+      } catch (error) {
+        console.error(`Falha ao girar o bloco ${mode.blockName}.`, error);
+        mode.animating = false;
+        mode.direction = null;
+        mode.gesture = null;
+        rotateQuadrilateralBlockButton.disabled = false;
+        try {
+          updateBoardFocusOverlay();
+          updateSelectedRegionPanel(mode.selectedRegionCode);
+          regionRotationHelp.textContent =
+            'Falha ao girar. O gesto foi liberado; tente novamente ou cancele a rotação.';
+        } catch (recoveryError) {
+          console.error('Falha ao restaurar a interface de rotação.', recoveryError);
+        }
+        readout.textContent =
+          `Falha ao girar ${mode.blockName}. Consulte o console para ver o erro.`;
+        return;
+      }
+
       if (!rotationSucceeded) {
         mode.animating = false;
         mode.direction = null;
@@ -7589,9 +7615,10 @@
         updateSelectedRegionPanel(mode.selectedRegionCode);
         return;
       }
+
       quadrilateralRotationReturnTimeout = window.setTimeout(() => {
         if (quadrilateralRotationMode === mode) endQuadrilateralRotationMode(true);
-      }, mode.kind === 'circular' ? 3200 : 850);
+      }, returnDelay);
     }
 
     function rotateQuadrilateralBlock(
@@ -7685,6 +7712,7 @@
         .map((block) => block.name);
       if (!rotatableNames.length) return false;
 
+      const blockUpdates = [];
       rotatableNames.forEach((blockName) => {
         const block = quadrilateralBoard.blocks.find((item) => item.name === blockName);
         if (!block) throw new Error(`bloco quadricular ausente: ${blockName}`);
@@ -7696,21 +7724,54 @@
         }
         const sourceBlock = currentBoardData.blocks.find((block) => String(block.name || '') === blockName);
         if (!sourceBlock) throw new Error(`bloco quadricular ausente: ${blockName}`);
-        sourceBlock.matrix = matrix;
         const positionsByCode = {};
         matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
           if (!code) return;
           if (!positionsByCode[code]) positionsByCode[code] = [];
           positionsByCode[code].push([rowIndex + 1, columnIndex + 1]);
         }));
-        sourceBlock.regions.forEach((region) => {
+        const regionUpdates = sourceBlock.regions.map((region) => {
           const code = region.code || region.name || region.identifier || region.id;
           const propertyName = Array.isArray(region.posicoes) ? 'posicoes' : 'positions';
-          region[propertyName] = positionsByCode[code] || [];
+          return {
+            region,
+            propertyName,
+            hadProperty: Object.prototype.hasOwnProperty.call(region, propertyName),
+            previousPositions: region[propertyName],
+            nextPositions: positionsByCode[code] || []
+          };
+        });
+        blockUpdates.push({
+          sourceBlock,
+          previousMatrix: sourceBlock.matrix,
+          nextMatrix: matrix,
+          regionUpdates
         });
       });
 
-      applyRegionData(currentBoardData);
+      blockUpdates.forEach(({ sourceBlock, nextMatrix, regionUpdates }) => {
+        sourceBlock.matrix = nextMatrix;
+        regionUpdates.forEach(({ region, propertyName, nextPositions }) => {
+          region[propertyName] = nextPositions;
+        });
+      });
+      try {
+        applyRegionData(currentBoardData);
+      } catch (error) {
+        blockUpdates.forEach(({ sourceBlock, previousMatrix, regionUpdates }) => {
+          sourceBlock.matrix = previousMatrix;
+          regionUpdates.forEach(({ region, propertyName, hadProperty, previousPositions }) => {
+            if (hadProperty) region[propertyName] = previousPositions;
+            else delete region[propertyName];
+          });
+        });
+        try {
+          applyRegionData(currentBoardData);
+        } catch (rollbackError) {
+          console.error('Falha ao reconstruir o tabuleiro após reverter uma rotação.', rollbackError);
+        }
+        throw error;
+      }
       return true;
     }
 

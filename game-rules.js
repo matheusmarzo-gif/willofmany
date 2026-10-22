@@ -188,6 +188,7 @@
     );
   }
 
+  // Generated-map war adjacency follows physical cells across ranks; movement keeps its own rank-aware cache.
   function getAxisAlignedRegionNeighbors(regionCode, regionGeometryByCode, includeCornerContact = false) {
     const geometry = regionGeometryByCode?.[regionCode];
     if (geometry?.shape !== 'quadrilateral' || !Array.isArray(geometry.cells)) return [];
@@ -595,6 +596,77 @@
     };
   }
 
+  function ensureRandomMapStartingPieces(initialPieces, startingRegions) {
+    if (!Array.isArray(initialPieces) || !Array.isArray(startingRegions)) {
+      throw new TypeError('Random-map starting pieces and regions must be arrays.');
+    }
+    const candidates = startingRegions.filter(({ code, x, y }) =>
+      /^L8-\d+$/.test(code) && Number.isFinite(x) && Number.isFinite(y));
+    if (candidates.length < 2) {
+      throw new Error('o mapa aleatório precisa de duas regiões L8 para as peças iniciais');
+    }
+
+    const startingCodes = new Map();
+    const usedCodes = new Set();
+    initialPieces.forEach(({ team, stage, regionCode }) => {
+      if (!['blue', 'orange'].includes(team) || stage !== 'g' ||
+          !/^L8-\d+$/.test(regionCode) || usedCodes.has(regionCode) ||
+          startingCodes.has(team)) return;
+      startingCodes.set(team, regionCode);
+      usedCodes.add(regionCode);
+    });
+
+    if (!startingCodes.size) {
+      let farthestPair = null;
+      for (let first = 0; first < candidates.length; first += 1) {
+        for (let second = first + 1; second < candidates.length; second += 1) {
+          const distance = Math.hypot(
+            candidates[first].x - candidates[second].x,
+            candidates[first].y - candidates[second].y
+          );
+          if (!farthestPair || distance > farthestPair.distance) {
+            farthestPair = {
+              blue: candidates[first].code,
+              orange: candidates[second].code,
+              distance
+            };
+          }
+        }
+      }
+      startingCodes.set('blue', farthestPair.blue);
+      startingCodes.set('orange', farthestPair.orange);
+    } else {
+      ['blue', 'orange'].forEach((team) => {
+        if (startingCodes.has(team)) return;
+        const occupied = [...startingCodes.values()].map((code) =>
+          candidates.find((candidate) => candidate.code === code));
+        const candidate = candidates
+          .filter(({ code }) => !usedCodes.has(code))
+          .sort((first, second) => {
+            const firstDistance = Math.min(...occupied.map((point) =>
+              Math.hypot(first.x - point.x, first.y - point.y)));
+            const secondDistance = Math.min(...occupied.map((point) =>
+              Math.hypot(second.x - point.x, second.y - point.y)));
+            return secondDistance - firstDistance || first.code.localeCompare(second.code);
+          })[0];
+        if (!candidate) {
+          throw new Error('não foi possível separar as peças iniciais do mapa aleatório');
+        }
+        startingCodes.set(team, candidate.code);
+        usedCodes.add(candidate.code);
+      });
+    }
+
+    return [
+      ...initialPieces.filter(({ stage }) => stage !== 'g'),
+      ...['blue', 'orange'].map((team) => ({
+        team,
+        stage: 'g',
+        regionCode: startingCodes.get(team)
+      }))
+    ];
+  }
+
   return Object.freeze({
     soldierWeights,
     stageOrder,
@@ -636,6 +708,7 @@
     getQuadrilateralRegionStrokeWidth,
     clampStageZoom,
     getStageZoomOffsetAtPoint,
-    getAnnularSectorCentroid
+    getAnnularSectorCentroid,
+    ensureRandomMapStartingPieces
   });
 });

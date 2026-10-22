@@ -24,6 +24,46 @@ test('piece stage weights preserve the current soldier values', () => {
   assert.deepEqual(rules.stageOrder, ['a', 'b', 'c', 'd', 'e', 'f', 'g']);
 });
 
+test('random-map initialization restores one distinct starting G per team', () => {
+  const regions = [
+    { code: 'L8-1', x: 0, y: 0 },
+    { code: 'L8-2', x: 20, y: 0 },
+    { code: 'L8-3', x: -100, y: 0 }
+  ];
+  const result = rules.ensureRandomMapStartingPieces([
+    { team: 'orange', stage: 'g', regionCode: 'L8-2' },
+    { team: 'orange', stage: 'g', regionCode: 'L8-1' },
+    { team: 'blue', stage: 'f', regionCode: 'L7-1' }
+  ], regions);
+  const startingPieces = result.filter(({ stage }) => stage === 'g');
+
+  assert.deepEqual(startingPieces, [
+    { team: 'blue', stage: 'g', regionCode: 'L8-3' },
+    { team: 'orange', stage: 'g', regionCode: 'L8-2' }
+  ]);
+  assert.deepEqual(result.find(({ stage }) => stage === 'f'), {
+    team: 'blue',
+    stage: 'f',
+    regionCode: 'L7-1'
+  });
+});
+
+test('random-map initialization places opposite G pieces when both are missing', () => {
+  const result = rules.ensureRandomMapStartingPieces([], [
+    { code: 'L8-1', x: 0, y: 0 },
+    { code: 'L8-2', x: 10, y: 0 },
+    { code: 'L8-3', x: -100, y: 0 }
+  ]);
+
+  assert.deepEqual(result, [
+    { team: 'blue', stage: 'g', regionCode: 'L8-2' },
+    { team: 'orange', stage: 'g', regionCode: 'L8-3' }
+  ]);
+  assert.throws(() => rules.ensureRandomMapStartingPieces([], [
+    { code: 'L8-1', x: 0, y: 0 }
+  ]), /duas regiões L8/);
+});
+
 test('quadrilateral random-map regions get eight slots and enough focus zoom at 800x400', () => {
   const redRegionCell = { x: 454, y: 454, width: 18.5, height: 9.25 };
   const slots = rules.getQuadrilateralCellSlots([redRegionCell], 8);
@@ -181,7 +221,7 @@ test('AI applies the refreshed strategy weights while preserving the legacy conf
       maxWeight: 8
     });
     assert.equal(config.povoados.discountFactor, 0.88);
-    assert.equal(config.povoados.evaluationHorizonTurns, 8);
+    assert.equal(config.povoados.evaluationHorizonTurns, 16);
     assert.deepEqual(config.desirability.farmBonusByLevel, {
       1: 60,
       2: 120,
@@ -384,14 +424,15 @@ test('farm production tiers are shared and map 250 wheat per turn to level 1', (
   assert.equal(rules.getFarmBuildingLevel({ farmBuildingLevel: 2 }), 2);
   assert.equal(rules.getFarmBuildingLevel({ farmProductionPerTurn: 250 }), 1);
   const analysis = gameAI.calculateDesirability({
+    aiTeam: 'blue',
     regions: {
-      'L8-1': { dominator: 'free', farmProductionPerTurn: 250 }
+      'L8-1': { dominator: 'blue', farmProductionPerTurn: 250 }
     }
   });
 
   assert.deepEqual(analysis.regions['L8-1'].internalBreakdown, [
-    { label: 'Base L8 livre', value: 50 },
-    { label: 'Fazenda nível 1', value: 60 }
+    { label: 'Base L8 aliada', value: 30 },
+    { label: 'Fazenda controlada', value: 60 }
   ]);
 });
 
@@ -1056,19 +1097,27 @@ test('desirability analysis explains each internal score factor', () => {
   const analysis = gameAI.calculateDesirability({
     aiTeam: 'blue',
     humanTeam: 'orange',
+    points: 5,
     wheatEnabled: true,
     wheatTotalsByTeam: { blue: { production: 0, consumption: 1 } },
+    regionPiecesByRegion: {
+      'L8-1': { blue: { g: 2 }, orange: {} }
+    },
     regions: {
-      'L8-1': { dominator: 'free', farmProductionPerTurn: 1 }
+      'L8-1': { dominator: 'blue' },
+      'L8-2': { dominator: 'free', farmProductionPerTurn: 1 }
+    },
+    regionNeighborCache: {
+      'L8-1': { right: ['L8-2'] },
+      'L8-2': { left: ['L8-1'] }
     }
   });
-  const score = analysis.regions['L8-1'];
+  const score = analysis.regions['L8-2'];
 
-  assert.equal(score.internal, 330);
+  assert.equal(score.internal, 304);
   assert.deepEqual(score.internalBreakdown, [
     { label: 'Base L8 livre', value: 50 },
-    { label: 'Fazenda nível 1', value: 60 },
-    { label: 'Déficit de trigo', value: 220 }
+    { label: 'Rota para fazenda L8-2 (1 etapas, chegada estimada em 1 turnos)', value: 254 }
   ]);
 });
 

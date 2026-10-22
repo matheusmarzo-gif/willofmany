@@ -125,10 +125,14 @@ test('rank changes are opt-in for AI/online games and enabled for Level 9 only',
   assert.match(gameClient,
     /function positionExpandedRankChangeControl\(regionCode\)[\s\S]*?is-viewport-positioned[\s\S]*?getBoundingClientRect\(\)/);
   assert.match(gameClient,
+    /function placeBoardInitialPieces\(\)[\s\S]*?isGeneratedBoardData\(currentBoardData\)[\s\S]*?gameRules\.ensureRandomMapStartingPieces/);
+  assert.match(gameClient,
     /function getCombatNeighbors\(regionCode\)[\s\S]*?randomMap\?\.generator === 'cartografo-estrategico'[\s\S]*?getAxisAlignedRegionNeighbors/);
   assert.match(gameCss, /\.rank-change-floating-controls\.is-viewport-positioned\s*\{\s*position:fixed/);
   assert.match(gameCss,
-    /\.rank-change-floating-controls \.rank-change-expand-button \{ width:42px; min-width:42px; height:42px; min-height:42px;/);
+    /\.rank-change-floating-controls\.is-viewport-positioned button:not\(\.rank-change-expand-button\) \{ min-height:24px; padding:3px 4px; font-size:7px;/);
+  assert.match(gameCss,
+    /\.rank-change-floating-controls \.rank-change-expand-button \{ width:56px; min-width:56px; height:56px; min-height:56px;/);
   assert.match(gameClient, /window\.addEventListener\('resize',[\s\S]*?updateCollapsedRankChangeControlPosition\(\)/);
 });
 
@@ -1459,6 +1463,10 @@ test('campaign mode opens a custom illustrated trail with data-driven unlocked l
   assert.match(gameClient, /`B\$\{Number\(blockNumber\)\}`/);
   assert.match(gameClient, /gameRules\.rotateQuadrilateralMatrix\(/);
   assert.match(gameClient, /function rotateQuadrilateralBlocksForLayer\(\s*layerNumber,\s*direction,\s*selectedBlockName = null,\s*rotationPath = null\s*\)[\s\S]*?applyRegionData\(currentBoardData\);/);
+  assert.match(gameClient,
+    /function completeQuadrilateralRotationGesture\(mode, rotate, returnDelay\)[\s\S]*?catch \(error\)[\s\S]*?mode\.animating = false[\s\S]*?Falha ao girar/);
+  assert.match(gameClient,
+    /const blockUpdates = \[\][\s\S]*?previousMatrix: sourceBlock\.matrix[\s\S]*?catch \(error\) \{[\s\S]*?sourceBlock\.matrix = previousMatrix[\s\S]*?applyRegionData\(currentBoardData\)[\s\S]*?throw error;/);
   assert.match(gameClient, /function evaluateCampaignGuideTransitions\(event = null\)/);
   assert.ok(levelTwoBoard.campaign.guide.transitions.some((transition) =>
     transition.from === 'await-circular' &&

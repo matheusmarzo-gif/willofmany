@@ -17,18 +17,15 @@ nova: confira a branch, o commit e o estado do Git conforme abaixo.
 1. Localize a raiz ativa com `git rev-parse --show-toplevel`.
 2. Confira `git branch --show-current`, `git status --short`, `git log -1
    --oneline` e `git remote -v` antes de editar ou publicar.
-3. A versão-fonte atualizada nesta retomada está em:
-   `C:\Users\MATHEUS\.copilot\session-state\786adb26-53cc-4e67-bc60-2df110b036be\files\willofmany-main-publish-20261001b`
-   na branch `main`, commit `5e577f9` (verifique o hash/estado atual em vez de
-   assumir que continuam iguais).
+3. Para mudanças destinadas à branch publicada, use um checkout limpo e atual de
+   `main`; confirme `origin/main` com `git fetch` e compare os commits antes de
+   editar ou publicar. Não presuma que o checkout do Desktop é a fonte mais nova.
 4. A pasta
    `C:\Users\MATHEUS\Desktop\matheus - the will of many` é uma cópia de trabalho
-   separada. No momento destas notas, ela está na branch `master`, contém
-   alterações locais e **não contém** os módulos novos (`game-client.js`,
-   `game-rules.js`, `game.css`) nem esta nota. Não a sobrescreva, não faça
-   checkout/reset e não copie o workspace inteiro para ela. Se o usuário quiser
-   atualizar essa pasta, compare e integre cada arquivo explicitamente,
-   preservando as mudanças locais.
+   separada. Verifique sua branch e preserve todas as alterações locais; não a
+   sobrescreva, não faça checkout/reset e não copie o workspace inteiro para ela.
+   Se o usuário quiser integrá-la ou atualizá-la, compare e aplique cada arquivo
+   explicitamente, preservando mudanças que não pertencem a esta tarefa.
 5. O APK entregue é uma saída de build, não a fonte do código. Seu caminho usual é
    `C:\Users\MATHEUS\Desktop\matheus - the will of many\android-app\app\build\outputs\apk\debug\app-debug.apk`.
 6. Não confunda **Level 8** (a oitava missão de campanha, `tabuleiro-08.json`) com
@@ -47,7 +44,7 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
    Evite despejar ou ler o arquivo todo sem necessidade.
 5. Leia os JSONs do tabuleiro ou dados de região envolvidos antes de alterar
    valores codificados. Os tabuleiros de campanha são configurados em
-  `tabuleiro-01.json`–`tabuleiro-09.json`. Blocos
+   `tabuleiro-01.json`–`tabuleiro-09.json`. Blocos
    quadriculares rotativos são selecionados individualmente, e a rotação
    recursiva dos anéis é definida pela matriz quadrada do bloco.
 6. Leia os testes relacionados e procure consumidores da regra em IA, campanha,
@@ -60,20 +57,25 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
 - `game.css`: estilos e layouts responsivos.
 - `game-client.js`: estado de partida, interface, mecânicas ainda não extraídas,
   campanha, renderização e integrações do cliente.
-- `game-rules.js`: regras puras de composição, contagem e custo; exporta
-  `window.WillOfManyRules` no navegador e CommonJS nos testes.
+- `game-rules.js`: regras puras de composição, contagem, custo e adjacência física
+  usada pela guerra em mapas aleatórios; exporta `window.WillOfManyRules` no
+  navegador e CommonJS nos testes.
 - `random-map-generator.js`: bundle do Cartógrafo carregado antes de
   `game-client.js`; a fonte TypeScript e o comando de build ficam em
   `cartografo-estrategico/`.
 - Levels aleatórios da campanha começam no Level 10 e continuam em páginas de
   cinco níveis; cada meta aumenta 5 regiões de 60 até o limite de 900. Os mapas
   usam células duas vezes mais largas que altas e são salvos individualmente em
-  IndexedDB, com migração dos mapas legados do `localStorage`.
+  IndexedDB, com migração dos mapas legados do `localStorage`. Contra IA e Online
+  também podem usar mapas aleatórios, configurados pelo jogador/anfitrião.
 - `will-of-many-ai.js`: decisões da IA.
+- `rollback/will-of-many-ai.before-resource-desirability.js`: cópia integral da
+  IA anterior à revisão das rotas de recursos; serve para rollback e não deve ser
+  carregada nem empacotada como asset do jogo.
 - `will-of-many-ai-config.json`: pesos, faixas de desejabilidade, bônus de trigo,
   proporções de tropas, penalidades temporárias e critérios de reciclagem editáveis.
-- `tabuleiro-01.json` / `tabuleiro-02.json` / `tabuleiro-03.json`: dados
-  específicos dos níveis de campanha.
+- `tabuleiro-01.json`–`tabuleiro-09.json`: dados específicos dos níveis estáticos
+  da campanha; os níveis aleatórios começam no Level 10.
 - `regioes-will-of-many-circular.json`: dados-base carregados para o tabuleiro
   misto/circular padrão.
 - `android-app/app/src/main/java/com/willofmany/app/MainActivity.java`: WebView,
@@ -103,6 +105,11 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
   jogo e não devem ser substituídos por pesos de estratégia.
 - A ordem do cliente é importante: `game.css`, `game-rules.js`,
   `will-of-many-ai.js`, `random-map-generator.js`, depois `game-client.js`.
+- Em mapas aleatórios, a guerra usa a adjacência física das células entre ranks,
+  não apenas o cache de vizinhos para movimento; contato por canto só vale quando
+  configurado pelo tabuleiro. `tests/will-of-many-ai.test.js` cobre rotas e
+  decisões estratégicas da IA. Os controles flutuantes de upgrade/downgrade ficam
+  presos à viewport para não herdarem o zoom, e o ícone recolhido mede 42×42 px.
 - Tabuleiros usam JSONs externos. Se o carregamento falhar, exiba/trate o erro;
   não reintroduza fallback silencioso com snapshot antigo.
 - Preserve os contratos de save, Bluetooth e WebSocket. Confira os clientes e
@@ -119,7 +126,7 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
 Execute os testes relevantes para os arquivos alterados:
 
 ```powershell
-node --test tests\game-rules.test.js tests\asset-entrypoints.test.js tests\random-map-generator.test.js
+node --test tests\game-rules.test.js tests\asset-entrypoints.test.js tests\random-map-generator.test.js tests\will-of-many-ai.test.js
 ```
 
 Para qualquer alteração de HTML, JavaScript do jogo, Android, manifesto ou

@@ -58,17 +58,27 @@
     "seekFarmsWhenDeficit": true,
     "proactiveReserveTurns": 2
   },
-  "_wheat_readme": "Quando o consumo de trigo superar a producao, a IA antecipa a busca por fazendas se o estoque atual nao cobrir proactiveReserveTurns turnos de deficit. seekFarmsWhenDeficit=true habilita essa protecao.",
+  "_wheat_readme": "Quando o consumo de trigo supera a producao, a desejabilidade das fazendas cresce conforme o deficit e a reserva projetada se aproximam do esgotamento. proactiveReserveTurns define a janela de projecao; seekFarmsWhenDeficit=true habilita essa protecao.",
 
   "povoados": {
     "enabled": true,
     "discountFactor": 0.88,
-    "evaluationHorizonTurns": 8,
+    "evaluationHorizonTurns": 16,
     "captureCostPerStep": 4,
+    "enemyCaptureCostPerStep": 12,
     "desirabilityWeight": 0.5,
     "maxDesirabilityBonus": 500
   },
-  "_povoados_readme": "A IA estima o valor presente da renda dos povoados alcancaveis por rotas direcionadas do tabuleiro, ponderando cada movimento/promocao pelo custo do rank de origem e somando captureCostPerStep ao entrar em territorios nao controlados. Ela planeja a proxima etapa somente quando a renda projetada supera o custo estimado; o bonus de desejabilidade e limitado a maxDesirabilityBonus. Os valores reais das construcoes continuam definidos em game-rules.js.",
+  "_povoados_readme": "A renda dos povoados e descontada a partir do turno estimado de chegada (limitado por evaluationHorizonTurns), e o custo pondera movimento/promocao e captura. Territorios inimigos usam enemyCaptureCostPerStep para representar o risco adicional. O valor liquido integra a desejabilidade das regioes e do primeiro passo da rota; maxDesirabilityBonus limita a atracao antes do peso. Os valores reais das construcoes continuam definidos em game-rules.js.",
+
+  "resourceRoutes": {
+    "enabled": true,
+    "estimatedActionsPerTurn": 8,
+    "fallbackCoinsPerTurn": 8,
+    "firstStepPropagation": 0.85,
+    "routeCostWeight": 1
+  },
+  "_resourceRoutes_readme": "Estima a chegada combinando a quantidade de acoes de rota por turno e o custo real de movimento/promocao dividido pelos pontos disponiveis e renda por turno. Parte do valor liquido do recurso e propagada para o primeiro passo viavel, que compete com outras regioes pela desejabilidade. routeCostWeight controla o desconto de custo/captura; fallbackCoinsPerTurn so e usado por snapshots antigos sem renda explicita.",
 
   "desirability": {
     "baseScoreByLayer": {
@@ -100,6 +110,8 @@
     ],
     "_relativeStrengthBands_readme": "Percentual relativo = (tropas da regiao / tropas totais do rank) / (1 / regioes ocupadas do rank) * 100. maxPercent define o limite inclusivo de cada faixa; null representa acima da faixa anterior.",
     "farmBonusByLevel": { "1": 60, "2": 120, "3": 220, "4": 380, "5": 600 },
+    "farmInterestMultiplier": 0.65,
+    "_farmBonus_readme": "A desejabilidade da fazenda usa farmBonusByLevel multiplicado por farmInterestMultiplier mesmo sem deficit, mais wheatDeficitFarmBonus ajustado pela urgencia da reserva. O valor e descontado pelo tempo de chegada e custo/risco da rota; a IA aplica parte dele ao primeiro passo viavel.",
     "_farmLevelByProduction_readme": "O nivel e determinado pela producao farmProductionPerTurn: nivel 1=250, nivel 2=1000, nivel 3=4000, nivel 4=16000 e nivel 5=50000. Essa tabela factual compartilhada esta definida uma unica vez em game-rules.js; por exemplo, producao 250 corresponde ao nivel 1.",
     "wheatDeficitFarmBonus": 220,
     "unsupportedNeighborBonus": 40,

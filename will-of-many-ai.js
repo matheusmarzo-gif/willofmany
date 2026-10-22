@@ -39,10 +39,18 @@
     povoados: {
       enabled: true,
       discountFactor: 0.88,
-      evaluationHorizonTurns: 8,
+      evaluationHorizonTurns: 16,
       captureCostPerStep: 4,
+      enemyCaptureCostPerStep: 12,
       desirabilityWeight: 0.5,
       maxDesirabilityBonus: 500
+    },
+    resourceRoutes: {
+      enabled: true,
+      estimatedActionsPerTurn: 8,
+      fallbackCoinsPerTurn: 8,
+      firstStepPropagation: 0.85,
+      routeCostWeight: 1
     },
     desirability: {
       baseScoreByLayer: {
@@ -72,6 +80,7 @@
         { maxPercent: null, allied: -400, enemy: 600 }
       ],
       farmBonusByLevel: { 1: 60, 2: 120, 3: 220, 4: 380, 5: 600 },
+      farmInterestMultiplier: 0.65,
       wheatDeficitFarmBonus: 220,
       unsupportedNeighborBonus: 40,
       troopRatioByOuterLayer: { 8: 8, 7: 7, 6: 6, 5: 5, 4: 4, 3: 3, 2: 2 },
@@ -185,7 +194,14 @@
     });
   }
 
-  function getRankAwareRoutesFromOwnedRegions(snapshot, team, human, codes, captureCostPerStep) {
+  function getRankAwareRoutesFromOwnedRegions(
+    snapshot,
+    team,
+    human,
+    codes,
+    captureCostPerStep,
+    enemyCaptureCostPerStep
+  ) {
     var routes = {};
     var queue = [];
 
@@ -228,8 +244,15 @@
 
     codes.forEach(function (code) {
       if (getRegionOwner(snapshot, code, team, human) !== team) return;
-      routes[code] = { cost: 0, steps: 0, source: code, firstHop: null };
-      pushRoute({ code: code, cost: 0, steps: 0, source: code, firstHop: null });
+      routes[code] = {
+        cost: 0,
+        travelCost: 0,
+        captureCost: 0,
+        steps: 0,
+        source: code,
+        firstHop: null
+      };
+      pushRoute(Object.assign({ code: code }, routes[code]));
     });
 
     while (queue.length) {
@@ -249,14 +272,22 @@
           : promotionCostByLayer[sourceLayer];
         if (!Number.isFinite(transitionCost)) return;
         var owner = getRegionOwner(snapshot, neighbor, team, human);
-        var nextCost = current.cost + transitionCost +
-          (owner === team ? 0 : Math.max(0, Number(captureCostPerStep) || 0));
+        var captureCost = owner === team
+          ? 0
+          : Math.max(0, Number(owner === human
+            ? enemyCaptureCostPerStep
+            : captureCostPerStep) || 0);
+        var nextTravelCost = currentRoute.travelCost + transitionCost;
+        var nextCaptureCost = currentRoute.captureCost + captureCost;
+        var nextCost = nextTravelCost + nextCaptureCost;
         var nextSteps = current.steps + 1;
         var previous = routes[neighbor];
         if (previous && (previous.cost < nextCost ||
             (previous.cost === nextCost && previous.steps <= nextSteps))) return;
         var nextRoute = {
           cost: nextCost,
+          travelCost: nextTravelCost,
+          captureCost: nextCaptureCost,
           steps: nextSteps,
           source: current.steps === 0 ? current.code : current.source,
           firstHop: current.steps === 0 ? neighbor : current.firstHop
@@ -265,6 +296,8 @@
         pushRoute({
           code: neighbor,
           cost: nextCost,
+          travelCost: nextTravelCost,
+          captureCost: nextCaptureCost,
           steps: nextSteps,
           source: nextRoute.source,
           firstHop: nextRoute.firstHop
@@ -274,22 +307,72 @@
     return routes;
   }
 
-  function calculatePovoadoNetPresentValue(production, distance, settings, routeCost) {
+  function calculatePovoadoNetPresentValue(production, arrivalTurns, settings, routeCost) {
     settings = object(settings);
     var horizon = Math.max(1, Math.floor(Number(settings.evaluationHorizonTurns) || 8));
     var discountFactor = Number(settings.discountFactor);
     if (!Number.isFinite(discountFactor) || discountFactor < 0 || discountFactor > 1) {
       discountFactor = 0.85;
     }
-    var distanceTurns = Math.max(0, Math.floor(Number(distance) || 0));
+    var arrival = Math.max(1, Math.ceil(Number(arrivalTurns) || 1));
     var discountedIncome = 0;
-    for (var turn = distanceTurns + 1; turn <= horizon; turn += 1) {
+    for (var turn = arrival + 1; turn <= horizon; turn += 1) {
       discountedIncome += production * Math.pow(discountFactor, turn);
     }
     var captureCost = Number.isFinite(Number(routeCost))
       ? Math.max(0, Number(routeCost))
-      : distanceTurns * Math.max(0, Number(settings.captureCostPerStep) || 0);
+      : arrival * Math.max(0, Number(settings.captureCostPerStep) || 0);
     return Math.max(0, discountedIncome - captureCost);
+  }
+
+  function estimateResourceRouteArrivalTurns(route, snapshot, settings) {
+    route = object(route);
+    snapshot = object(snapshot);
+    settings = object(settings || config.resourceRoutes);
+    var steps = Math.max(0, Math.ceil(Number(route.steps) || 0));
+    if (!steps) return 0;
+    var actionsPerTurn = Math.max(1, Number(settings.estimatedActionsPerTurn) || 8);
+    var turnsForActions = Math.ceil(steps / actionsPerTurn);
+    var travelCost = Number.isFinite(Number(route.travelCost))
+      ? Math.max(0, Number(route.travelCost))
+      : Math.max(0, Number(route.cost) || 0);
+    var currentPoints = Number(snapshot.points);
+    if (!Number.isFinite(currentPoints)) {
+      currentPoints = Number(object(snapshot.pontosDoTurn)[
+        snapshot.aiTeam || snapshot.aiPlayer || snapshot.team || snapshot.currentTeam
+      ]);
+    }
+    currentPoints = Math.max(0, Number.isFinite(currentPoints) ? currentPoints : 0);
+    var coinsPerTurn = Number(snapshot.coinsPerTurn);
+    if (!Number.isFinite(coinsPerTurn) || coinsPerTurn <= 0) {
+      coinsPerTurn = Math.max(0, Number(settings.fallbackCoinsPerTurn) || 8);
+    }
+    var turnsForCoins = travelCost <= currentPoints
+      ? 1
+      : coinsPerTurn > 0
+        ? 1 + Math.ceil((travelCost - currentPoints) / coinsPerTurn)
+        : Infinity;
+    return Math.max(1, turnsForActions, turnsForCoins);
+  }
+
+  function getWheatUrgency(snapshot, team, balanceInfo, reserveTurns) {
+    snapshot = object(snapshot);
+    if (snapshot.wheatEnabled !== true) return 0;
+    var balance = Number(balanceInfo && balanceInfo.balance);
+    if (!Number.isFinite(balance) || balance >= 0) return 0;
+    var totals = object(object(snapshot.wheatTotalsByTeam)[team] ||
+      object(snapshot.wheatTotals)[team]);
+    var consumption = Math.max(0, Number(totals.consumption) || 0);
+    var stock = Number(object(snapshot.wheatBalances)[team]);
+    var turns = Math.max(0, Number(reserveTurns) || 0);
+    if (!Number.isFinite(stock) || turns === 0) return 1;
+    var projectedStock = stock + balance * turns;
+    var reserveNeed = Math.max(1, Math.abs(balance * turns));
+    var reservePressure = Math.max(0, Math.min(1, 1 - projectedStock / reserveNeed));
+    var deficitSeverity = consumption > 0
+      ? Math.max(0, Math.min(1, Math.abs(balance) / consumption))
+      : 1;
+    return Math.max(reservePressure, deficitSeverity);
   }
 
   function shouldSeekFarmForWheat(snapshot, team, balanceInfo, reserveTurns) {
@@ -606,6 +689,7 @@
         internalBreakdown: [],
         external: 0,
         externalContributions: {},
+        resourceRoute: null,
         total: 0
       };
       var ownershipLabel = owner === team
@@ -630,18 +714,81 @@
       }
     });
 
-    var wheatDeficit = snapshot.wheatEnabled === true &&
-      getSnapshotWheatBalance(snapshot, team) < 0;
+    var wheatUrgency = config.wheat.seekFarmsWhenDeficit
+      ? getWheatUrgency(
+        snapshot,
+        team,
+        { balance: getSnapshotWheatBalance(snapshot, team) },
+        object(config.wheat).proactiveReserveTurns
+      )
+      : 0;
     var povoadoSettings = object(config.povoados);
-    var villageRoutes = povoadoSettings.enabled === true
+    var resourceSettings = object(config.resourceRoutes);
+    var strategicRoutes = resourceSettings.enabled !== false
       ? (routeCache || getRankAwareRoutesFromOwnedRegions(
-        snapshot, team, human, codes, povoadoSettings.captureCostPerStep
+        snapshot,
+        team,
+        human,
+        codes,
+        povoadoSettings.captureCostPerStep,
+        povoadoSettings.enemyCaptureCostPerStep
       ))
       : {};
     var farmBonuses = object(settings.farmBonusByLevel);
     var wheatFarmBonus = Number(settings.wheatDeficitFarmBonus) || 0;
+    var farmInterestMultiplier = Math.max(0, Number(settings.farmInterestMultiplier) || 0);
+    var routeCostWeight = Math.max(0, Number(resourceSettings.routeCostWeight) || 0);
+    var routePropagation = Math.max(0, Math.min(1,
+      Number(resourceSettings.firstStepPropagation) || 0));
+    var resourceDiscount = Number(povoadoSettings.discountFactor);
+    if (!Number.isFinite(resourceDiscount) || resourceDiscount < 0 || resourceDiscount > 1) {
+      resourceDiscount = 0.88;
+    }
     var unsupportedBonus = Number(settings.unsupportedNeighborBonus) || 0;
     var rankDeficitBonus = Number(settings.troopDeficitBonus) || 0;
+
+    function addResourceRouteAttraction(targetCode, route, type, value, arrivalTurns) {
+      if (!route || !route.firstHop || value <= 0 || !scores[route.firstHop]) return;
+      var routeLabel = (type === 'farm' ? 'Rota para fazenda ' : 'Povoado destino ') +
+        targetCode + (type === 'village' ? ' (valor econômico descontado; ' : ' (') +
+        route.steps + ' etapas, chegada estimada em ' + arrivalTurns + ' turnos)';
+      if (route.firstHop !== targetCode) {
+        scores[targetCode].internal += value;
+        scores[targetCode].internalBreakdown.push({
+          label: routeLabel,
+          value: value
+        });
+      }
+      var firstStepBonus = route.firstHop === targetCode
+        ? value
+        : value * routePropagation;
+      var firstStepScore = scores[route.firstHop];
+      if (firstStepBonus <= Number(firstStepScore.resourceRoute?.bonus || 0)) return;
+      firstStepScore.internal += firstStepBonus -
+        Number(firstStepScore.resourceRoute?.bonus || 0);
+      if (firstStepScore.resourceRoute?.breakdown) {
+        var oldBreakdownIndex = firstStepScore.internalBreakdown.indexOf(
+          firstStepScore.resourceRoute.breakdown
+        );
+        if (oldBreakdownIndex !== -1) {
+          firstStepScore.internalBreakdown.splice(oldBreakdownIndex, 1);
+        }
+      }
+      var breakdown = {
+        label: routeLabel,
+        value: firstStepBonus
+      };
+      firstStepScore.resourceRoute = {
+        type: type,
+        target: targetCode,
+        route: route,
+        arrivalTurns: arrivalTurns,
+        bonus: firstStepBonus,
+        breakdown: breakdown
+      };
+      firstStepScore.internalBreakdown.push(breakdown);
+    }
+
     Object.keys(scores).forEach(function (code) {
       var score = scores[code];
       var count = Number(occupiedCounts[score.layer]) || 0;
@@ -666,47 +813,60 @@
 
       var region = object(regions[code]);
       var farmProduction = getFarmProduction(region);
-      if (farmProduction > 0) {
-        var farmLevel = getFarmLevel(region);
-        var farmBonus = Number(farmBonuses[farmLevel]) || 0;
-        score.internal += farmBonus;
-        if (farmBonus !== 0) {
+      var farmRoute = strategicRoutes[code];
+      if (farmProduction > 0 && score.owner === team) {
+        var ownedFarmBonus = (Number(farmBonuses[getFarmLevel(region)]) || 0) +
+          wheatFarmBonus * wheatUrgency;
+        score.internal += ownedFarmBonus;
+        if (ownedFarmBonus !== 0) {
           score.internalBreakdown.push({
-            label: 'Fazenda nível ' + farmLevel,
-            value: farmBonus
+            label: 'Fazenda controlada',
+            value: ownedFarmBonus
           });
         }
-        if (wheatDeficit) {
-          score.internal += wheatFarmBonus;
-          if (wheatFarmBonus !== 0) {
-            score.internalBreakdown.push({
-              label: 'Déficit de trigo',
-              value: wheatFarmBonus
-            });
-          }
-        }
+      }
+      if (farmProduction > 0 && score.owner !== team && farmRoute?.firstHop) {
+        var farmLevel = getFarmLevel(region);
+        var farmBaseValue = (Number(farmBonuses[farmLevel]) || 0) *
+          farmInterestMultiplier + wheatFarmBonus * wheatUrgency;
+        var farmArrivalTurns = estimateResourceRouteArrivalTurns(
+          farmRoute,
+          snapshot,
+          resourceSettings
+        );
+        var farmValue = Math.max(0,
+          farmBaseValue * Math.pow(resourceDiscount, Math.max(0, farmArrivalTurns - 1)) -
+            farmRoute.cost * routeCostWeight
+        );
+        addResourceRouteAttraction(code, farmRoute, 'farm', farmValue, farmArrivalTurns);
       }
       var villageLevel = Number(region.villageBuildingLevel);
       var villageProduction = Number(rules.villageCoinProductionByLevel[villageLevel]) || 0;
-      var villageRoute = villageRoutes[code];
-      if (villageProduction > 0 && score.owner !== team && villageRoute) {
+      var villageRoute = strategicRoutes[code];
+      if (povoadoSettings.enabled === true && villageProduction > 0 &&
+          score.owner !== team && villageRoute?.firstHop) {
+        var villageArrivalTurns = estimateResourceRouteArrivalTurns(
+          villageRoute,
+          snapshot,
+          resourceSettings
+        );
         var villageValue = calculatePovoadoNetPresentValue(
           villageProduction,
-          villageRoute.steps,
+          villageArrivalTurns,
           povoadoSettings,
           villageRoute.cost
         ) * Math.max(0, Number(povoadoSettings.desirabilityWeight) || 0);
-        var villageBonus = Math.min(
+        var villageAttraction = Math.min(
           Math.max(0, Number(povoadoSettings.maxDesirabilityBonus) || 0),
           villageValue
         );
-        score.internal += villageBonus;
-        if (villageBonus !== 0) {
-          score.internalBreakdown.push({
-            label: 'Povoado nível ' + villageLevel + ' (valor econômico descontado)',
-            value: villageBonus
-          });
-        }
+        addResourceRouteAttraction(
+          code,
+          villageRoute,
+          'village',
+          villageAttraction,
+          villageArrivalTurns
+        );
       }
       if (rankDeficits[score.layer]) {
         score.internal += rankDeficitBonus;
@@ -848,7 +1008,8 @@
           team,
           human,
           codes,
-          object(config.povoados).captureCostPerStep
+          object(config.povoados).captureCostPerStep,
+          object(config.povoados).enemyCaptureCostPerStep
         );
       }
       return strategicRoutes;
@@ -1166,6 +1327,41 @@
         })[0] || null;
     }
 
+    function planWheatEmergencyAction() {
+      if (!config.wheat.seekFarmsWhenDeficit || snapshot.wheatEnabled === false) return null;
+      var wheatBalance = getWheatBalance();
+      if (wheatBalance.balance >= 0) return null;
+      var ownsFarm = findFarmRegions().some(function (farm) {
+        return owns(farm.code, team);
+      });
+      if (ownsFarm && !shouldSeekFarmForWheat(
+        snapshot,
+        team,
+        wheatBalance,
+        object(config.wheat).proactiveReserveTurns
+      )) return null;
+
+      return findFarmRegions()
+        .filter(function (farm) { return !owns(farm.code, team); })
+        .map(function (farm) {
+            var route = getStrategicRoutes()[farm.code];
+            return route ? {
+              farm: farm.code,
+              distance: route.cost,
+              route: route,
+              production: farm.production
+            } : null;
+        })
+        .filter(Boolean)
+        .sort(function (left, right) {
+            return left.distance / left.production - right.distance / right.production ||
+              left.distance - right.distance ||
+              left.farm.localeCompare(right.farm);
+        })
+        .map(function (farm) { return planResourceRouteAction(farm.route); })
+        .find(function (action) { return action !== null; }) || null;
+    }
+
     // Calculate conquest priority weight based on region count difference
     function getConquestPriorityWeight() {
       var diff = humanRegionCount - teamRegionCount;
@@ -1206,14 +1402,6 @@
       return Math.ceil(neededForce / stageCost) + costSettings.sufficientForceRatioCost;
     }
 
-    // Sum of this team's force across every region of a given layer (same definition the
-    // engine itself uses in promotionBudget/hasDirectRecruitmentPromotionCapacity).
-    function layerForce(layerNumber, side) {
-      return codes.reduce(function (sum, code) {
-        return sum + (layer(code) === layerNumber && owns(code, side) ? force(code, side) : 0);
-      }, 0);
-    }
-
     function planResourceRouteAction(route) {
       if (!route || !route.firstHop || !route.source) return null;
       var source = route.source;
@@ -1229,15 +1417,11 @@
 
       if (!isFree) {
         var enemyForce = force(targetCode, human);
-        var requiredRatio = sourceLayer;
-        var ownLayerForce = layerForce(sourceLayer, team);
-        var superiorLayerForce = layerForce(sourceLayer - 1, team);
-        var neededForBudget = sourceLayer * superiorLayerForce + (sourceLayer + 1);
-        var neededForWarSafety = enemyForce * requiredRatio;
-        var neededOwnLayerForce = Math.max(neededForBudget, neededForWarSafety);
-        if (ownLayerForce < neededOwnLayerForce) {
-          // Buy the strongest affordable denomination at the source region (cheapest in
-          // time, matching "comprar unidades mais caras primeiro" to reach the goal sooner).
+        var ownLayerTotals = layerTotals[sourceLayer] || { ai: 0 };
+        var superiorLayerTotals = layerTotals[sourceLayer - 1] || { ai: 0 };
+        var neededForPromotion = sourceLayer * superiorLayerTotals.ai + sourceLayer + 1;
+        var neededForWarSafety = enemyForce * sourceLayer;
+        if (ownLayerTotals.ai < Math.max(neededForPromotion, neededForWarSafety)) {
           var buildupPurchase = strongestToWeakest.map(function (stage) {
             return getPurchaseAction(source, stage);
           }).find(function (action) { return action !== null; });
@@ -1249,63 +1433,32 @@
           !transferPreservesComposition(source, targetCode, team, 1) ||
           (isMove && isReverseMoveBlocked(source, targetCode, 1)) ||
           (!isMove && promotionBudget(source) < 1)) {
+        var promotionPurchase = !isMove
+          ? getPromotionPurchaseAction(source, targetCode, 1)
+          : null;
+        if (promotionPurchase &&
+            (promotionPurchase.type !== 'buy' || promotionPurchase.followUp)) {
+          return promotionPurchase;
+        }
+        var routePurchase = isMove
+          ? buyForTransfer(source, 1, cost, {
+            type: 'move',
+            source: source,
+            target: targetCode,
+            amount: 1
+          })
+          : null;
+        if (routePurchase) return routePurchase;
         var unlockPurchase = strongestToWeakest.map(function (stage) {
           return getPurchaseAction(source, stage);
         }).find(function (action) { return action !== null; });
-        return unlockPurchase || null;
+        return unlockPurchase || promotionPurchase || null;
       }
 
       if (!Number.isFinite(Number(points)) || Number(points) < cost) return null;
       return isMove
         ? { type: 'move', source: source, target: targetCode, amount: 1 }
         : getPromotionPurchaseAction(source, targetCode, 1);
-    }
-
-    function planWheatEmergencyAction() {
-      if (!config.wheat.seekFarmsWhenDeficit || snapshot.wheatEnabled === false) return null;
-      var balanceInfo = getWheatBalance();
-      if (!shouldSeekFarmForWheat(
-        snapshot,
-        team,
-        balanceInfo,
-        object(config.wheat).proactiveReserveTurns
-      )) return null;
-      var farm = findClosestFarm();
-      return farm && farm.route.steps > 1
-        ? planResourceRouteAction(farm.route)
-        : null;
-    }
-
-    function planVillageExpansionAction() {
-      var villageSettings = object(config.povoados);
-      if (villageSettings.enabled !== true) return null;
-      var routes = getStrategicRoutes();
-      var candidates = Object.keys(routes).map(function (code) {
-        var route = routes[code];
-        var region = object(regions[code]);
-        var level = Number(region.villageBuildingLevel);
-        var production = Number(rules.villageCoinProductionByLevel[level]) || 0;
-        if (!production || owns(code, team) || !route.firstHop || route.steps <= 1) return null;
-        var netValue = calculatePovoadoNetPresentValue(
-          production,
-          route.steps,
-          villageSettings,
-          route.cost
-        );
-        return netValue > 0
-          ? { code: code, route: route, value: netValue }
-          : null;
-      }).filter(Boolean).sort(function (left, right) {
-        return right.value - left.value ||
-          left.route.cost - right.route.cost ||
-          left.code.localeCompare(right.code);
-      });
-
-      for (var index = 0; index < candidates.length; index += 1) {
-        var action = planResourceRouteAction(candidates[index].route);
-        if (action) return action;
-      }
-      return null;
     }
 
     var points = snapshot.points;
@@ -1638,6 +1791,9 @@
       }
     }
 
+    var wheatEmergencyAction = planWheatEmergencyAction();
+    if (wheatEmergencyAction) return wheatEmergencyAction;
+
     function addDesirabilityPenalty(code, turn, type) {
       var settings = object(object(config.desirability.penalties)[type]);
       var duration = Math.max(1, Number(settings.durationTurns) || 5);
@@ -1892,10 +2048,6 @@
       var visitedTargets = {};
       var rankSettings = object(config.desirability.troopRatioByOuterLayer);
       var candidateLimit = Math.max(1, codes.length);
-      var wheatEmergencyAction = planWheatEmergencyAction();
-      if (wheatEmergencyAction) return wheatEmergencyAction;
-      var villageExpansionAction = planVillageExpansionAction();
-      if (villageExpansionAction) return villageExpansionAction;
 
       for (var attempt = 0; attempt < candidateLimit; attempt += 1) {
         var analysis = calculateDesirability(
@@ -1920,15 +2072,20 @@
               first.localeCompare(second);
           });
         if (!candidates.length) return { type: 'pass' };
+
         var hasUnvisitedExpansionTarget = candidates.some(function (code) {
           if (owns(code, team)) return false;
           return adjacent(code).some(function (source) {
             return owns(source, team) && !owns(source, human);
           });
         });
-
         var target = candidates[0];
         var targetLayer = layer(target);
+        var resourceRoute = analysis.regions[target].resourceRoute;
+        if (resourceRoute && resourceRoute.route.firstHop === target) {
+          var resourceAction = planResourceRouteAction(resourceRoute.route);
+          if (resourceAction) return resourceAction;
+        }
         if (owns(target, team) && !owns(target, human)) {
           if (hasUnvisitedExpansionTarget) {
             visitedTargets[target] = true;
@@ -2469,12 +2626,17 @@
       };
     }
 
-    // Check wheat emergency - when losing wheat, prefer advancing toward the closest farm.
-    // The farm itself may be free or enemy-held; only free regions can be entered directly
-    // (entering enemy territory is handled by the game's automatic war resolution, not by
-    // a direct "move"), so this only influences which free neighbor the AI advances into.
+    // Fallback for the route planner above: when no planned farm route action is available,
+    // rank legal one-step moves toward the most cost-effective farm. Enemy regions are
+    // reached through automatic war resolution, so direct movement only enters free regions.
     var wheatStatus = getWheatBalance();
-    var needsFarmConquest = config.wheat.seekFarmsWhenDeficit && wheatStatus.balance < 0;
+    var needsFarmConquest = config.wheat.seekFarmsWhenDeficit &&
+      shouldSeekFarmForWheat(
+        snapshot,
+        team,
+        wheatStatus,
+        object(config.wheat).proactiveReserveTurns
+      );
     var farmTargetCode = needsFarmConquest ? (findClosestFarm() || {}).farm : null;
 
     var freeMoves = [];
@@ -2699,7 +2861,8 @@
     shouldSeekFarmForWheat: shouldSeekFarmForWheat,
     shouldDeclareWar: shouldDeclareWar,
     setConfig: setConfig,
-    getConfig: getConfig
+    getConfig: getConfig,
+    estimateResourceRouteArrivalTurns: estimateResourceRouteArrivalTurns
   };
 })(
   typeof window !== 'undefined' ? window : globalThis,
