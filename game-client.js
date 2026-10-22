@@ -2958,6 +2958,14 @@
     }
 
     function getCombatNeighbors(regionCode) {
+      if (currentBoardData?.randomMap?.generator === 'cartografo-estrategico') {
+        return gameRules.getAxisAlignedRegionNeighbors(
+          regionCode,
+          regionGeometryByCode,
+          currentBoardData?.campaign?.warIncludesCornerContact === true
+        );
+      }
+
       const neighbors = regionNeighborCache[regionCode];
       const regionNeighbors = neighbors
         ? [
@@ -4658,14 +4666,21 @@
     }
 
     function restoreRankChangeControlsToStage() {
-      rankChangeFloatingControls.classList.remove('is-landscape-collapsed');
+      rankChangeFloatingControls.classList.remove(
+        'is-landscape-collapsed',
+        'is-viewport-positioned'
+      );
       if (rankChangeFloatingControls.parentElement !== stage) {
         stage.appendChild(rankChangeFloatingControls);
       }
     }
 
     function updateCollapsedRankChangeControlPosition() {
-      if (rankChangeControlsExpanded || !rankChangeControlsRegionCode) return;
+      if (!rankChangeControlsRegionCode) return;
+      if (rankChangeControlsExpanded) {
+        positionExpandedRankChangeControl(rankChangeControlsRegionCode);
+        return;
+      }
       const button = rankChangeFloatingControls.querySelector('.rank-change-expand-button');
       if (button) positionCollapsedRankChangeControl(rankChangeControlsRegionCode, button);
     }
@@ -4676,11 +4691,66 @@
           app.appendChild(rankChangeFloatingControls);
         }
         rankChangeFloatingControls.classList.add('is-landscape-collapsed');
+        rankChangeFloatingControls.classList.add('is-viewport-positioned');
         const statisticsBounds = statisticsButton.getBoundingClientRect();
         if (!statisticsBounds.width || !statisticsBounds.height) return;
         rankChangeFloatingControls.style.left =
           `${statisticsBounds.left + statisticsBounds.width / 2}px`;
         rankChangeFloatingControls.style.top = `${statisticsBounds.bottom + 4}px`;
+        return;
+      }
+      if (currentBoardData?.randomMap?.generator === 'cartografo-estrategico') {
+        if (rankChangeFloatingControls.parentElement !== app) {
+          app.appendChild(rankChangeFloatingControls);
+        }
+        rankChangeFloatingControls.classList.add('is-viewport-positioned');
+        rankChangeFloatingControls.classList.remove('is-landscape-collapsed');
+        const regionShape = [...stage.querySelectorAll('[data-region]')]
+          .find((shape) => shape.dataset.region === regionCode);
+        if (!regionShape) return;
+
+        const regionBounds = regionShape.getBoundingClientRect();
+        const buttonBounds = button.getBoundingClientRect();
+        if (!regionBounds.width || !regionBounds.height ||
+            !buttonBounds.width || !buttonBounds.height) return;
+
+        const halfWidth = buttonBounds.width / 2;
+        const halfHeight = buttonBounds.height / 2;
+        const regionCenterX = (regionBounds.left + regionBounds.right) / 2;
+        const regionCenterY = (regionBounds.top + regionBounds.bottom) / 2;
+        const clamp = (value, minimum, maximum) =>
+          minimum <= maximum ? Math.max(minimum, Math.min(maximum, value)) : (minimum + maximum) / 2;
+        const candidates = [
+          {
+            x: regionBounds.left - halfWidth,
+            y: clamp(regionCenterY, regionBounds.top + halfHeight, regionBounds.bottom - halfHeight)
+          },
+          {
+            x: regionBounds.right + halfWidth,
+            y: clamp(regionCenterY, regionBounds.top + halfHeight, regionBounds.bottom - halfHeight)
+          },
+          {
+            x: clamp(regionCenterX, regionBounds.left + halfWidth, regionBounds.right - halfWidth),
+            y: regionBounds.top - halfHeight
+          },
+          {
+            x: clamp(regionCenterX, regionBounds.left + halfWidth, regionBounds.right - halfWidth),
+            y: regionBounds.bottom + halfHeight
+          }
+        ];
+        const fitsInViewport = (candidate) =>
+          candidate.x - halfWidth >= 0 &&
+          candidate.x + halfWidth <= window.innerWidth &&
+          candidate.y - halfHeight >= 0 &&
+          candidate.y + halfHeight <= window.innerHeight;
+        const fittingCandidates = candidates.filter(fitsInViewport);
+        const position = (fittingCandidates.length ? fittingCandidates : candidates)
+          .sort((first, second) =>
+            Math.hypot(first.x - regionCenterX, first.y - regionCenterY) -
+            Math.hypot(second.x - regionCenterX, second.y - regionCenterY)
+          )[0];
+        rankChangeFloatingControls.style.left = `${position.x}px`;
+        rankChangeFloatingControls.style.top = `${position.y - halfHeight}px`;
         return;
       }
       restoreRankChangeControlsToStage();
@@ -4734,6 +4804,42 @@
         `${((position.x - stageBounds.left) / stageBounds.width) * 100}%`;
       rankChangeFloatingControls.style.top =
         `${((position.y - halfHeight - stageBounds.top) / stageBounds.height) * 100}%`;
+    }
+
+    function positionExpandedRankChangeControl(regionCode) {
+      if (currentBoardData?.randomMap?.generator !== 'cartografo-estrategico' ||
+          rankChangeFloatingControls.classList.contains('is-hidden')) return;
+      if (rankChangeFloatingControls.parentElement !== app) {
+        app.appendChild(rankChangeFloatingControls);
+      }
+      rankChangeFloatingControls.classList.add('is-viewport-positioned');
+      rankChangeFloatingControls.classList.remove('is-landscape-collapsed');
+      const regionShape = [...stage.querySelectorAll('[data-region]')]
+        .find((shape) => shape.dataset.region === regionCode);
+      if (!regionShape) return;
+
+      const regionBounds = regionShape.getBoundingClientRect();
+      const controlsBounds = rankChangeFloatingControls.getBoundingClientRect();
+      if (!regionBounds.width || !regionBounds.height ||
+          !controlsBounds.width || !controlsBounds.height) return;
+
+      const halfWidth = controlsBounds.width / 2;
+      const top = Math.max(
+        4,
+        Math.min(
+          regionBounds.top - controlsBounds.height - 4,
+          window.innerHeight - controlsBounds.height - 4
+        )
+      );
+      const centerX = Math.max(
+        halfWidth + 4,
+        Math.min(
+          (regionBounds.left + regionBounds.right) / 2,
+          window.innerWidth - halfWidth - 4
+        )
+      );
+      rankChangeFloatingControls.style.left = `${centerX}px`;
+      rankChangeFloatingControls.style.top = `${top}px`;
     }
 
     function renderRankChangeControls(regionCode) {
@@ -4829,6 +4935,7 @@
           renderRankChangeControls(regionCode);
         }, 3000);
       }
+      positionExpandedRankChangeControl(regionCode);
     }
 
     function closeModal(modal) {
@@ -6181,6 +6288,7 @@
         if (Object.keys(regionGeometryByCode).length) renderBoardLayers();
         if (currentBoardData?.randomMap?.generator === 'cartografo-estrategico' &&
             focusedRegionCode) updateBoardFocusOverlay();
+        updateCollapsedRankChangeControlPosition();
         return;
       }
       const rect = stagePanel.getBoundingClientRect();
@@ -6193,6 +6301,7 @@
       if (Object.keys(regionGeometryByCode).length) renderBoardLayers();
       if (currentBoardData?.randomMap?.generator === 'cartografo-estrategico' &&
           focusedRegionCode) updateBoardFocusOverlay();
+      updateCollapsedRankChangeControlPosition();
       if (rect.width <= 0 || rect.height <= 0) return;
     }
 

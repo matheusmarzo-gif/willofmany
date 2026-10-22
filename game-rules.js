@@ -188,6 +188,21 @@
     );
   }
 
+  function getAxisAlignedRegionNeighbors(regionCode, regionGeometryByCode, includeCornerContact = false) {
+    const geometry = regionGeometryByCode?.[regionCode];
+    if (geometry?.shape !== 'quadrilateral' || !Array.isArray(geometry.cells)) return [];
+
+    return Object.entries(regionGeometryByCode)
+      .filter(([candidateCode, candidate]) =>
+        candidateCode !== regionCode &&
+        candidate?.shape === 'quadrilateral' &&
+        Array.isArray(candidate.cells) &&
+        geometry.cells.some((firstCell) =>
+          candidate.cells.some((secondCell) =>
+            areAxisAlignedCellsNeighbors(firstCell, secondCell, 1, includeCornerContact))))
+      .map(([candidateCode]) => candidateCode);
+  }
+
   function rotateQuadrilateralMatrix(matrix, direction, rotationArea = null) {
     if (!Array.isArray(matrix) || !matrix.length ||
         matrix.some((row) => !Array.isArray(row) || row.length !== matrix.length)) {
@@ -599,6 +614,7 @@
     calculateRankChangeSoldierTotal,
     mapCampaignObjectiveRegions,
     areAxisAlignedCellsNeighbors,
+    getAxisAlignedRegionNeighbors,
     rotateQuadrilateralMatrix,
     rotateQuadrilateralMatrixPath,
     getQuadrilateralMatrixRingPath,

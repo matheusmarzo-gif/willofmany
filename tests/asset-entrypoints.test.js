@@ -122,6 +122,13 @@ test('rank changes are opt-in for AI/online games and enabled for Level 9 only',
   assert.match(gameClient,
     /function positionCollapsedRankChangeControl\(regionCode, button\)[\s\S]*?app\.appendChild\(rankChangeFloatingControls\)[\s\S]*?statisticsButton\.getBoundingClientRect\(\)[\s\S]*?rankChangeFloatingControls\.style\.top = `\$\{statisticsBounds\.bottom \+ 4\}px`/);
   assert.match(gameCss, /\.rank-change-floating-controls\.is-landscape-collapsed\s*\{\s*position:fixed/);
+  assert.match(gameClient,
+    /function positionExpandedRankChangeControl\(regionCode\)[\s\S]*?is-viewport-positioned[\s\S]*?getBoundingClientRect\(\)/);
+  assert.match(gameClient,
+    /function getCombatNeighbors\(regionCode\)[\s\S]*?randomMap\?\.generator === 'cartografo-estrategico'[\s\S]*?getAxisAlignedRegionNeighbors/);
+  assert.match(gameCss, /\.rank-change-floating-controls\.is-viewport-positioned\s*\{\s*position:fixed/);
+  assert.match(gameCss,
+    /\.rank-change-floating-controls \.rank-change-expand-button \{ width:42px; min-width:42px; height:42px; min-height:42px;/);
   assert.match(gameClient, /window\.addEventListener\('resize',[\s\S]*?updateCollapsedRankChangeControlPosition\(\)/);
 });
 

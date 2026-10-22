@@ -1282,6 +1282,47 @@ test('war groups all unspent adjacent armies and skips a region after it fought'
   }]);
 });
 
+test('random-map war adjacency includes physical neighbors across any rank', () => {
+  const geometryByCode = {
+    'L8-1': {
+      shape: 'quadrilateral',
+      cells: [{ x: 5, y: 5, width: 10, height: 10 }]
+    },
+    'L2-1': {
+      shape: 'quadrilateral',
+      cells: [{ x: 5, y: -5, width: 10, height: 10 }]
+    },
+    'L4-1': {
+      shape: 'quadrilateral',
+      cells: [{ x: 15, y: 15, width: 10, height: 10 }]
+    },
+    'L1-1': {
+      shape: 'quadrilateral',
+      cells: [{ x: 45, y: 45, width: 10, height: 10 }]
+    }
+  };
+  const orangeNeighbors = rules.getAxisAlignedRegionNeighbors('L8-1', geometryByCode);
+  const blueNeighbors = rules.getAxisAlignedRegionNeighbors('L2-1', geometryByCode);
+  const conflicts = rules.buildWarConflicts(
+    rules.getWarRegionOrder(['L8-1', 'L2-1']),
+    { 'L8-1': orangeNeighbors, 'L2-1': blueNeighbors },
+    { 'L8-1': 'orange', 'L2-1': 'blue' }
+  );
+
+  assert.deepEqual(orangeNeighbors, ['L2-1']);
+  assert.deepEqual(conflicts, [{
+    regionCode: 'L2-1',
+    alliedRegions: ['L2-1'],
+    enemyRegions: ['L8-1'],
+    attacker: 'blue'
+  }]);
+  assert.deepEqual(
+    rules.getAxisAlignedRegionNeighbors('L8-1', geometryByCode, true),
+    ['L2-1', 'L4-1'],
+    'corner contact is included only when the board enables it'
+  );
+});
+
 test('focused war preview builds a conflict independently from a neighboring focal region', () => {
   const neighborsByRegion = {
     'L8-2': ['L8-3'],
