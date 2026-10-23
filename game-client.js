@@ -3191,7 +3191,8 @@
       }).join('');
       const victoryScore = `<p class="victory-score">Pontos de vitória — Laranja: ${victoryPoints.orange} · Azul: ${victoryPoints.blue}</p>`;
       const wheatSummary = `<p class="victory-score">Trigo armazenado — Laranja: ${formatStatisticsNumber(wheatBalances.orange)} · Azul: ${formatStatisticsNumber(wheatBalances.blue)}. Produção/consumo por turno — Laranja: ${formatStatisticsNumber(totals.orange.production)} / ${formatStatisticsNumber(totals.orange.consumption)} · Azul: ${formatStatisticsNumber(totals.blue.production)} / ${formatStatisticsNumber(totals.blue.consumption)}.</p>`;
-      statisticsTableContainer.innerHTML = `${victoryScore}${wheatSummary}<h3>Resumo por disco</h3><table class="statistics-table">
+      const villageIncomeSummary = `<p class="victory-score">Moedas geradas por turno — Laranja: ${formatStatisticsNumber(getVillageCoinIncome('orange'))} moedas · Azul: ${formatStatisticsNumber(getVillageCoinIncome('blue'))} moedas</p>`;
+      statisticsTableContainer.innerHTML = `${villageIncomeSummary}${victoryScore}${wheatSummary}<h3>Resumo por disco</h3><table class="statistics-table">
         <thead><tr>
           <th scope="col">Disco</th>
           <th scope="col">Regiões laranja</th>
@@ -3458,41 +3459,57 @@
         };
       });
 
-      getRegionCalculationOrder().forEach((regionCode) => {
-        const layer = getRegionLayer(regionCode);
-        const state = forceState[regionCode];
-        if (layer <= 1) return;
-        const sourceTeam = getRegionDominador(regionCode);
-        if (sourceTeam !== 'orange' && sourceTeam !== 'blue') return;
-        const sourceState = state.byTeam[sourceTeam];
-        const soldiers = getTeamSoldierCount(regionCode, sourceTeam);
-        if (soldiers <= 0) return;
+      for (let layer = 8; layer > 1; layer -= 1) {
+        const layerRegionCodes = Object.keys(allRegionMasks?.[layer] || {})
+          .map(Number)
+          .map((region) => `L${layer}-${region}`);
+        const getCurrentForcePerSoldier = (regionCode) => {
+          const team = getRegionDominador(regionCode);
+          if (team !== 'orange' && team !== 'blue') return 0;
+          const soldiers = getTeamSoldierCount(regionCode, team);
+          if (soldiers <= 0) return 0;
+          const currentForce = forceState[regionCode].byTeam[team].forca;
+          const bonusFactor = regionForceBonusFactors[layer] || 1;
+          return currentForce * bonusFactor / soldiers;
+        };
+        layerRegionCodes.sort((a, b) =>
+          getCurrentForcePerSoldier(b) - getCurrentForcePerSoldier(a) ||
+          Number(a.split('-')[1]) - Number(b.split('-')[1]));
 
-        const superiorRegions = (regionNeighborCache[regionCode]?.superior || [])
-          .filter((targetCode) => getRegionLayer(targetCode) === layer - 1)
-          .filter((targetCode) => getRegionDominador(targetCode) === sourceTeam)
-          .sort((a, b) => {
-            const aRegion = Number(a.split('-')[1]);
-            const bRegion = Number(b.split('-')[1]);
-            return aRegion - bRegion;
+        layerRegionCodes.forEach((regionCode) => {
+          const state = forceState[regionCode];
+          const sourceTeam = getRegionDominador(regionCode);
+          if (sourceTeam !== 'orange' && sourceTeam !== 'blue') return;
+          const sourceState = state.byTeam[sourceTeam];
+          const soldiers = getTeamSoldierCount(regionCode, sourceTeam);
+          if (soldiers <= 0) return;
+
+          const superiorRegions = (regionNeighborCache[regionCode]?.superior || [])
+            .filter((targetCode) => getRegionLayer(targetCode) === layer - 1)
+            .filter((targetCode) => getRegionDominador(targetCode) === sourceTeam)
+            .sort((a, b) => {
+              const aRegion = Number(a.split('-')[1]);
+              const bRegion = Number(b.split('-')[1]);
+              return aRegion - bRegion;
+            });
+          const forcePerSoldier = sourceState.forca / soldiers;
+          const recipientsPerSourceGroup = layer;
+          let availableSourceGroups = soldiers / recipientsPerSourceGroup;
+
+          superiorRegions.forEach((targetCode) => {
+            if (availableSourceGroups <= 0) return;
+            const targetState = forceState[targetCode].byTeam[sourceTeam];
+            const recipientCount = Math.min(targetState.unidades_livres_temp, availableSourceGroups);
+            if (recipientCount <= 0) return;
+
+            const donatedForce = recipientCount * recipientsPerSourceGroup * forcePerSoldier / 2;
+            sourceState.forca -= donatedForce;
+            targetState.forca += donatedForce;
+            targetState.unidades_livres_temp -= recipientCount;
+            availableSourceGroups -= recipientCount;
           });
-        const forcePerSoldier = sourceState.forca / soldiers;
-        const recipientsPerSourceGroup = layer;
-        let availableSourceGroups = soldiers / recipientsPerSourceGroup;
-
-        superiorRegions.forEach((targetCode) => {
-          if (availableSourceGroups <= 0) return;
-          const targetState = forceState[targetCode].byTeam[sourceTeam];
-          const recipientCount = Math.min(targetState.unidades_livres_temp, availableSourceGroups);
-          if (recipientCount <= 0) return;
-
-          const donatedForce = recipientCount * recipientsPerSourceGroup * forcePerSoldier / 2;
-          sourceState.forca -= donatedForce;
-          targetState.forca += donatedForce;
-          targetState.unidades_livres_temp -= recipientCount;
-          availableSourceGroups -= recipientCount;
         });
-      });
+      }
 
       const aggregateForceState = {};
       Object.entries(forceState).forEach(([regionCode, state]) => {

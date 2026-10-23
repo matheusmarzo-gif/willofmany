@@ -391,6 +391,26 @@ test('AI and online games do not end automatically on turn 30', () => {
     /if \(currentTurn === 30 && hasTurn30Limit\(\) &&\s*!isWarRunning && !isGameOver\) startWar\(true\)/);
 });
 
+test('region donations process each rank by current final force per soldier', () => {
+  const calculationStart = gameClient.indexOf('function recalculateRegionForces()');
+  const calculationEnd = gameClient.indexOf('function getNeighborRegionCode(', calculationStart);
+  const calculation = gameClient.slice(calculationStart, calculationEnd);
+
+  assert.match(calculation,
+    /for \(let layer = 8; layer > 1; layer -= 1\) \{[\s\S]*?const currentForce = forceState\[regionCode\]\.byTeam\[team\]\.forca;[\s\S]*?return currentForce \* bonusFactor \/ soldiers;[\s\S]*?layerRegionCodes\.sort\(\(a, b\) =>\s*getCurrentForcePerSoldier\(b\) - getCurrentForcePerSoldier\(a\)[\s\S]*?layerRegionCodes\.forEach\(\(regionCode\)/);
+  assert.match(calculation,
+    /sourceState\.forca -= donatedForce;\s*targetState\.forca \+= donatedForce/);
+});
+
+test('statistics lead with generated village coins per turn for each owning team', () => {
+  assert.match(gameClient,
+    /function getVillageCoinIncome\(team\)\s*\{\s*return getRegionCalculationOrder\(\)\.reduce\(\(income, regionCode\) => \{\s*if \(getRegionDominador\(regionCode\) !== team\) return income;\s*return income \+ getVillageCoinProductionPerTurn\(regionGeometryByCode\[regionCode\]\);/);
+  assert.match(gameClient,
+    /const villageIncomeSummary = `<p class="victory-score">Moedas geradas por turno — Laranja: \$\{formatStatisticsNumber\(getVillageCoinIncome\('orange'\)\)\} moedas · Azul: \$\{formatStatisticsNumber\(getVillageCoinIncome\('blue'\)\)\} moedas<\/p>`;/);
+  assert.match(gameClient,
+    /statisticsTableContainer\.innerHTML = `\$\{villageIncomeSummary\}\$\{victoryScore\}\$\{wheatSummary\}/);
+});
+
 test('random maps can be sized for AI games and retain the game coordinate dimensions', () => {
   assert.match(html, /id="ai-random-map-enabled" type="checkbox"/);
   assert.match(html, /id="ai-random-map-target" type="number" min="25" max="900"/);
