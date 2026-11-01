@@ -24,7 +24,7 @@ import {
   importMapFromJSON,
   ExportFormatType,
   QuadrilateralExportOptions,
-} from '../utils/mapGenerator';
+} from '../mapGenerator';
 
 interface JsonExportModalProps {
   isOpen: boolean;

@@ -86,6 +86,8 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
   explicitamente declarados nesta tarefa.
 - `ARCHITECTURE.md`: mapa ampliado, dependências, pontos de entrada por mecânica e
   roteiro incremental para modularizar.
+- `FUNCTION_CATALOG.md`: inventário de funções e responsabilidades do cliente,
+  IA/regras, ferramentas de mapas, Android e servidor.
 - `tests/`: testes do módulo de regras e dos caminhos/empacotamento dos assets.
 
 ## Regras para editar com segurança
@@ -110,6 +112,11 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
   configurado pelo tabuleiro. `tests/will-of-many-ai.test.js` cobre rotas e
   decisões estratégicas da IA. Os controles flutuantes de upgrade/downgrade ficam
   presos à viewport para não herdarem o zoom, e o ícone recolhido mede 42×42 px.
+- A doação de força pode usar vizinhança direta ou estendida (diretos + vizinhos
+  dos vizinhos); o padrão é estendida. Levels 1–10 da campanha forçam a direta.
+  Nas partidas Contra IA, Online, Dois jogadores e Bluetooth, a opção é salva
+  junto ao estado da partida; em partidas compartilhadas vale a configuração do
+  anfitrião. Preserve `getExtendedNeighbors` e os testes de contrato ao alterar.
 - Tabuleiros usam JSONs externos. Se o carregamento falhar, exiba/trate o erro;
   não reintroduza fallback silencioso com snapshot antigo.
 - Preserve os contratos de save, Bluetooth e WebSocket. Confira os clientes e

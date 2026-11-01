@@ -34,10 +34,6 @@ public class OnlineMatch {
         return blue;
     }
 
-    public PlayerView getPlayer(String team) {
-        return "orange".equals(team) ? orange : blue;
-    }
-
     public String getTeam(long playerId) {
         if (orange.id().equals(playerId)) return "orange";
         if (blue.id().equals(playerId)) return "blue";

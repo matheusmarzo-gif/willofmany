@@ -20,7 +20,7 @@ import {
   RotateCw,
   SlidersHorizontal,
 } from 'lucide-react';
-import { SectorInfo } from '../utils/sectorRotation';
+import { SectorInfo } from '../sectorRotation';
 
 interface ControlSidebarProps {
   parameters: GeneratorParameters;

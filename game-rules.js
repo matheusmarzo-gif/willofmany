@@ -204,6 +204,25 @@
       .map(([candidateCode]) => candidateCode);
   }
 
+  function getExtendedNeighbors(regionCode, neighborsByRegion) {
+    const directNeighbors = neighborsByRegion?.[regionCode] || {};
+    const extendedNeighbors = new Set([
+      ...(directNeighbors.superior || []),
+      ...(directNeighbors.inferior || []),
+      ...(directNeighbors.sameRank || [])
+    ]);
+
+    [...extendedNeighbors].forEach((neighborCode) => {
+      const neighbors = neighborsByRegion?.[neighborCode] || {};
+      (neighbors.superior || []).forEach((code) => extendedNeighbors.add(code));
+      (neighbors.inferior || []).forEach((code) => extendedNeighbors.add(code));
+      (neighbors.sameRank || []).forEach((code) => extendedNeighbors.add(code));
+    });
+
+    extendedNeighbors.delete(regionCode);
+    return [...extendedNeighbors];
+  }
+
   function rotateQuadrilateralMatrix(matrix, direction, rotationArea = null) {
     if (!Array.isArray(matrix) || !matrix.length ||
         matrix.some((row) => !Array.isArray(row) || row.length !== matrix.length)) {
@@ -687,6 +706,7 @@
     mapCampaignObjectiveRegions,
     areAxisAlignedCellsNeighbors,
     getAxisAlignedRegionNeighbors,
+    getExtendedNeighbors,
     rotateQuadrilateralMatrix,
     rotateQuadrilateralMatrixPath,
     getQuadrilateralMatrixRingPath,

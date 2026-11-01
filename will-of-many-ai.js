@@ -2114,17 +2114,18 @@
           continue;
         }
 
+        function sourceLayerPreference(sourceLayer) {
+          if (sourceLayer === targetLayer + 1) return 0;
+          if (sourceLayer === targetLayer) return 1;
+          if (sourceLayer === targetLayer - 1) return 2;
+          return 3;
+        }
+
         var sourceCandidates = adjacent(target).filter(function (source) {
           return owns(source, team) && !owns(source, human);
         }).sort(function (first, second) {
-          function rankPreference(source) {
-            var sourceLayer = layer(source);
-            if (sourceLayer === targetLayer + 1) return 0;
-            if (sourceLayer === targetLayer) return 1;
-            if (sourceLayer === targetLayer - 1) return 2;
-            return 3;
-          }
-          return rankPreference(first) - rankPreference(second) ||
+          return sourceLayerPreference(layer(first)) -
+            sourceLayerPreference(layer(second)) ||
             force(second, team) - force(first, team) || first.localeCompare(second);
         });
         codes.forEach(function (source) {
@@ -2133,16 +2134,12 @@
               sourceCandidates.indexOf(source) !== -1) return;
           sourceCandidates.push(source);
         });
+
         sourceCandidates.sort(function (first, second) {
           var firstLayer = layer(first);
           var secondLayer = layer(second);
-          function preference(sourceLayer) {
-            if (sourceLayer === targetLayer + 1) return 0;
-            if (sourceLayer === targetLayer) return 1;
-            if (sourceLayer === targetLayer - 1) return 2;
-            return 3;
-          }
-          return preference(firstLayer) - preference(secondLayer) ||
+          return sourceLayerPreference(firstLayer) -
+            sourceLayerPreference(secondLayer) ||
             force(second, team) - force(first, team) || first.localeCompare(second);
         });
         for (var sourceIndex = 0; sourceIndex < sourceCandidates.length; sourceIndex += 1) {

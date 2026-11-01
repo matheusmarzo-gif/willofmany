@@ -396,8 +396,19 @@ test('region donations process each rank by current final force per soldier', ()
   const calculationEnd = gameClient.indexOf('function getNeighborRegionCode(', calculationStart);
   const calculation = gameClient.slice(calculationStart, calculationEnd);
 
+  assert.match(html, /id="force-donation-extended-enabled" type="checkbox" checked/);
+  assert.match(gameClient,
+    /let extendedForceDonationEnabled = true;[\s\S]*?extendedForceDonationEnabled,[\s\S]*?save\.extendedForceDonationEnabled !== false/);
+  assert.match(gameClient,
+    /function usesExtendedForceDonationNeighborhood\(\)[\s\S]*?campaignLevelNumber <= 10[\s\S]*?extendedForceDonationEnabled/);
+  assert.match(gameClient,
+    /extendedForceDonationEnabled = isCampaignGame\(\)\s*\?\s*\(getCampaignLevelNumber\(activeCampaignLevel\.id\) \|\| 0\) > 10\s*:\s*forceDonationExtendedCheckbox\.checked/);
+  assert.match(gameClient,
+    /forceDonationNeighborhoodOption\.classList\.toggle\('is-hidden', gameMode === 'campaign'\)/);
   assert.match(calculation,
     /for \(let layer = 8; layer > 1; layer -= 1\) \{[\s\S]*?const currentForce = forceState\[regionCode\]\.byTeam\[team\]\.forca;[\s\S]*?return currentForce \* bonusFactor \/ soldiers;[\s\S]*?layerRegionCodes\.sort\(\(a, b\) =>\s*getCurrentForcePerSoldier\(b\) - getCurrentForcePerSoldier\(a\)[\s\S]*?layerRegionCodes\.forEach\(\(regionCode\)/);
+  assert.match(calculation,
+    /const directSuperiorRegions = regionNeighborCache\[regionCode\]\?\.superior \|\| \[\];[\s\S]*?usesExtendedForceDonationNeighborhood\(\)[\s\S]*?gameRules\.getExtendedNeighbors\(regionCode, regionNeighborCache\)[\s\S]*?: directSuperiorRegions;[\s\S]*?getRegionLayer\(targetCode\) === layer - 1[\s\S]*?getRegionDominador\(targetCode\) === sourceTeam[\s\S]*?\.sort\(\(a, b\)/);
   assert.match(calculation,
     /sourceState\.forca -= donatedForce;\s*targetState\.forca \+= donatedForce/);
 });
@@ -1194,11 +1205,15 @@ test('Level 8 defines unique regions, fixed singleton cells, rotating rings, and
       .sort((left, right) => Number(left.split('-')[1]) - Number(right.split('-')[1])),
     Array.from({ length: 32 }, (_, index) => `L7-${index + 1}`)
   );
-  assert.deepEqual(
-    regions.filter((region) => region.layer === 6).map((region) => region.code)
-      .sort((left, right) => Number(left.split('-')[1]) - Number(right.split('-')[1])),
-    Array.from({ length: 8 }, (_, index) => `L6-${index + 1}`)
-  );
+  const layerSixRegionCodes = regions
+    .filter((region) => region.layer === 6)
+    .map((region) => region.code)
+    .sort();
+  const rotatingBlockCenters = levelEightBoard.blocks
+    .filter((block) => block.rotationEnabled)
+    .map((block) => block.matrix[1][1])
+    .sort();
+  assert.deepEqual(layerSixRegionCodes, rotatingBlockCenters);
   assert.deepEqual(levelEightBoard.blocks.slice(0, 12).map((block) => block.rotationEnabled),
     Array(12).fill(false));
   assert.deepEqual(levelEightBoard.blocks.slice(12).map((block) => block.rotationEnabled),
@@ -1252,7 +1267,7 @@ test('Level 8 defines unique regions, fixed singleton cells, rotating rings, and
   assert.match(gameClient, /illustration\.setAttribute\('height', '45'\)/);
   assert.match(gameClient, /illustration\.setAttribute\('width', '48'\)/);
   assert.match(gameClient, /illustration\.setAttribute\('height', '48'\)/);
-  assert.match(gameClient, /gameRules\.getQuadrilateralBuildingIconScale\(\s*geometry\.cells,\s*iconScale,\s*45\s*\)/);
+  assert.match(gameClient, /gameRules\.getQuadrilateralBuildingIconScale\(\s*geometry\.cells,\s*iconScale\s*\)/);
   for (let level = 1; level <= 5; level += 1) {
     assert.ok(fs.existsSync(path.join(root, `fazenda_${level}.png`)));
     assert.ok(fs.existsSync(path.join(root, `povoado_${level}.png`)));

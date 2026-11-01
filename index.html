@@ -63,8 +63,15 @@
             Permitir Upgrade/Downgrade
           </label>
         </div>
+        <div class="upgrade-downgrade-option" id="force-donation-neighborhood-option">
+          <label for="force-donation-extended-enabled">
+            <input id="force-donation-extended-enabled" type="checkbox" checked>
+            Usar vizinhança estendida para doar força
+          </label>
+          <small id="force-donation-neighborhood-hint">A vizinhança estendida inclui vizinhos diretos e vizinhos de vizinhos. Em partidas Online e Bluetooth, a escolha do anfitrião vale para ambos.</small>
+        </div>
         <div class="is-hidden" id="bluetooth-options">
-          <p>O anfitrião escolhe a velocidade, cria a sala e joga de Laranja. O convidado joga de Azul.</p>
+          <p>O anfitrião escolhe a velocidade e a vizinhança da doação, cria a sala e joga de Laranja. O convidado joga de Azul.</p>
           <button class="start-confirm" id="bluetooth-host-button" type="button">Criar sala Bluetooth</button>
           <button class="start-confirm" id="bluetooth-search-button" type="button">Buscar partidas</button>
           <div id="bluetooth-devices" aria-live="polite"></div>

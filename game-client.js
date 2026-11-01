@@ -8,6 +8,8 @@
     const newGameOptions = document.querySelector('#new-game-options');
     const upgradeDowngradeOption = document.querySelector('#upgrade-downgrade-option');
     const upgradeDowngradeCheckbox = document.querySelector('#upgrade-downgrade-enabled');
+    const forceDonationNeighborhoodOption = document.querySelector('#force-donation-neighborhood-option');
+    const forceDonationExtendedCheckbox = document.querySelector('#force-donation-extended-enabled');
     const startMessage = document.querySelector('#start-message');
     const startGameButton = document.querySelector('#start-game-button');
     const startBackButton = document.querySelector('#start-back-button');
@@ -352,6 +354,7 @@
     let selectedStartSpeed = null;
     let gameMode = 'ai';
     let upgradeDowngradeEnabled = false;
+    let extendedForceDonationEnabled = true;
     let bluetoothRole = null;
     let bluetoothConnected = false;
     let onlineToken = localStorage.getItem('will-of-many-online-token') || '';
@@ -493,8 +496,8 @@
         ? `Fronteira estratégica · página ${selectedCampaignTrailPage - 1}`
         : 'Trilha da campanha';
       campaignTrailDescription.textContent = randomChapter
-        ? `Levels ${firstLevel}–${lastLevel}: mapas gerados e guardados neste aparelho.`
-        : 'Escolha um level desbloqueado para continuar sua jornada.';
+        ? `Levels ${firstLevel}–${lastLevel}: mapas gerados e guardados neste aparelho. Level 10 usa vizinhança direta; Levels 11+ usam estendida.`
+        : 'Escolha um level desbloqueado para continuar sua jornada. Levels 1–10 usam vizinhança direta na doação de força.';
       campaignTrailSwitchButton.classList.toggle('is-hidden', selectedCampaignTrailPage === 1);
       campaignTrailSwitchButton.textContent = 'Página anterior';
       campaignTrailNextButton.classList.toggle(
@@ -900,6 +903,7 @@
         turnCreatedPieces: JSON.parse(JSON.stringify(turnCreatedPieces)),
         upgradeDowngradeEnabled,
         regionRankChanges: JSON.parse(JSON.stringify(rankChangedRegions)),
+        extendedForceDonationEnabled,
         victoryPoints: { ...victoryPoints },
         wheatBalances: { ...wheatBalances },
         lastWheatTurnReport: lastWheatTurnReport ? { ...lastWheatTurnReport } : null,
@@ -1096,6 +1100,10 @@
         activeCampaignLevel = gameMode === 'campaign' ? campaignBoardConfig : null;
         upgradeDowngradeEnabled = save.upgradeDowngradeEnabled === true &&
           (!isCampaignGame() || activeCampaignLevel?.upgradeDowngradeEnabled === true);
+        extendedForceDonationEnabled = isCampaignGame()
+          ? (getCampaignLevelNumber(activeCampaignLevel.id) || 0) > 10
+          : save.extendedForceDonationEnabled !== false;
+        extendedForceDonationEnabled = usesExtendedForceDonationNeighborhood();
         applySavedRankChanges(save.regionRankChanges || []);
         const savedRegionMapVersion = Number(save.levelThreeRegionMapVersion);
         const migrateLevelThreeRegionCodes = gameMode === 'campaign' &&
@@ -1357,6 +1365,14 @@
     }
     function isCampaignGame() {
       return gameMode === 'campaign' && !!activeCampaignLevel;
+    }
+
+    function usesExtendedForceDonationNeighborhood() {
+      const campaignLevelNumber = isCampaignGame()
+        ? getCampaignLevelNumber(activeCampaignLevel.id)
+        : null;
+      return !(campaignLevelNumber !== null && campaignLevelNumber <= 10) &&
+        extendedForceDonationEnabled;
     }
 
     function hasTurn30Limit() {
@@ -3253,14 +3269,6 @@
       return gameRules.getPieceCount(teamCounts);
     }
 
-    function renderWarStatus(title, alliedRegions, enemyRegions, alliedForce, enemyForce, result) {
-      warStatus.innerHTML = `<h2>${title}</h2>
-        <p>Aliados: ${alliedRegions.join(', ') || 'nenhum'}</p>
-        <p>Inimigos: ${enemyRegions.join(', ') || 'nenhum'}</p>
-        <p>${result}</p>`;
-      warStatus.classList.remove('is-hidden');
-    }
-
     function renderWarForces(attacker, alliedForce, enemyForce) {
       const orangeForce = attacker === 'orange' ? alliedForce : enemyForce;
       const blueForce = attacker === 'blue' ? alliedForce : enemyForce;
@@ -3484,7 +3492,11 @@
           const soldiers = getTeamSoldierCount(regionCode, sourceTeam);
           if (soldiers <= 0) return;
 
-          const superiorRegions = (regionNeighborCache[regionCode]?.superior || [])
+          const directSuperiorRegions = regionNeighborCache[regionCode]?.superior || [];
+          const potentialRecipients = usesExtendedForceDonationNeighborhood()
+            ? gameRules.getExtendedNeighbors(regionCode, regionNeighborCache)
+            : directSuperiorRegions;
+          const superiorRegions = potentialRecipients
             .filter((targetCode) => getRegionLayer(targetCode) === layer - 1)
             .filter((targetCode) => getRegionDominador(targetCode) === sourceTeam)
             .sort((a, b) => {
@@ -10587,11 +10599,6 @@
       return coins;
     }
 
-    function performMove(direction, amount) {
-      const targetCode = getNeighborRegionCode(selectedRegionCode, direction);
-      if (targetCode) performMoveTo(targetCode, amount);
-    }
-
     function performMoveTo(neighbor, amount) {
       if (!isCurrentTurnActionAllowed()) return;
       if (!selectedRegionCode) return;
@@ -11911,6 +11918,9 @@
       upgradeDowngradeEnabled = isCampaignGame()
         ? activeCampaignLevel.upgradeDowngradeEnabled === true
         : ['ai', 'online'].includes(gameMode) && upgradeDowngradeCheckbox.checked;
+      extendedForceDonationEnabled = isCampaignGame()
+        ? (getCampaignLevelNumber(activeCampaignLevel.id) || 0) > 10
+        : forceDonationExtendedCheckbox.checked;
       localStorage.removeItem('will-of-many-save');
       resetGameState();
       placeBoardInitialPieces();
@@ -11976,6 +11986,7 @@
       selectStartOption('#game-mode-options button', 'mode', gameMode);
       upgradeDowngradeOption.classList.toggle('is-hidden',
         !['ai', 'online'].includes(gameMode));
+      forceDonationNeighborhoodOption.classList.toggle('is-hidden', gameMode === 'campaign');
       colorOptionsGroup.classList.toggle('is-hidden', gameMode !== 'ai');
       document.querySelector('#color-choice-label').classList.toggle('is-hidden', gameMode !== 'ai');
       localModeHint.classList.toggle('is-hidden', gameMode !== 'local');

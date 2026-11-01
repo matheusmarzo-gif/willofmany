@@ -16,7 +16,7 @@ import {
   FAZENDA_YIELD,
 } from '../types/map';
 import { X, Check, Trash2, Shield, Coins, Wheat, Grid3X3, RotateCw } from 'lucide-react';
-import { SectorInfo } from '../utils/sectorRotation';
+import { SectorInfo } from '../sectorRotation';
 
 interface TileInspectorProps {
   tile: RegionTile | null;

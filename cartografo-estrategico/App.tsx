@@ -16,10 +16,10 @@ import {
   DEFAULT_PARAMETERS,
   FullMapState,
   generateFullMap,
-} from './utils/mapGenerator';
-import { placeBuildings } from './utils/buildingPlacer';
+} from './mapGenerator';
+import { placeBuildings } from './buildingPlacer';
 import { GeneratorParameters, RankContributionMatrix, RegionTile } from './types/map';
-import { getSectorForCoord, rotateSector } from './utils/sectorRotation';
+import { getSectorForCoord, rotateSector } from './sectorRotation';
 
 export default function App() {
   const [parameters, setParameters] = useState<GeneratorParameters>(DEFAULT_PARAMETERS);

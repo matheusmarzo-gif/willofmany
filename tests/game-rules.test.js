@@ -88,6 +88,24 @@ test('random-map pieces stay proportional to focused cells and respect the usual
   assert.equal(rules.getQuadrilateralCellPieceSize([spaciousCell], 600, 400, 4), 30);
 });
 
+test('extended neighborhood includes direct and two-step neighbors once', () => {
+  const neighborsByRegion = {
+    'L8-1': { superior: [], inferior: ['L7-1'], sameRank: ['L8-2'] },
+    'L7-1': { superior: ['L6-1'], inferior: ['L8-1'], sameRank: ['L7-2'] },
+    'L8-2': { superior: [], inferior: ['L7-2'], sameRank: ['L8-1'] },
+    'L7-2': { superior: ['L6-1', 'L6-2'], inferior: ['L8-2'], sameRank: ['L7-1'] },
+    'L6-1': { superior: [], inferior: ['L7-1', 'L7-2'], sameRank: [] },
+    'L6-2': { superior: [], inferior: ['L7-2'], sameRank: [] },
+    'L5-1': { superior: [], inferior: ['L6-2'], sameRank: [] }
+  };
+
+  assert.deepEqual(
+    rules.getExtendedNeighbors('L8-1', neighborsByRegion).sort(),
+    ['L6-1', 'L7-1', 'L7-2', 'L8-2']
+  );
+  assert.deepEqual(rules.getExtendedNeighbors('L8-missing', neighborsByRegion), []);
+});
+
 test('random-map building icons are constrained to the region cell dimensions', () => {
   const cells = [
     { width: 16, height: 8 },

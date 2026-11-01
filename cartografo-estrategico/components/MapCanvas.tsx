@@ -28,7 +28,7 @@ import {
   RotateCw,
   X,
 } from 'lucide-react';
-import { getSectorForCoord, SectorInfo } from '../utils/sectorRotation';
+import { getSectorForCoord, SectorInfo } from '../sectorRotation';
 import { MapBlock } from '../types/map';
 
 export type MapViewMode = 'ranks' | 'buildings' | 'distance' | 'yield' | 'waves';

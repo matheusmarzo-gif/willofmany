@@ -399,13 +399,6 @@
       return { column, row, key: tileKey(column, row) };
     }
 
-    function toggleTile(key) {
-      if (paintMode) selectedTiles.add(key);
-      else selectedTiles.delete(key);
-      draw();
-      updateStatus();
-    }
-
     function paintBrush(center) {
       const radius = Math.floor(brushSize / 2);
       for (let row = center.row - radius; row <= center.row + radius; row += 1) {
