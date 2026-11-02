@@ -37,18 +37,13 @@
     const bluetoothSearchButton = document.querySelector('#bluetooth-search-button');
     const bluetoothDevices = document.querySelector('#bluetooth-devices');
     const onlineOptions = document.querySelector('#online-options');
-    const onlineRandomMapCheckbox = document.querySelector('#online-random-map-enabled');
-    const onlineRandomMapTarget = document.querySelector('#online-random-map-target');
-    const onlineRandomMapTargetValue = document.querySelector('#online-random-map-target-value');
-    const onlineRandomMapSizeLabel = document.querySelector('#online-random-map-size-label');
-    const onlineRandomMapRotationsCheckbox = document.querySelector('#online-random-map-rotations-enabled');
-    const onlineRandomMapRotationsLabel = document.querySelector('#online-random-map-rotations-label');
-    const aiRandomMapCheckbox = document.querySelector('#ai-random-map-enabled');
-    const aiRandomMapTarget = document.querySelector('#ai-random-map-target');
-    const aiRandomMapTargetValue = document.querySelector('#ai-random-map-target-value');
-    const aiRandomMapSizeLabel = document.querySelector('#ai-random-map-size-label');
-    const aiRandomMapRotationsCheckbox = document.querySelector('#ai-random-map-rotations-enabled');
-    const aiRandomMapRotationsLabel = document.querySelector('#ai-random-map-rotations-label');
+    const randomMapOption = document.querySelector('#random-map-option');
+    const randomMapCheckbox = document.querySelector('#random-map-enabled');
+    const randomMapTarget = document.querySelector('#random-map-target');
+    const randomMapTargetValue = document.querySelector('#random-map-target-value');
+    const randomMapSizeLabel = document.querySelector('#random-map-size-label');
+    const randomMapRotationsCheckbox = document.querySelector('#random-map-rotations-enabled');
+    const randomMapRotationsLabel = document.querySelector('#random-map-rotations-label');
     const onlineNameInput = document.querySelector('#online-name');
     const googleSignIn = document.querySelector('#google-sign-in');
     const onlineProfile = document.querySelector('#online-profile');
@@ -1384,7 +1379,7 @@
       if (isCampaignGame()) {
         return getCampaignLevelNumber(activeCampaignLevel.id) >= firstRandomCampaignLevel;
       }
-      return gameMode === 'ai' || isOnlineGame();
+      return ['ai', 'local', 'bluetooth'].includes(gameMode) || isOnlineGame();
     }
 
     function isWheatEnabled() {
@@ -11877,14 +11872,9 @@
           : null;
         if (randomCampaignLevel) {
           await loadRandomCampaignBoard(selectedCampaignLevelId);
-        } else if ((gameMode === 'online' && onlineRandomMapCheckbox.checked) ||
-                   (gameMode === 'ai' && aiRandomMapCheckbox.checked)) {
-          const targetRegions = Number(
-            gameMode === 'online' ? onlineRandomMapTarget.value : aiRandomMapTarget.value
-          );
-          const rotationsEnabled = gameMode === 'online'
-            ? onlineRandomMapRotationsCheckbox.checked
-            : aiRandomMapRotationsCheckbox.checked;
+        } else if (gameMode !== 'campaign' && randomMapCheckbox.checked) {
+          const targetRegions = Number(randomMapTarget.value);
+          const rotationsEnabled = randomMapRotationsCheckbox.checked;
           if (!Number.isInteger(targetRegions) || targetRegions < 25 || targetRegions > 900) {
             throw new Error('escolha uma meta de 25 a 900 regiões para o mapa aleatório');
           }
@@ -11895,8 +11885,7 @@
       } catch (error) {
         startMessage.textContent = gameMode === 'campaign'
           ? `Não foi possível preparar o level da campanha: ${error.message}`
-          : ((gameMode === 'online' && onlineRandomMapCheckbox.checked) ||
-             (gameMode === 'ai' && aiRandomMapCheckbox.checked))
+          : gameMode !== 'campaign' && randomMapCheckbox.checked
             ? `Não foi possível preparar o mapa aleatório: ${error.message}`
           : `Não foi possível carregar o tabuleiro padrão: ${error.message}`;
         return;
@@ -11950,6 +11939,8 @@
             wheatBalances[team] = Number.isFinite(balance) ? Math.max(0, balance) : 0;
           }
         }
+      } else if (currentBoardData?.randomMap?.generator === 'cartografo-estrategico') {
+        wheatBalances = { orange: 100, blue: 100 };
       }
       aiTurnStartingPoints = currentTeam === aiTeam ? pontosDoTurn[currentTeam] : null;
       renderBoardLayers();
@@ -11992,11 +11983,9 @@
       localModeHint.classList.toggle('is-hidden', gameMode !== 'local');
       bluetoothOptions.classList.toggle('is-hidden', gameMode !== 'bluetooth');
       onlineOptions.classList.toggle('is-hidden', gameMode !== 'online');
-      onlineRandomMapSizeLabel.classList.toggle('is-hidden', !onlineRandomMapCheckbox.checked);
-      onlineRandomMapRotationsLabel.classList.toggle('is-hidden', !onlineRandomMapCheckbox.checked);
-      document.querySelector('#ai-random-map-option').classList.toggle('is-hidden', gameMode !== 'ai');
-      aiRandomMapSizeLabel.classList.toggle('is-hidden', !aiRandomMapCheckbox.checked);
-      aiRandomMapRotationsLabel.classList.toggle('is-hidden', !aiRandomMapCheckbox.checked);
+      randomMapOption.classList.toggle('is-hidden', gameMode === 'campaign');
+      randomMapSizeLabel.classList.toggle('is-hidden', !randomMapCheckbox.checked);
+      randomMapRotationsLabel.classList.toggle('is-hidden', !randomMapCheckbox.checked);
       document.querySelector('#speed-options').classList.toggle('is-hidden', gameMode === 'online' || gameMode === 'campaign');
       document.querySelector('#speed-choice-label').classList.toggle('is-hidden', gameMode === 'online' || gameMode === 'campaign');
       startGameButton.classList.toggle('is-hidden', gameMode === 'bluetooth' || gameMode === 'online');
@@ -12227,19 +12216,12 @@
         startGameButton.disabled = !selectedStartSpeed || (gameMode === 'ai' && !selectedStartColor);
       });
     });
-    onlineRandomMapCheckbox.addEventListener('change', () => {
-      onlineRandomMapSizeLabel.classList.toggle('is-hidden', !onlineRandomMapCheckbox.checked);
-      onlineRandomMapRotationsLabel.classList.toggle('is-hidden', !onlineRandomMapCheckbox.checked);
+    randomMapCheckbox.addEventListener('change', () => {
+      randomMapSizeLabel.classList.toggle('is-hidden', !randomMapCheckbox.checked);
+      randomMapRotationsLabel.classList.toggle('is-hidden', !randomMapCheckbox.checked);
     });
-    onlineRandomMapTarget.addEventListener('input', () => {
-      onlineRandomMapTargetValue.value = onlineRandomMapTarget.value;
-    });
-    aiRandomMapCheckbox.addEventListener('change', () => {
-      aiRandomMapSizeLabel.classList.toggle('is-hidden', !aiRandomMapCheckbox.checked);
-      aiRandomMapRotationsLabel.classList.toggle('is-hidden', !aiRandomMapCheckbox.checked);
-    });
-    aiRandomMapTarget.addEventListener('input', () => {
-      aiRandomMapTargetValue.value = aiRandomMapTarget.value;
+    randomMapTarget.addEventListener('input', () => {
+      randomMapTargetValue.value = randomMapTarget.value;
     });
     startGameButton.addEventListener('click', beginConfiguredGame);
     campaignMenuButton.addEventListener('click', returnCampaignToMenu);

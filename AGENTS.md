@@ -66,8 +66,9 @@ Leia somente os arquivos/ranges necessários à tarefa, seguindo esta ordem:
 - Levels aleatórios da campanha começam no Level 10 e continuam em páginas de
   cinco níveis; cada meta aumenta 5 regiões de 60 até o limite de 900. Os mapas
   usam células duas vezes mais largas que altas e são salvos individualmente em
-  IndexedDB, com migração dos mapas legados do `localStorage`. Contra IA e Online
-  também podem usar mapas aleatórios, configurados pelo jogador/anfitrião.
+  IndexedDB, com migração dos mapas legados do `localStorage`. Contra IA, Dois
+  jogadores, Bluetooth e Online também podem usar mapas aleatórios, com 100 de
+  trigo inicial para cada equipe.
 - `will-of-many-ai.js`: decisões da IA.
 - `rollback/will-of-many-ai.before-resource-desirability.js`: cópia integral da
   IA anterior à revisão das rotas de recursos; serve para rollback e não deve ser

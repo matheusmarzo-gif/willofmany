@@ -329,7 +329,7 @@ test('random campaign levels are unlocked after Level 9 and their maps are saved
   assert.match(gameClient, /storedRegionCount === level\.targetRegions[\s\S]*?hasValidRandomMapStartingPieces\(storedBoard\)/);
   assert.match(gameClient, /storedBoard\.randomMap\.targetRegions === level\.targetRegions/);
   assert.match(gameClient, /storedRegionCount === level\.targetRegions/);
-  assert.match(gameClient, /function isRandomMapEliminationVictoryMode\(\)[\s\S]*?getCampaignLevelNumber\(activeCampaignLevel\.id\) >= firstRandomCampaignLevel[\s\S]*?return gameMode === 'ai' \|\| isOnlineGame\(\)/);
+  assert.match(gameClient, /function isRandomMapEliminationVictoryMode\(\)[\s\S]*?getCampaignLevelNumber\(activeCampaignLevel\.id\) >= firstRandomCampaignLevel[\s\S]*?return \['ai', 'local', 'bluetooth'\]\.includes\(gameMode\) \|\| isOnlineGame\(\)/);
   assert.match(gameClient, /function finishIfRandomMapTeamEliminated\([\s\S]*?gameRules\.getEliminationWinner\(pieceCounts\.orange, pieceCounts\.blue\)[\s\S]*?finishGame\(winner, 'elimination'/);
   assert.match(gameClient, /if \(isRandomMapEliminationVictoryMode\(\)\) \{\s*return finishIfRandomMapTeamEliminated\(notifyOpponent\);\s*\}/);
   assert.match(gameClient, /reason === 'elimination' \? 'Vitória por eliminação: uma equipe ficou sem peças\.'/);
@@ -340,12 +340,13 @@ test('random campaign levels are unlocked after Level 9 and their maps are saved
   assert.match(gameCss, /\.campaign-trail-screen\.is-random-campaign \.campaign-trail-map/);
 });
 
-test('online random maps are configured by the orange host and synchronized in saved state', () => {
-  assert.match(html, /id="online-random-map-enabled" type="checkbox"/);
-  assert.match(html, /id="online-random-map-target" type="number" min="25" max="900"/);
-  assert.match(html, /id="online-random-map-rotations-enabled" type="checkbox"/);
-  assert.match(gameClient, /gameMode === 'online' && onlineRandomMapCheckbox\.checked/);
-  assert.match(gameClient, /onlineRandomMapRotationsCheckbox\.checked/);
+test('random maps can be configured in every non-campaign mode and synchronized in saved state', () => {
+  assert.match(html, /id="random-map-enabled" type="checkbox"/);
+  assert.match(html, /id="random-map-target" type="number" min="25" max="900"/);
+  assert.match(html, /id="random-map-rotations-enabled" type="checkbox"/);
+  assert.match(gameClient, /gameMode !== 'campaign' && randomMapCheckbox\.checked/);
+  assert.match(gameClient, /randomMapRotationsCheckbox\.checked/);
+  assert.match(gameClient, /return \['ai', 'local', 'bluetooth'\]\.includes\(gameMode\) \|\| isOnlineGame\(\)/);
   assert.match(gameClient, /sendOnlineMessage\(\{\s*type: 'game_start',\s*state: JSON\.parse\(localStorage\.getItem\('will-of-many-save'\)\)/);
   const receiveStart = gameClient.indexOf(
     "if (message.type === 'game_start' || message.type === 'game_state')"
@@ -422,17 +423,14 @@ test('statistics lead with generated village coins per turn for each owning team
     /statisticsTableContainer\.innerHTML = `\$\{villageIncomeSummary\}\$\{victoryScore\}\$\{wheatSummary\}/);
 });
 
-test('random maps can be sized for AI games and retain the game coordinate dimensions', () => {
-  assert.match(html, /id="ai-random-map-enabled" type="checkbox"/);
-  assert.match(html, /id="ai-random-map-target" type="number" min="25" max="900"/);
-  assert.match(html, /id="ai-random-map-rotations-enabled" type="checkbox"/);
-  assert.match(gameClient, /gameMode === 'ai' && aiRandomMapCheckbox\.checked/);
-  assert.match(gameClient, /aiRandomMapRotationsCheckbox\.checked/);
-  assert.match(gameClient, /gameMode === 'online' \? onlineRandomMapTarget\.value : aiRandomMapTarget\.value/);
+test('random maps use configurable region counts and retain the game coordinate dimensions', () => {
+  assert.match(html, /id="random-map-enabled" type="checkbox"/);
+  assert.match(html, /id="random-map-target" type="number" min="25" max="900"/);
+  assert.match(html, /id="random-map-rotations-enabled" type="checkbox"/);
   assert.match(gameClient, /gameRules\.getQuadrilateralCellDimensions\(\s*block,\s*data\?\.randomMap\?\.generator === 'cartografo-estrategico'\s*\)/);
   assert.match(gameClient, /applyRegionData\(createRandomBoardData\(targetRegions, null, rotationsEnabled\)\)/);
   assert.match(gameClient, /if \(!hasValidRandomMapStartingPieces\(boardData\)\) \{\s*throw new Error\('o mapa gerado precisa conter dois starting points L8 opostos, um para cada equipe, com peça G'\)/);
-  assert.match(gameClient, /aiRandomMapSizeLabel\.classList\.toggle\('is-hidden', !aiRandomMapCheckbox\.checked\)/);
+  assert.match(gameClient, /randomMapSizeLabel\.classList\.toggle\('is-hidden', !randomMapCheckbox\.checked\)/);
 });
 
 test('random-map quadrilateral regions use piece slots and adaptive focus zoom', () => {
@@ -489,6 +487,7 @@ test('board supports touch pinch and mouse-wheel zoom without shrinking piece so
 
 test('random campaign levels enable rotations and use non-accumulating tiered coin economies', () => {
   assert.match(gameClient, /rotationEnabled: true,\s*aiActionsEnabled: true/);
+  assert.match(gameClient, /initialWheat: \{ orange: 100, blue: 100 \}/);
   assert.match(gameClient, /initialCoins: level\.number <= 15 \? 40 : level\.number <= 20 \? 60 : 80/);
   assert.match(gameClient, /coinsPerTurn: level\.number <= 15 \? 10 : level\.number <= 20 \? 15 : 20/);
   assert.match(gameClient, /preserveCoinsBetweenTurns: false/);
@@ -1197,6 +1196,8 @@ test('Level 8 defines unique regions, fixed singleton cells, rotating rings, and
     gameClient,
     /if \(activeCampaignLevel\.initialWheat && typeof activeCampaignLevel\.initialWheat === 'object'\) \{\s*for \(const team of \['orange', 'blue'\]\) \{\s*const balance = Number\(activeCampaignLevel\.initialWheat\[team\]\);\s*wheatBalances\[team\] = Number\.isFinite\(balance\) \? Math\.max\(0, balance\) : 0;\s*\}\s*\}[\s\S]*?const wheatReport = isWheatEnabled\(\) \? applyWheatForTurn\(currentTeam\) : null;/
   );
+  assert.match(gameClient,
+    /\} else if \(currentBoardData\?\.randomMap\?\.generator === 'cartografo-estrategico'\) \{\s*wheatBalances = \{ orange: 100, blue: 100 \};\s*\}[\s\S]*?const wheatReport = isWheatEnabled\(\) \? applyWheatForTurn\(currentTeam\) : null;/);
   assert.equal(levelEightBoard.blocks.length, 16);
   assert.equal(regions.length, 48);
   assert.equal(new Set(regionCodes).size, 48, 'every physical region has a unique global code');

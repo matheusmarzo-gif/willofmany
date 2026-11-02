@@ -48,13 +48,13 @@ ou de integração puderem afetá-lo.
 | `game-rules.js` | Funções puras compartilhadas de composição, contagem, custo, reembolso, garantia de peças G iniciais em mapas aleatórios, agrupamento de conflitos, detecção do vencedor por eliminação e adjacência física de células/regiões quadriculares; também define as tabelas factuais `farmProductionByLevel` e `villageCoinProductionByLevel`. Expõe `WillOfManyRules` no navegador e CommonJS para testes. | Alterar regras determinísticas sem acesso ao DOM. |
 | `will-of-many-ai.js` | Escolha e análise de ações da IA; exporta `window.WillOfManyAI.chooseAction(snapshot)`, `calculateDesirability(snapshot)` e `shouldDeclareWar(snapshot)`. Calcula desejabilidade interna, externa e total; avalia valor líquido de fazendas e povoados por rotas com custo, risco e chegada estimada; propaga atração ao primeiro passo viável e compara a rota com as demais ações. | Comportamento do oponente automático. |
 | `rollback/will-of-many-ai.before-resource-desirability.js` | Cópia integral do `will-of-many-ai.js` anterior à revisão das rotas de recursos, preservada para rollback; não é carregada nem empacotada como asset. | Reverter a IA caso a nova estratégia não tenha o comportamento desejado. |
-| `random-map-generator.js` | Bundle do núcleo TypeScript de `cartografo-estrategico`, carregado pelo cliente clássico antes de `game-client.js`; exporta `WillOfManyMapGenerator.generateRandomBoard(targetRegions, rotationsEnabled)`. Ao final da geração, localiza e garante uma peça G azul e uma laranja nos dois starting points distintos. | Gerar um tabuleiro quadricular compartilhado em campanha, Contra IA e partidas online. |
+| `random-map-generator.js` | Bundle do núcleo TypeScript de `cartografo-estrategico`, carregado pelo cliente clássico antes de `game-client.js`; exporta `WillOfManyMapGenerator.generateRandomBoard(targetRegions, rotationsEnabled)`. Ao final da geração, localiza e garante uma peça G azul e uma laranja nos dois starting points distintos. | Gerar um tabuleiro quadricular compartilhado em campanha e em partidas Contra IA, Dois jogadores, Bluetooth e Online. |
 | `will-of-many-ai-config.json` | Valores editáveis de desejabilidade por rank/ocupação, faixas de força relativa, bônus de fazenda/suporte, proporções de tropas, kernel de distância, penalidades temporárias e critérios de reciclagem, incluindo a regra de saldo inicial alto, limite de ações, horizonte econômico dos povoados, custo/risco das rotas, propagação ao primeiro passo e reserva preventiva de trigo. Custos reais e legalidade permanecem definidos pelo motor/regras. | Ajustar estratégia sem alterar `will-of-many-ai.js`. |
 | `tests/game-rules.test.js`, `tests/will-of-many-ai.test.js` | Testes de caracterização do módulo de regras e da estratégia da IA, usando `node:test` sem dependências adicionais. | Validar composição, custos, conflitos, rotas e decisões da IA. |
 | `tests/asset-entrypoints.test.js`, `tests/random-map-generator.test.js` | Verificam a ordem/empacotamento dos assets, integração dos modos e formato e limites dos mapas gerados. | Alterar recursos de entrada, integração do cliente ou o adaptador do Cartógrafo. |
 | `FUNCTION_CATALOG.md` | Inventário de funções nomeadas, entradas globais e responsabilidades dos módulos do cliente, servidor, Android e ferramentas de mapas. | Localizar uma implementação e entender seus consumidores antes de refatorar. |
-| `tabuleiro-01.json`–`tabuleiro-09.json` e Levels 10+ | Os níveis estáticos configuram regiões, peças iniciais, moedas, objetivo, rotação e guia. A partir do Level 10, os mapas são gerados com exatamente `min(900, 60 + 5 × (level − 10))` regiões, em páginas de cinco níveis; a campanha aleatória vence por eliminação de uma equipe, não por captura de todas as regiões. Contra IA e Online também permitem gerar mapas de 25–900 regiões, com configuração de rotação. Os níveis aleatórios da campanha habilitam rotação em anel em todos os blocos e rotação linear em matrizes 3×3 e 5×5. Cada mapa de campanha fica salvo por level no IndexedDB local para manter o mesmo mapa ao rejogar; mapas antigos sem essas regras de rotação são regenerados. A economia não acumula saldo: Levels 10–15 começam com 40 moedas e recebem 10 por turno; Levels 16–20, 60 e 15; Level 21 em diante, 80 e 20. | Alterar campanha estática, mapas aleatórios ou progressão. |
-| `regioes-will-of-many-circular.json`, `regioes-will-of-many.json`, `will-of-many-final.json` | Máscaras/regiões usadas para compor o tabuleiro e derivar geometria e vizinhança. O tabuleiro circular é a fonte padrão dos modos não campanha, salvo quando Contra IA ou Online inicia um mapa aleatório; os outros JSONs são fallbacks de carregamento inicial. No tabuleiro circular atual, `disco` identifica o anel rotativo de cada região. | Geometria, regiões, dados-base e vizinhança do tabuleiro padrão. |
+| `tabuleiro-01.json`–`tabuleiro-09.json` e Levels 10+ | Os níveis estáticos configuram regiões, peças iniciais, moedas, objetivo, rotação e guia. A partir do Level 10, os mapas são gerados com exatamente `min(900, 60 + 5 × (level − 10))` regiões, em páginas de cinco níveis; a campanha aleatória vence por eliminação de uma equipe, não por captura de todas as regiões, e começa com 100 de trigo para cada equipe. Contra IA, Dois jogadores, Bluetooth e Online também permitem gerar mapas de 25–900 regiões, com configuração de rotação e estoque inicial de 100 de trigo por equipe. Os níveis aleatórios da campanha habilitam rotação em anel em todos os blocos e rotação linear em matrizes 3×3 e 5×5. Cada mapa de campanha fica salvo por level no IndexedDB local para manter o mesmo mapa ao rejogar; mapas antigos sem essas regras de rotação são regenerados. A economia não acumula saldo: Levels 10–15 começam com 40 moedas e recebem 10 por turno; Levels 16–20, 60 e 15; Level 21 em diante, 80 e 20. | Alterar campanha estática, mapas aleatórios ou progressão. |
+| `regioes-will-of-many-circular.json`, `regioes-will-of-many.json`, `will-of-many-final.json` | Máscaras/regiões usadas para compor o tabuleiro e derivar geometria e vizinhança. O tabuleiro circular é a fonte padrão dos modos não campanha, salvo quando uma partida não campanha inicia um mapa aleatório; os outros JSONs são fallbacks de carregamento inicial. No tabuleiro circular atual, `disco` identifica o anel rotativo de cada região. | Geometria, regiões, dados-base e vizinhança do tabuleiro padrão. |
 | `regioes-will-of-many-l8.json` | Dados auxiliares de regiões L8 usados por ferramentas/edição. Confirme os pontos de leitura antes de tratá-lo como fonte do tabuleiro ativo. | Investigação de geometria e edição de regiões L8. |
 | `editor-regioes.html` | Ferramenta visual de edição/inspeção de regiões e dados auxiliares. | Ajustar ou depurar máscaras e caixas de região. |
 | `peca_*.png`, `fazenda_1.png`–`fazenda_5.png`, `povoado_1.png`–`povoado_5.png`, `l1.png`–`l8.png`, `final*.png`, `tutorial-*.svg` | Imagens de peças, fazendas e povoados por nível, camadas, telas finais e tutorial. | Arte, ícones e recursos empacotados. |
@@ -211,15 +211,17 @@ do motor.
 
 1. A página carrega as máscaras de região e aplica os dados com `applyRegionData`.
    Os modos não campanha usam `regioes-will-of-many-circular.json` por padrão;
-   Contra IA e Online podem optar pelo gerador aleatório. Os Levels 1–9 usam seus
+   Todos os modos não campanha podem optar pelo gerador aleatório. Os Levels 1–9 usam seus
    JSONs estáticos. A partir do Level 10, `random-map-generator.js` gera regiões
    2× mais largas que altas e persiste cada mapa no IndexedDB antes do início da
    partida.
 2. Ao selecionar um modo não campanha no fluxo **Jogo novo**, o cliente carrega o
    tabuleiro circular para a prévia e o volta a confirmar em
    `beginConfiguredGame`; esse método gera um mapa aleatório quando selecionado
-   em Contra IA ou Online, e mantém o tabuleiro circular nos demais casos,
-   inclusive nos caminhos diretos de início por Bluetooth.
+   em Contra IA, Dois jogadores, Bluetooth ou Online, e mantém o tabuleiro
+   circular nos demais casos. Cada equipe começa mapas aleatórios não campanha
+   com 100 de trigo; os níveis aleatórios da campanha definem esse estoque em
+   `campaign.initialWheat`.
 3. No modo campanha, `beginConfiguredGame` carrega o JSON do nível antes de
    preparar peças iniciais, objetivo e estado do guia; nos Levels 10+, carrega o
    mapa armazenado ou gera e salva um novo antes da partida. Os níveis aleatórios
@@ -262,7 +264,7 @@ do motor.
    camada escura cobre o fundo e as regiões não disponíveis são escurecidas
    diretamente, sem recalcular as geometrias sob zoom ou rotação. Os outros
    tabuleiros preservam seu overlay existente.
-   Os mapas aleatórios em Contra IA, Online e campanha (Level 10+) vencem quando
+   Os mapas aleatórios em Contra IA, Dois jogadores, Bluetooth, Online e campanha (Level 10+) vencem quando
    uma equipe fica sem peças; a campanha libera o próximo nível se a equipe
    Laranja vencer. Os ícones gerados de fazendas e povoados usam os PNGs
    `fazenda_1.png`–`fazenda_5.png` e `povoado_1.png`–`povoado_5.png` da raiz,
